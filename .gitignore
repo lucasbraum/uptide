@@ -12,5 +12,5 @@ eval-out/
 /packages/cli/README.md
 /packages/cli/LICENSE
 *.tgz
-# Private planning: pasted into briefs, never committed (scripts/public-export-exclude.txt).
+# Private planning never belongs in this repository (scripts/public-tree.mjs).
 /docs/plan-*.md

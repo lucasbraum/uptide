@@ -26,8 +26,7 @@
     "build:stripe-changelog": "tsx scripts/build-stripe-changelog.ts",
     "eval:stripe-fixture": "tsx scripts/eval-stripe-fixture.ts",
     "eval:action": "tsx scripts/eval-action.ts",
-    "public:check": "node scripts/public-tree.mjs . --require-denylist",
-    "public:export": "node scripts/export-public.mjs"
+    "public:check": "node scripts/public-tree.mjs . --require-denylist"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.14",
