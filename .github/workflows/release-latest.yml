@@ -1,0 +1,86 @@
+name: Release (latest)
+
+# Manual only, and only from a public repository. Publishes one stable version of the
+# `uptide` package under the `latest` dist-tag, with npm provenance. Running it is the
+# owner's decision: nothing else triggers it. See docs/releasing.md.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Stable version to publish (x.y.z)
+        type: string
+        default: 0.3.0
+      dry_run:
+        description: Build, test, version and pack, but do not publish
+        type: boolean
+        default: true
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish-latest:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # npm provenance: the registry verifies this workflow's OIDC identity.
+      id-token: write
+    env:
+      VERSION: ${{ inputs.version }}
+    steps:
+      - name: A stable release comes from the public repository's main branch
+        if: ${{ github.event.repository.visibility != 'public' || github.ref != 'refs/heads/main' }}
+        run: |
+          echo "::error::latest is published only from main of a public repository (this is ${{ github.event.repository.visibility }}, ${{ github.ref }})."
+          exit 1
+      - name: The version is a plain x.y.z
+        run: |
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::'$VERSION' is not a stable version (x.y.z)."
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      - name: The version is not on npm yet
+        run: |
+          if npm view "uptide@$VERSION" version 2>/dev/null | grep -q .; then
+            echo "::error::uptide@$VERSION is already published."
+            exit 1
+          fi
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm lint
+      - run: pnpm build
+      - run: pnpm typecheck
+      - run: pnpm test
+      - name: Smoke-test the tarball that is about to be published
+        run: pnpm smoke 22
+      # Only the version changes in the tree; nothing is committed from here. The bump, the
+      # consumed changesets and the tag are committed by a human afterwards (docs/releasing.md).
+      - name: Set the version
+        run: npm pkg set "version=$VERSION"
+        working-directory: packages/cli
+      - name: Rebuild with the release version
+        run: pnpm build
+        env:
+          UPTIDE_BUILD_CLEAN: '1'
+      - name: The published build must be stamped clean
+        run: node scripts/check-build-stamp.mjs
+      # Only the CLI is published: the engine is bundled into it.
+      - name: Publish dry run
+        if: ${{ inputs.dry_run }}
+        run: pnpm --filter uptide publish --tag latest --access public --no-git-checks --dry-run
+      - name: Publish to npm under the latest dist-tag
+        if: ${{ !inputs.dry_run }}
+        run: pnpm --filter uptide publish --tag latest --access public --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'

@@ -1,0 +1,13 @@
+{
+  "name": "file-type",
+  "version": "22.1.1",
+  "type": "module",
+  "exports": {
+    "types": "./source/index.d.ts",
+    "default": "./source/index.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT"
+}

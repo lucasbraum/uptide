@@ -1,0 +1,46 @@
+{
+  "name": "uptide-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Renovate updates the version. We update the code.",
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "pnpm@10.17.1",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "echo 'Releases are published by the Release workflow (manual trigger). See docs/releasing.md.' && exit 1",
+    "smoke": "turbo run build --filter=uptide && node packages/cli/smoke/run.mjs",
+    "eval": "pnpm --filter @uptide/core build && tsx scripts/eval.ts",
+    "test:network": "UPTIDE_NETWORK=1 turbo run test",
+    "eval:check": "pnpm --filter @uptide/core build && tsx scripts/eval-check.ts",
+    "eval:fix": "pnpm --filter @uptide/core build && tsx scripts/eval-fix.ts",
+    "build:stripe-changelog": "tsx scripts/build-stripe-changelog.ts",
+    "eval:stripe-fixture": "tsx scripts/eval-stripe-fixture.ts",
+    "eval:action": "tsx scripts/eval-action.ts",
+    "public:check": "node scripts/public-tree.mjs . --require-denylist",
+    "public:export": "node scripts/export-public.mjs"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.14",
+    "@changesets/cli": "^3.0.3",
+    "@types/node": "^22.0.0",
+    "@uptide/core": "workspace:*",
+    "tsup": "^8.5.1",
+    "tsx": "^4.20.3",
+    "turbo": "^2.11.4",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.2"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": []
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "lib": "workspace:*",
+    "synthetic": "1.0.0"
+  },
+  "license": "MIT"
+}

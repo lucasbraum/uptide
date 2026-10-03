@@ -1,0 +1,19 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"],
+      "cache": false,
+      "env": ["UPTIDE_BUILD_CLEAN"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"]
+    },
+    "test": {
+      "dependsOn": ["^build", "build"],
+      "env": ["UPTIDE_NETWORK"]
+    }
+  },
+  "globalPassThroughEnv": ["ANTHROPIC_API_KEY"]
+}

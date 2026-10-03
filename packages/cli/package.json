@@ -1,0 +1,51 @@
+{
+  "name": "uptide",
+  "version": "0.1.0",
+  "description": "Renovate updates the version. We update the code. Checks what a zod or stripe upgrade breaks in your TypeScript repo and migrates it on a verified branch.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "uptide": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lucasbraum/uptide.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/lucasbraum/uptide#readme",
+  "bugs": "https://github.com/lucasbraum/uptide/issues",
+  "keywords": [
+    "zod",
+    "stripe",
+    "upgrade",
+    "migration",
+    "codemod",
+    "breaking-changes",
+    "typescript"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepack": "node scripts/prepack.mjs",
+    "postpack": "node scripts/prepack.mjs --clean"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@uptide/core": "workspace:*",
+    "commander": "^15.0.0",
+    "picocolors": "^1.1.1",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.2"
+  }
+}

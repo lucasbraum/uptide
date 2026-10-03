@@ -1,0 +1,604 @@
+{
+  "repo": "/repo/smoke-pnpm",
+  "workspaces": [".", "packages/api", "packages/shared"],
+  "packages": [
+    {
+      "workspace": "*",
+      "name": "zod",
+      "installed": "3.23.8",
+      "latest": "4.6.5",
+      "target": "4.6.5",
+      "majorsBehind": 1,
+      "findings": [
+        {
+          "change": {
+            "package": "zod",
+            "from": "3.23.8",
+            "to": "4.6.5",
+            "path": "string",
+            "source": "types",
+            "confidence": 1,
+            "kind": "signature",
+            "before": "(params?: ({ errorMap?: ZodErrorMap | undefined; invalid_type_error?: string | undefined; required_error?: string | undefined; message?: string | undefined; description?: string | undefined } & { coerce?: true | undefined }) | undefined) => ZodString",
+            "after": "(params?: core.$ZodStringParams | string): ZodString; <T extends string>(params?: core.$ZodStringParams | string): core.$ZodType<T, T>",
+            "evidence": "checker",
+            "severity": "additive",
+            "notes": "signature narrowed (compatible for callers)"
+          },
+          "usage": {
+            "file": "packages/api/src/signup.ts",
+            "line": 4,
+            "column": 12,
+            "endLine": 4,
+            "endColumn": 18,
+            "symbolPath": "string",
+            "access": "call",
+            "snippet": "email: z.string({ required_error: 'Email is required' }),",
+            "via": "direct",
+            "package": "zod",
+            "compileError": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.",
+            "compileCode": 2769
+          },
+          "severity": "breaking",
+          "confidence": 1,
+          "fixability": "mechanical",
+          "reason": "compiler rejects this usage: No overload matches this call."
+        },
+        {
+          "change": {
+            "package": "zod",
+            "from": "3.23.8",
+            "to": "4.6.5",
+            "path": "enum",
+            "source": "types",
+            "confidence": 1,
+            "kind": "signature",
+            "before": "<U extends string, T extends Readonly<[U, ...U[]]>>(values: T, params?: RawCreateParams): ZodEnum<Writeable<T>>; <U extends string, T extends [U, ...U[]]>(values: T, params?: RawCreateParams): ZodEnum<T>",
+            "after": "<const T extends readonly string[]>(values: T, params?: core.$ZodEnumParams | string): ZodEnum<util.ToEnum<T[number]>>; <const T extends util.EnumLike>(entries: T, params?: core.$ZodEnumParams | string): ZodEnum<T>",
+            "severity": "breaking",
+            "evidence": "text",
+            "notes": "overload removed or changed"
+          },
+          "usage": {
+            "file": "packages/api/src/signup.ts",
+            "line": 5,
+            "column": 11,
+            "endLine": 5,
+            "endColumn": 15,
+            "symbolPath": "enum",
+            "access": "call",
+            "snippet": "plan: z.enum(['free', 'pro'], { invalid_type_error: 'Unknown plan' }),",
+            "via": "direct",
+            "package": "zod",
+            "compileError": "No overload matches this call.\n  Overload 1 of 2, '(values: readonly [\"free\", \"pro\"], params?: string | { error?: string | $ZodErrorMap<$ZodIssueInvalidValue<unknown>> | undefined; message?: string | undefined; } | undefined): ZodEnum<...>', gave the following error.\n    Object literal may only specify known properties, and 'invalid_type_error' does not exist in type '{ error?: string | $ZodErrorMap<$ZodIssueInvalidValue<unknown>> | undefined; message?: string | undefined; }'.\n  Overload 2 of 2, '(entries: Readonly<Record<string, EnumValue>>, params?: string | { error?: string | $ZodErrorMap<$ZodIssueInvalidValue<unknown>> | undefined; message?: string | undefined; } | undefined): ZodEnum<...>', gave the following error.\n    Argument of type 'string[]' is not assignable to parameter of type 'Readonly<Record<string, EnumValue>>'.\n      Index signature for type 'string' is missing in type 'string[]'.",
+            "compileCode": 2769
+          },
+          "severity": "breaking",
+          "confidence": 1,
+          "fixability": "mechanical",
+          "reason": "overload removed or changed"
+        },
+        {
+          "change": {
+            "package": "zod",
+            "from": "3.23.8",
+            "to": "4.6.5",
+            "path": "number",
+            "source": "types",
+            "confidence": 0.8,
+            "kind": "signature",
+            "before": "(params?: ({ errorMap?: ZodErrorMap | undefined; invalid_type_error?: string | undefined; required_error?: string | undefined; message?: string | undefined; description?: string | undefined } & { coerce?: boolean | undefined }) | undefined) => ZodNumber",
+            "after": "(params?: core.$ZodNumberParams | string): ZodNumber",
+            "evidence": "checker",
+            "severity": "additive"
+          },
+          "usage": {
+            "file": "packages/shared/src/index.ts",
+            "line": 8,
+            "column": 10,
+            "endLine": 8,
+            "endColumn": 16,
+            "symbolPath": "number",
+            "access": "call",
+            "snippet": "age: z.number({ invalid_type_error: 'Age must be a number' }).int(),",
+            "via": "direct",
+            "package": "zod",
+            "compileError": "Object literal may only specify known properties, and 'invalid_type_error' does not exist in type '$ZodNumberParams'.",
+            "compileCode": 2353
+          },
+          "severity": "breaking",
+          "confidence": 0.8,
+          "fixability": "mechanical",
+          "reason": "compiler rejects this usage: Object literal may only specify known properties, and 'invalid_type_error' does not exist in type '$ZodNumberParams'."
+        },
+        {
+          "change": {
+            "package": "zod",
+            "from": "3.23.8",
+            "to": "4.6.5",
+            "path": "TS2769",
+            "kind": "type",
+            "severity": "breaking",
+            "source": "types",
+            "confidence": 1,
+            "evidence": "checker",
+            "notes": "No overload matches this call."
+          },
+          "usage": {
+            "file": "packages/shared/src/index.ts",
+            "line": 5,
+            "column": 5,
+            "endLine": 5,
+            "endColumn": 19,
+            "symbolPath": "TS2769",
+            "access": "read",
+            "snippet": "required_error: 'Name is required',",
+            "via": "inferred",
+            "compileError": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'."
+          },
+          "severity": "breaking",
+          "confidence": 1,
+          "fixability": "mechanical",
+          "reason": "compile error not attributed to a known API change"
+        }
+      ],
+      "callSitesChecked": 11,
+      "unanalyzed": [],
+      "status": "breaking",
+      "notes": [],
+      "timing": {
+        "fetchMs": 0,
+        "diffMs": 0,
+        "usagesMs": 0,
+        "compileMs": 0
+      },
+      "compile": {
+        "baselineErrors": 0,
+        "unresolvedInTarget": [],
+        "unresolvedFiles": [],
+        "unattributed": [
+          {
+            "file": "packages/shared/src/index.ts",
+            "line": 5,
+            "column": 5,
+            "endLine": 5,
+            "endColumn": 19,
+            "code": 2769,
+            "message": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.",
+            "snippet": "required_error: 'Name is required',"
+          }
+        ]
+      },
+      "runtime": [
+        {
+          "package": "zod",
+          "node": "v22.20.0",
+          "nodeSource": "current",
+          "changes": [
+            {
+              "kind": "key-removed",
+              "loader": "require",
+              "key": "defaultErrorMap",
+              "detail": "`defaultErrorMap` is no longer an export of require()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "require",
+              "key": "makeIssue",
+              "detail": "`makeIssue` is no longer an export of require()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "require",
+              "key": "EMPTY_PATH",
+              "detail": "`EMPTY_PATH` is no longer an export of require()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "require",
+              "key": "addIssueToContext",
+              "detail": "`addIssueToContext` is no longer an export of require()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "require",
+              "key": "ParseStatus",
+              "detail": "`ParseStatus` is no longer an export of require()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "require",
+              "key": "DIRTY",
+              "detail": "`DIRTY` is no longer an export of require()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "require",
+              "key": "OK",
+              "detail": "`OK` is no longer an export of require()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "require",
+              "key": "isAborted",
+              "detail": "`isAborted` is no longer an export of require()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "require",
+              "key": "isDirty",
+              "detail": "`isDirty` is no longer an export of require()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "require",
+              "key": "isValid",
+              "detail": "`isValid` is no longer an export of require()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "require",
+              "key": "isAsync",
+              "detail": "`isAsync` is no longer an export of require()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "require",
+              "key": "objectUtil",
+              "detail": "`objectUtil` is no longer an export of require()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "require",
+              "key": "ZodParsedType",
+              "detail": "`ZodParsedType` is no longer an export of require()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "require",
+              "key": "getParsedType",
+              "detail": "`getParsedType` is no longer an export of require()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "require",
+              "key": "datetimeRegex",
+              "detail": "`datetimeRegex` is no longer an export of require()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "require",
+              "key": "ZodNativeEnum",
+              "detail": "`ZodNativeEnum` is no longer an export of require()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "require",
+              "key": "ZodEffects",
+              "detail": "`ZodEffects` is no longer an export of require()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "require",
+              "key": "ZodTransformer",
+              "detail": "`ZodTransformer` is no longer an export of require()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "require",
+              "key": "BRAND",
+              "detail": "`BRAND` is no longer an export of require()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "require",
+              "key": "ZodBranded",
+              "detail": "`ZodBranded` is no longer an export of require()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "require",
+              "key": "ZodPipeline",
+              "detail": "`ZodPipeline` is no longer an export of require()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "require",
+              "key": "Schema",
+              "detail": "`Schema` is no longer an export of require()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "require",
+              "key": "ZodSchema",
+              "detail": "`ZodSchema` is no longer an export of require()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "require",
+              "key": "late",
+              "detail": "`late` is no longer an export of require()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "require",
+              "key": "effect",
+              "detail": "`effect` is no longer an export of require()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "require",
+              "key": "oboolean",
+              "detail": "`oboolean` is no longer an export of require()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "require",
+              "key": "onumber",
+              "detail": "`onumber` is no longer an export of require()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "require",
+              "key": "ostring",
+              "detail": "`ostring` is no longer an export of require()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "require",
+              "key": "pipeline",
+              "detail": "`pipeline` is no longer an export of require()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "require",
+              "key": "transformer",
+              "detail": "`transformer` is no longer an export of require()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "require",
+              "key": "quotelessJson",
+              "detail": "`quotelessJson` is no longer an export of require()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "import",
+              "key": "BRAND",
+              "detail": "`BRAND` is no longer an export of import()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "import",
+              "key": "DIRTY",
+              "detail": "`DIRTY` is no longer an export of import()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "import",
+              "key": "EMPTY_PATH",
+              "detail": "`EMPTY_PATH` is no longer an export of import()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "import",
+              "key": "OK",
+              "detail": "`OK` is no longer an export of import()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "import",
+              "key": "ParseStatus",
+              "detail": "`ParseStatus` is no longer an export of import()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "import",
+              "key": "Schema",
+              "detail": "`Schema` is no longer an export of import()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "import",
+              "key": "ZodBranded",
+              "detail": "`ZodBranded` is no longer an export of import()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "import",
+              "key": "ZodEffects",
+              "detail": "`ZodEffects` is no longer an export of import()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "import",
+              "key": "ZodNativeEnum",
+              "detail": "`ZodNativeEnum` is no longer an export of import()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "import",
+              "key": "ZodParsedType",
+              "detail": "`ZodParsedType` is no longer an export of import()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "import",
+              "key": "ZodPipeline",
+              "detail": "`ZodPipeline` is no longer an export of import()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "import",
+              "key": "ZodSchema",
+              "detail": "`ZodSchema` is no longer an export of import()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "import",
+              "key": "ZodTransformer",
+              "detail": "`ZodTransformer` is no longer an export of import()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "import",
+              "key": "addIssueToContext",
+              "detail": "`addIssueToContext` is no longer an export of import()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "import",
+              "key": "datetimeRegex",
+              "detail": "`datetimeRegex` is no longer an export of import()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "import",
+              "key": "defaultErrorMap",
+              "detail": "`defaultErrorMap` is no longer an export of import()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "import",
+              "key": "effect",
+              "detail": "`effect` is no longer an export of import()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "import",
+              "key": "getParsedType",
+              "detail": "`getParsedType` is no longer an export of import()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "import",
+              "key": "isAborted",
+              "detail": "`isAborted` is no longer an export of import()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "import",
+              "key": "isAsync",
+              "detail": "`isAsync` is no longer an export of import()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "import",
+              "key": "isDirty",
+              "detail": "`isDirty` is no longer an export of import()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "import",
+              "key": "isValid",
+              "detail": "`isValid` is no longer an export of import()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "import",
+              "key": "late",
+              "detail": "`late` is no longer an export of import()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "import",
+              "key": "makeIssue",
+              "detail": "`makeIssue` is no longer an export of import()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "import",
+              "key": "objectUtil",
+              "detail": "`objectUtil` is no longer an export of import()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "import",
+              "key": "oboolean",
+              "detail": "`oboolean` is no longer an export of import()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "import",
+              "key": "onumber",
+              "detail": "`onumber` is no longer an export of import()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "import",
+              "key": "ostring",
+              "detail": "`ostring` is no longer an export of import()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "import",
+              "key": "pipeline",
+              "detail": "`pipeline` is no longer an export of import()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "import",
+              "key": "quotelessJson",
+              "detail": "`quotelessJson` is no longer an export of import()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "import",
+              "key": "transformer",
+              "detail": "`transformer` is no longer an export of import()"
+            }
+          ],
+          "usedKeys": ["z", "object", "string", "enum", "infer", "TypeOf"]
+        }
+      ],
+      "workspaces": ["packages/api", "packages/shared"],
+      "source": "catalog",
+      "plan": [
+        {
+          "rule": "error-params",
+          "title": "New error API (required_error \u2192 error)",
+          "severity": "breaking",
+          "by": {
+            "rule": 4,
+            "agent": 0,
+            "manual": 0
+          },
+          "sites": 4,
+          "fixes": 4,
+          "locations": [
+            {
+              "file": "packages/api/src/signup.ts",
+              "line": 4
+            },
+            {
+              "file": "packages/api/src/signup.ts",
+              "line": 5
+            },
+            {
+              "file": "packages/shared/src/index.ts",
+              "line": 5
+            },
+            {
+              "file": "packages/shared/src/index.ts",
+              "line": 8
+            }
+          ],
+          "detail": "No overload matches this call."
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "packagesNeedingAttention": 1,
+    "breaking": 4,
+    "deprecated": 0,
+    "unverified": 0,
+    "unaffected": 0,
+    "notImported": 0,
+    "partiallyAnalyzed": 0,
+    "autoFixable": 4
+  },
+  "timing": {
+    "totalMs": 0
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@smoke/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "zod": "~3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  },
+  "license": "MIT",
+  "scripts": {
+    "preinstall": "node -e \"require('node:fs').writeFileSync('/tmp/UPTIDE_INSTALL_SCRIPT_RAN', 'bad')\""
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "repo": "/repo/clean",
+  "workspaces": ["."],
+  "packages": [],
+  "summary": {
+    "packagesNeedingAttention": 0,
+    "breaking": 0,
+    "deprecated": 0,
+    "unverified": 0,
+    "unaffected": 0,
+    "notImported": 0,
+    "partiallyAnalyzed": 0,
+    "autoFixable": 0
+  }
+}

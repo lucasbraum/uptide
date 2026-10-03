@@ -1,0 +1,73 @@
+name: Release (next)
+
+# Manual only. Publishes the `uptide` package under the `next` dist-tag; `latest` is never
+# moved from here (that is release-latest.yml). npm provenance is on only when this
+# repository is public: the registry refuses it from a private one. See docs/releasing.md.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Build, test, version and pack, but do not publish
+        type: boolean
+        default: false
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish-next:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # npm provenance: the registry verifies this workflow's OIDC identity.
+      id-token: write
+    env:
+      # The one flag for provenance: 'true' only when the repository is public.
+      UPTIDE_PROVENANCE: ${{ github.event.repository.visibility == 'public' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm lint
+      - run: pnpm build
+      - run: pnpm test
+      - name: Smoke-test the tarball that is about to be published
+        run: pnpm smoke 22
+      - name: Snapshot version (x.y.z-next.<timestamp>)
+        run: |
+          before=$(node -p "require('./packages/cli/package.json').version")
+          pnpm changeset version --snapshot next
+          after=$(node -p "require('./packages/cli/package.json').version")
+          if [ "$before" = "$after" ]; then
+            echo "::error::No pending changeset for uptide: nothing to release. Run 'pnpm changeset' first."
+            exit 1
+          fi
+          echo "Publishing uptide@$after"
+      # The version bump above is the only change in the tree: the published build is a clean
+      # build of the commit being released, and is stamped so.
+      - name: Rebuild with the snapshot version
+        run: pnpm build
+        env:
+          UPTIDE_BUILD_CLEAN: '1'
+      - name: The published build must be stamped clean
+        run: node scripts/check-build-stamp.mjs
+      # Only the CLI is published: the engine is bundled into it. `changeset publish` is
+      # deliberately not used, it would publish every public workspace package.
+      - name: Publish dry run
+        if: ${{ inputs.dry_run }}
+        run: pnpm --filter uptide publish --tag next --access public --no-git-checks --dry-run
+      - name: Publish to npm under the next dist-tag
+        if: ${{ !inputs.dry_run }}
+        run: pnpm --filter uptide publish --tag next --access public --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: ${{ env.UPTIDE_PROVENANCE }}

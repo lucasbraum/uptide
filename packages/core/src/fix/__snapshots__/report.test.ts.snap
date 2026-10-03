@@ -1,0 +1,741 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`storefront-zod > snapshots the full PR description and compact terminal/comment summary 1`] = `
+"## Upgrade zod 3.25.76 → 4.6.5
+
+**Ready for review.** The code was migrated to zod 4 in \`api\` and \`shared\`. No new type errors; pre-existing errors remain.
+
+| | |
+|---|---|
+| **Risk** | Medium: request validation in webhooks |
+| **Changes** | 29 sites in 8 files · 25 by rule · 4 by agent |
+| **Types** | ✅ 29 errors after the bump → 1 (1 pre-existing) |
+| **Behavior** | ✅ 9 schemas identical · 2 not checked · 21/21 custom-message assertions |
+| **Tests** | ✅ 5 tests in 3 files passed |
+
+### What changed
+
+**1. Default error messages** · 1 site · by rule
+Zod 4 words its default messages differently. Assertions that the migrated code made fail now match the new text; the tests pass again.
+<details><summary>Example and files</summary>
+
+\`\`\`diff
+- expect(parsed.error?.issues[0]?.message).toBe('Required');
++ expect(parsed.error?.issues[0]?.message).toBe('Invalid input: expected string, received undefined');
+\`\`\`
+
+- \`packages/shared/src/monitoring.test.ts\` (1)
+
+</details>
+
+**2. New error API** · 24 sites · by rule
+\`required_error\` and \`invalid_type_error\` were replaced by \`error\`. Messages are unchanged.
+<details><summary>Example and files</summary>
+
+\`\`\`diff
+- marketingOptIn: z.boolean({ invalid_type_error: 'Opt-in must be true or false' }).optional(),
++ marketingOptIn: z.boolean({ error: (iss) => iss.input === undefined ? undefined : 'Opt-in must be true or false' }).optional(),
+\`\`\`
+
+Returning \`undefined\` keeps zod's default message for wrong types, exactly like v3.
+
+- \`packages/api/src/routes/customers.ts\` (5)
+- \`packages/api/src/routes/orders.ts\` (6)
+- \`packages/api/src/routes/webhooks.ts\` (5)
+- \`packages/shared/src/address.ts\` (4)
+- \`packages/shared/src/product.ts\` (4)
+
+</details>
+
+**3. \`.ip()\` removed** · 1 site · by agent
+Now \`z.union([z.ipv4(), z.ipv6()])\`, which accepts both families like before.
+<details><summary>Diff and reasoning</summary>
+
+\`\`\`diff
+--- a/packages/shared/src/monitoring.ts
++++ b/packages/shared/src/monitoring.ts
+@@ -6 +6 @@
+-  clientIp: z.string().ip(),
++  clientIp: z.union([z.ipv4(), z.ipv6()]),
+\`\`\`
+
+- \`packages/shared/src/monitoring.ts\` (1)
+
+**packages/shared/src/monitoring.ts:6 · attempt 1 (accepted)**
+
+The \`ZodString#ip()\` method was removed in Zod 4. Per the migration guide, when the previous validator accepted both IPv4 and IPv6 (which is the default behaviour of \`.ip()\` with no \`version\` option), we replace it with \`z.union([z.ipv4(), z.ipv6()])\`. These are now top-level factories rather than chained string methods. No options or custom error message were present in the original call, so the replacement is straightforward.
+
+Diagnostics: 2 → 1.
+
+</details>
+
+**4. \`ZodTypeDef\` removed** · 1 fix, 3 errors · by agent
+\`consumer\` now types schemas as \`ZodType<TMessage, unknown>\`, preserving the input/output contract.
+<details><summary>Diff and reasoning</summary>
+
+\`\`\`diff
+--- a/packages/api/src/queue/consumer.ts
++++ b/packages/api/src/queue/consumer.ts
+@@ -2 +2 @@
+-import type { ZodType, ZodTypeDef } from 'zod';
++import type { ZodType } from 'zod';
+@@ -13 +13 @@
+-    private readonly schema: ZodType<TMessage, ZodTypeDef, unknown>,
++    private readonly schema: ZodType<TMessage, unknown>,
+\`\`\`
+
+- \`packages/api/src/queue/consumer.ts\` (3)
+
+**packages/api/src/queue/consumer.ts:2 · attempt 1 (accepted)**
+
+In Zod v4, \`ZodTypeDef\` no longer exists as an exported type, and \`ZodType\` now takes only two type parameters: \`Output\` and \`Input\` (both defaulting to \`unknown\`). The fix is to:
+
+1. Remove \`ZodTypeDef\` from the import (it's the only broken export; \`ZodType\` is still valid).
+
+2. Remove the middle \`ZodTypeDef\` type parameter from the \`ZodType<TMessage, ZodTypeDef, unknown>\` generic usage, replacing it with \`ZodType<TMessage, unknown>\` (Output=TMessage, Input=unknown), which preserves the same input/output contract without weakening types or casting to \`any\`.
+
+Diagnostics: 5 → 2.
+
+</details>
+
+### Worth a look
+
+- \`signUpSchema\` and \`createOrderSchema\`: behavior not checked (they import another schema file).
+
+### Decisions for you
+
+- Zod 4 words its default error messages differently, and a test of the migrated code failed on it. Updated 1 assertion: \`packages/shared/src/monitoring.test.ts:21\` \`"Required"\` → \`"Invalid input: expected string, received undefined"\`. Confirm that nothing outside the tests reads this text: logs, alerts, dead-letter descriptions, API responses.
+
+<details><summary>Verification details</summary>
+
+Type errors: baseline 1; target 29; after 1; 0 new. Verification: PASS.
+
+| Workspace | Baseline tests | Target tests |
+|---|---|---|
+| packages/api | passed | passed |
+| packages/shared | passed | passed |
+
+- \`packages/api\`: the \`test\` script of packages/api — \`vitest run\` — 3 tests in 2 files passed
+- \`packages/shared\`: the \`test\` script of packages/shared — \`vitest run\` — 2 tests in 1 file passed
+
+**Pre-existing errors**
+- packages/shared/src/errors.ts:19 TS2322: Type 'string' is not assignable to type 'number'.
+
+Samples: 1,800/1,800 identical across 11 schemas. Custom-message assertions: 21/21 identical.
+
+Fixed seed 1729; up to 200 v3-derived inputs per schema. Isolated schema declarations and dependencies; no application code executed. Sampled equivalence is not a proof; examples are greedily minimized.
+
+| Schema | Inputs | Identical | Valid v3 inputs | Differences / limits |
+|---|---|---|---|---|
+| packages/api/src/queue/consumer.ts: (reported site) | 0 | 0 | 0 | site is not a top-level schema binding; no application code executed |
+| packages/api/src/routes/customers.ts: updateCustomerSchema | 200 | 200 | 61 | 0 |
+| packages/api/src/routes/customers.ts: signUpSchema | 0 | 0 | 0 | unstubbed runtime import: @storefront/shared |
+| packages/api/src/routes/orders.ts: cancelOrderSchema | 200 | 200 | 43 | 0 |
+| packages/api/src/routes/orders.ts: createOrderSchema | 0 | 0 | 0 | unstubbed runtime import: @storefront/shared |
+| packages/api/src/routes/orders.ts: lineItemSchema | 200 | 200 | 56 | 0 |
+| packages/api/src/routes/webhooks.ts: shipmentWebhookSchema | 200 | 200 | 49 | 0 |
+| packages/api/src/routes/webhooks.ts: paymentWebhookSchema | 200 | 200 | 43 | 0 |
+| packages/shared/src/address.ts: addressSchema | 200 | 200 | 62 | 0 |
+| packages/shared/src/monitoring.ts: accessLogSchema | 200 | 200 | 53 | 0 |
+| packages/shared/src/product.ts: stockUpdateSchema | 200 | 200 | 58 | 0 |
+| packages/shared/src/product.ts: productSchema | 200 | 200 | 46 | 0 |
+
+**packages/api/src/routes/customers.ts: updateCustomerSchema custom messages**
+- packages/api/src/routes/customers.ts:13:21, missing marketingOptIn: default — no repository-defined message for this input
+- packages/api/src/routes/customers.ts:13:21, wrong-type marketingOptIn: identical — "Opt-in must be true or false" → "Opt-in must be true or false"
+- packages/api/src/routes/customers.ts:12:11, missing name: default — no repository-defined message for this input
+- packages/api/src/routes/customers.ts:12:11, wrong-type name: identical — "Name must be a string" → "Name must be a string"
+
+**packages/api/src/routes/orders.ts: cancelOrderSchema custom messages**
+- packages/api/src/routes/orders.ts:18:13, missing reason: identical — "Reason is required" → "Reason is required"
+- packages/api/src/routes/orders.ts:18:13, wrong-type reason: default — no repository-defined message for this input
+- packages/api/src/routes/orders.ts:17:14, missing orderId: identical — "Order is required" → "Order is required"
+- packages/api/src/routes/orders.ts:17:14, wrong-type orderId: default — no repository-defined message for this input
+
+**packages/api/src/routes/orders.ts: lineItemSchema custom messages**
+- packages/api/src/routes/orders.ts:6:15, missing quantity: identical — "Quantity is required" → "Quantity is required"
+- packages/api/src/routes/orders.ts:6:15, wrong-type quantity: default — no repository-defined message for this input
+- packages/api/src/routes/orders.ts:5:16, missing productId: identical — "Product is required" → "Product is required"
+- packages/api/src/routes/orders.ts:5:16, wrong-type productId: default — no repository-defined message for this input
+
+**packages/api/src/routes/webhooks.ts: shipmentWebhookSchema custom messages**
+- packages/api/src/routes/webhooks.ts:15:19, missing trackingCode: identical — "Tracking code is required" → "Tracking code is required"
+- packages/api/src/routes/webhooks.ts:15:19, wrong-type trackingCode: default — no repository-defined message for this input
+- packages/api/src/routes/webhooks.ts:14:9, missing id: identical — "Event id is required" → "Event id is required"
+- packages/api/src/routes/webhooks.ts:14:9, wrong-type id: default — no repository-defined message for this input
+
+**packages/api/src/routes/webhooks.ts: paymentWebhookSchema custom messages**
+- packages/api/src/routes/webhooks.ts:9:20, missing payload.amountCents: identical — "Amount is required" → "Amount is required"
+- packages/api/src/routes/webhooks.ts:9:20, wrong-type payload.amountCents: default — no repository-defined message for this input
+- packages/api/src/routes/webhooks.ts:8:16, missing payload.orderId: identical — "Order id is required" → "Order id is required"
+- packages/api/src/routes/webhooks.ts:8:16, wrong-type payload.orderId: default — no repository-defined message for this input
+- packages/api/src/routes/webhooks.ts:4:9, missing id: identical — "Event id is required" → "Event id is required"
+- packages/api/src/routes/webhooks.ts:4:9, wrong-type id: default — no repository-defined message for this input
+
+**packages/shared/src/address.ts: addressSchema custom messages**
+- packages/shared/src/address.ts:10:14, missing country: identical — "Country is required" → "Country is required"
+- packages/shared/src/address.ts:10:14, wrong-type country: default — no repository-defined message for this input
+- packages/shared/src/address.ts:7:5, missing postalCode: identical — "Postal code is required" → "Postal code is required"
+- packages/shared/src/address.ts:7:5, wrong-type postalCode: identical — "Postal code must be a string" → "Postal code must be a string"
+- packages/shared/src/address.ts:5:11, missing city: identical — "City is required" → "City is required"
+- packages/shared/src/address.ts:5:11, wrong-type city: default — no repository-defined message for this input
+- packages/shared/src/address.ts:4:12, missing line1: identical — "Address line is required" → "Address line is required"
+- packages/shared/src/address.ts:4:12, wrong-type line1: default — no repository-defined message for this input
+
+**packages/shared/src/monitoring.ts: accessLogSchema custom messages**
+- packages/shared/src/monitoring.ts:6:24, missing clientIp: default — no repository-defined message for this input
+- packages/shared/src/monitoring.ts:6:24, wrong-type clientIp: default — no repository-defined message for this input
+
+**packages/shared/src/product.ts: stockUpdateSchema custom messages**
+- packages/shared/src/product.ts:17:15, missing quantity: identical — "Quantity is required" → "Quantity is required"
+- packages/shared/src/product.ts:17:15, wrong-type quantity: default — no repository-defined message for this input
+
+**packages/shared/src/product.ts: productSchema custom messages**
+- packages/shared/src/product.ts:8:5, missing priceCents: identical — "Price is required" → "Price is required"
+- packages/shared/src/product.ts:8:5, wrong-type priceCents: identical — "Price must be a number" → "Price must be a number"
+- packages/shared/src/product.ts:6:11, missing name: identical — "Name is required" → "Name is required"
+- packages/shared/src/product.ts:6:11, wrong-type name: default — no repository-defined message for this input
+- packages/shared/src/product.ts:5:10, missing sku: identical — "SKU is required" → "SKU is required"
+- packages/shared/src/product.ts:5:10, wrong-type sku: default — no repository-defined message for this input
+
+**Tests: packages/api**
+\`\`\`text
+
+ RUN  v3.2.4 <repo>/packages/api
+
+ ✓ src/billing/renewal.test.ts (1 test) 1ms
+ ✓ src/routes/orders.test.ts (2 tests) 2ms
+
+ Test Files  2 passed (2)
+      Tests  3 passed (3)
+   Start at  15:29:13
+   Duration  310ms (transform 60ms, setup 0ms, collect 97ms, tests 4ms, environment 0ms, prepare 135ms)
+
+
+\`\`\`
+
+**Tests: packages/shared**
+\`\`\`text
+
+ RUN  v3.2.4 <repo>/packages/shared
+
+ ✓ src/monitoring.test.ts (2 tests) 3ms
+
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+   Start at  15:29:14
+   Duration  281ms (transform 32ms, setup 0ms, collect 64ms, tests 3ms, environment 0ms, prepare 48ms)
+
+
+\`\`\`
+
+**Run notes**
+
+- Review validation behaviour and custom messages; compilation alone cannot prove runtime equivalence.
+- Migration reference: https://zod.dev/v4/changelog
+
+</details>
+
+<details><summary>Run details</summary>
+
+Uptide 0.1.0 · claude-sonnet-4-6 · 2.6k/0.6k tokens · $0.02 · 1 min
+
+Uptide commit: \`35a44fd8d67ea3246b114585c84451777efd332b\` (working-tree changes)
+Branch: \`uptide/zod-4.6.5\`
+Verified at: 2026-10-03T22:29:15.705Z
+Verified commit: \`64d42628e97516638a0ef5654c4e1fd1cc6fa137\`
+
+</details>
+"
+`;
+
+exports[`storefront-zod > snapshots the full PR description and compact terminal/comment summary 2`] = `
+"## Upgrade zod 3.25.76 → 4.6.5
+
+| | |
+|---|---|
+| **Risk** | Medium: request validation in webhooks |
+| **Changes** | 29 sites in 8 files · 25 by rule · 4 by agent |
+| **Types** | ✅ 29 errors after the bump → 1 (1 pre-existing) |
+| **Behavior** | ✅ 9 schemas identical · 2 not checked · 21/21 custom-message assertions |
+| **Tests** | ✅ 5 tests in 3 files passed |
+
+### What changed
+
+**1. Default error messages** · 1 site · by rule
+**2. New error API** · 24 sites · by rule
+**3. \`.ip()\` removed** · 1 site · by agent
+**4. \`ZodTypeDef\` removed** · 1 fix, 3 errors · by agent
+"
+`;
+
+exports[`stripe > snapshots the full PR description and compact terminal/comment summary 1`] = `
+"## Upgrade stripe 14.25.0 → 22.6.2
+
+**Review required before merging.** The code was migrated to stripe 22. Types compile; runtime behavior needs review.
+
+| | |
+|---|---|
+| **Risk** | High: behavior changes |
+| **Changes** | 4 sites in 1 file · 0 by rule · 4 by agent |
+| **Types** | ✅ 4 errors after the bump → 0 |
+| **Behavior** | ⚠️ not checked |
+| **Tests** | ⚠️ no test script in the repository |
+
+### What changed
+
+**1. Stripe API version** · 2 sites · by agent
+API literals now match the target SDK; types compile, but response and webhook compatibility needs review.
+<details><summary>Diff and reasoning</summary>
+
+\`\`\`diff
+diff --git a/src/billing.ts b/src/billing.ts
+index 9f1cd8e..a3b1536 100644
+--- a/src/billing.ts
++++ b/src/billing.ts
+@@ -6,7 +6,7 @@ function subscriptionPeriodEnd(s: Stripe.Subscription): number {
+ }
+ 
+ export const version: Stripe.LatestApiVersion = '2026-08-26.dahlia';
+-const stripe = new Stripe('sk_test_fixture', { apiVersion: '2023-10-16' });
++const stripe = new Stripe('sk_test_fixture', { apiVersion: '2026-08-26.dahlia' });
+ 
+ export async function checkout(customer: string) {
+   return stripe.checkout.sessions.create({
+\`\`\`
+
+- \`src/billing.ts\` (2)
+
+**src/billing.ts:4 · attempt 1 (accepted)**
+
+The compiler error is on line 9, column 48: the \`apiVersion\` literal \`'2023-10-16'\` is no longer assignable to the new Stripe SDK's required type \`'2026-08-26.dahlia'\`. The fix is to update the string literal to the target API version \`'2026-08-26.dahlia'\`.
+
+The \`subscriptionPeriodEnd\` helper already exists in the file (lines 4–6) with the correct multi-item semantics (max of all item \`current_period_end\` values, returning 0 for empty items), so no changes are needed there.
+
+Only the \`apiVersion\` string literal on line 9 is patched. No casts, no type suppressions, no semantic changes.
+
+Diagnostics: 3 → 2.
+
+\`\`\`diff
+diff --git a/src/billing.ts b/src/billing.ts
+index 7cfe01b..9f1cd8e 100644
+--- a/src/billing.ts
++++ b/src/billing.ts
+@@ -1,6 +1,11 @@
+ import Stripe from 'stripe';
+ 
+-export const version: Stripe.LatestApiVersion = '2023-10-16';
++// same value for single-item subscriptions; max item end for multi-item subscriptions; empty items return 0
++function subscriptionPeriodEnd(s: Stripe.Subscription): number {
++  return s.items.data.reduce((end, item) => Math.max(end, item.current_period_end), 0);
++}
++
++export const version: Stripe.LatestApiVersion = '2026-08-26.dahlia';
+ const stripe = new Stripe('sk_test_fixture', { apiVersion: '2023-10-16' });
+ 
+ export async function checkout(customer: string) {
+\`\`\`
+
+**src/billing.ts:3 · attempt 1 (accepted)**
+
+The compiler error is straightforward: the string literal '2023-10-16' is no longer assignable to Stripe.LatestApiVersion, which is now '2026-08-26.dahlia'. The fix is to update the literal to match the new LatestApiVersion value.
+
+However, the migration guide explicitly warns: "Never update the literal mechanically or cast it to LatestApiVersion merely to compile. Confirm response and request field migrations." The guide also documents a breaking changelog entry (2025-03-31.basil) that removes subscription-level current_period_end/current_period_start and moves them to item level — and evidence shows src/billing.ts lines 18 and 24 access Stripe.Subscription#current_period_end. Those accesses must be migrated alongside the version bump.
+
+The guide prescribes a specific deterministic non-throwing helper for current_period_end:
+  function subscriptionPeriodEnd(s: Stripe.Subscription): number { return s.items.data.reduce((end, item) => Math.max(end, item.current_period_end), 0); }
+with a comment explaining: same value for single-item subscriptions; max item end for multi-item subscriptions; empty items return 0.
+
+Since I can only see lines 1, 3, 18, and 24 of billing.ts from the evidence (the enclosing function context only shows lines 1 and 3), I must:
+
+1. Update the version literal on line 3.
+
+2. Insert the subscriptionPeriodEnd helper immediately before line 3 (the enclosing context anchor is lines 1-3, so I insert after the import).
+
+3. Replace the two current_period_end accesses on lines 18 and 24 with calls to the helper.
+
+For lines 18 and 24, the snippets are not fully shown, but the evidence tells us \`s.current_period_end\` (or equivalent) is accessed. I'll apply the helper substitution at those lines. Because the exact surrounding code isn't shown, I'll anchor each hunk to the line numbers given by the evidence and replace \`.current_period_end\` with \`subscriptionPeriodEnd(...)\` — but since I don't know the variable name, I must be conservative. The evidence says \`Stripe.Subscription#current_period_end\` is accessed at lines 18 and 24; the most common pattern is \`subscription.current_period_end\` or \`sub.current_period_end\`. Without the full source I cannot safely patch lines 18/24. The guide says "Patch ONLY the current reported site" for the version literal, and the current reported finding is line 3 col 30. The current_period_end sites are listed as evidence for the changelog entry but are not the "current reported site" of the finding. I will therefore patch only line 3 (the reported site) and insert the helper, per the guide's instruction to "Patch ONLY the current reported site."
+
+Re-reading: the guide says the helper should be inserted and the evidence sites (18, 24) use it. But the instruction also says "Patch ONLY the current reported site. When adding a helper, insert immediately before the enclosing function shown in the context." The enclosing function context is lines 1-3. The helper insertion is required alongside updating line 3 because the basil changelog removes current_period_end from Subscription — so upgrading the version without fixing those accesses would cause compile errors at 18/24. But those are separate findings. I'll patch line 3 and insert the helper (the guide explicitly tells me to add it), but leave lines 18/24 for their own reported findings since I don't have their source text.
+
+Final decision: update line 3 literal + insert the helper after the import block (before line 3).
+
+Diagnostics: 4 → 3.
+
+</details>
+
+**2. Subscription billing period moved to items** · 2 sites · by agent
+One shared helper takes the item that ends last and returns start and end from that same item (undefined with no items), preserving the single-item values; multi-item and no-item behavior needs your decision.
+<details><summary>Diff and reasoning</summary>
+
+\`\`\`diff
+diff --git a/src/billing.ts b/src/billing.ts
+index f60fe68..a19c39f 100644
+--- a/src/billing.ts
++++ b/src/billing.ts
+@@ -26,7 +26,7 @@ export async function subscription(id: string) {
+ export function webhook(payload: Buffer, signature: string, secret: string) {
+   const event = stripe.webhooks.constructEvent(payload, signature, secret);
+   if (event.type === 'customer.subscription.updated') {
+-    return event.data.object.current_period_end;
++    return subscriptionPeriodEnd(event.data.object);
+   }
+   return null;
+ }
+\`\`\`
+
+- \`src/billing.ts\` (2)
+
+**src/billing.ts:24 · attempt 1 (accepted)**
+
+The Stripe 2025-03-31 (basil) API change moved billing period tracking from the Subscription level to individual SubscriptionItem level, removing \`current_period_end\` from \`Stripe.Subscription\`. The guide specifies using a deterministic, non-throwing helper that calls \`reduce\` over \`s.items.data\` to find the max \`current_period_end\` across all items (returning 0 for empty items). The enclosing function context shows the helper \`subscriptionPeriodEnd\` already exists in the file (lines 4-6). The fix is to replace the direct property access \`event.data.object.current_period_end\` with a call to the existing \`subscriptionPeriodEnd(event.data.object)\` helper. Multi-item decision: using \`Math.max\` across all items' \`current_period_end\` values ensures correctness for both single-item subscriptions (same result as the old field) and multi-item subscriptions (returns the latest period end). No throws, nulls, or new failure modes are introduced; the existing \`return null\` branch is preserved unchanged.
+
+Diagnostics: 1 → 0.
+
+\`\`\`diff
+diff --git a/src/billing.ts b/src/billing.ts
+index a3b1536..f60fe68 100644
+--- a/src/billing.ts
++++ b/src/billing.ts
+@@ -20,7 +20,7 @@ export async function checkout(customer: string) {
+ 
+ export async function subscription(id: string) {
+   const subscription = await stripe.subscriptions.retrieve(id);
+-  return subscription.current_period_end;
++  return subscriptionPeriodEnd(subscription);
+ }
+ 
+ export function webhook(payload: Buffer, signature: string, secret: string) {
+\`\`\`
+
+**src/billing.ts:18 · attempt 1 (accepted)**
+
+The Stripe API version 2025-03-31.basil removed \`current_period_end\` from \`Stripe.Subscription\` and moved billing periods to the item level (\`Stripe.SubscriptionItem#current_period_end\`). 
+
+The guide specifies a deterministic, non-throwing helper using \`reduce\` over \`s.items.data\` with \`Math.max\`, returning 0 for empty items. This helper is already present in the enclosing function context (lines 4-6), so I reuse it instead of adding a duplicate.
+
+The fix replaces the direct \`subscription.current_period_end\` access at line 23 with a call to the existing \`subscriptionPeriodEnd(subscription)\` helper.
+
+Multi-item decision: \`Math.max\` across all items' \`current_period_end\` values is used, which equals the single value for single-item subscriptions and returns the latest period end for multi-item subscriptions. This is consistent with the guide's prescribed approach.
+
+Diagnostics: 2 → 1.
+
+</details>
+
+### Worth a look
+
+- Runtime behavior was not checked; smoke-test billing and webhook responses against the target API version.
+- No tests ran. Add coverage for the changed billing and webhook flows before merging.
+
+### Decisions for you
+
+- Confirm the latest-ending item is the desired billing rule: items ending \`[100, 200]\` → that item's \`{ start, end }\`; a single item is unchanged.
+- Confirm what no items means (Stripe never returns that): the webhook keeps fetching the full subscription, API routes throw "subscription has no items". Check pagination: only returned \`items.data\` are considered.
+- Coordinate the API-version rollout with dashboard webhook endpoints and other services.
+
+<details><summary>Verification details</summary>
+
+Type errors: baseline 0; target 4; after 0; 0 new. Verification: PASS.
+
+| Workspace | Baseline tests | Target tests |
+|---|---|---|
+| . | missing | missing |
+
+**Run notes**
+
+- SDK 14.25.0 → 22.6.2. API pin 2023-10-16 → 2026-08-26.dahlia. SDK releases pin an API date; the date can also change within a major.
+- Changing apiVersion can change response shapes and webhook payloads. It is never a mechanical fix.
+
+**Stripe API changelog**
+
+1 relevant of 502. Each shown entry has concrete method, field, parameter or event evidence; resource-name overlap alone does not qualify. Unmapped changes are retained below for review.
+
+- 2025-03-31.basil: [Adds subscription item-level billing periods and removes subscription-level periods](https://docs.stripe.com/changelog/basil/2025-03-31/deprecate-subscription-current-period-start-and-end.md) — breaking; Billing — evidence: \`src/billing.ts:18\` (field \`Stripe.Subscription#current_period_end\`); \`src/billing.ts:24\` (field \`Stripe.Subscription#current_period_end\`)
+
+<details>
+<summary>501 other changelog entries</summary>
+
+- 2024-04-10: [Makes automatic async the default capture method for PaymentIntents when not specified](https://docs.stripe.com/changelog/2024-04-10/automatic-sync-default-paymentintents.md) — breaking; Payments
+- 2024-04-10: [Renames the \`features\` attribute of the \`Product\` object](https://docs.stripe.com/changelog/2024-04-10/renames-features-attribute-product-object.md) — breaking; Invoicing, Billing
+- 2024-04-10: [Renames the \`rendering_options\` attribute for invoices to \`rendering\`](https://docs.stripe.com/changelog/2024-04-10/renames-rendering-options-invoicing.md) — breaking; Invoicing, Billing
+- 2024-06-20: [Adds enum values for disabled reasons](https://docs.stripe.com/changelog/2024-06-20/adds-enum-disabled-reasons-capabilities.md) — breaking; Connect
+- 2024-06-20: [Adds enum values for fuel units](https://docs.stripe.com/changelog/2024-06-20/adds-enum-fuel-units-issuing.md) — breaking; Issuing
+- 2024-06-20: [Adds new enum values for request history reasons](https://docs.stripe.com/changelog/2024-06-20/adds-enum-request-history-reasons-issuing.md) — breaking; Issuing
+- 2024-06-20: [Deprecates \`alphanumeric_id\` for Issuing Authorization](https://docs.stripe.com/changelog/2024-06-20/deprecates-alphanumeric-id-issuing.md) — breaking; Issuing
+- 2024-06-20: [Deprecates the \`bank_transfer_payments\` capability type in favor of newer capability types](https://docs.stripe.com/changelog/2024-06-20/deprecates-bank-transfer-payments-capabilities.md) — breaking; Connect
+- 2024-06-20: [Removes undocumented fleet fields](https://docs.stripe.com/changelog/2024-06-20/removes-undocumented-fleet-fields-issuing.md) — breaking; Issuing
+- 2024-06-20: [Removes undocumented fuel fields](https://docs.stripe.com/changelog/2024-06-20/removes-undocumented-fuel-fields-issuing.md) — breaking; Issuing
+- 2024-06-20: [Renames a \`fuel\` attribute of the \`Authorization\` object](https://docs.stripe.com/changelog/2024-06-20/renames-fuel-attribute-authorization-object.md) — breaking; Issuing
+- 2024-06-20: [Renames a \`purchase_details\` attribute of the \`Transaction\` object](https://docs.stripe.com/changelog/2024-06-20/renames-purchase-details-transaction-object.md) — breaking; Issuing
+- 2024-09-30.acacia: [Adds additional reasonable defaulting to the Account Link API v1](https://docs.stripe.com/changelog/acacia/2024-09-30/account-link-api-default-fields-v1.md) — non-breaking; Connect
+- 2024-09-30.acacia: [Adds risk verification details for connected accounts](https://docs.stripe.com/changelog/acacia/2024-09-30/additional-risk-verification-details-connected-accounts.md) — breaking; Connect
+- 2024-09-30.acacia: [Adds billing alert resources and endpoints](https://docs.stripe.com/changelog/acacia/2024-09-30/adds-billing-alert-resources-endpoints.md) — non-breaking; Billing
+- 2024-09-30.acacia: [Adds Girocard as a PaymentMethod brand and network](https://docs.stripe.com/changelog/acacia/2024-09-30/adds-girocard-paymentmethod-brand-network.md) — non-breaking; Payments
+- 2024-09-30.acacia: [Adds wallet details for \`card_present\` Charges and Payment Methods](https://docs.stripe.com/changelog/acacia/2024-09-30/adds-offline-details-card-present-paymentmethods.md) — non-breaking; Terminal
+- 2024-09-30.acacia: [Adds Croatian Personal Identification Number to supported Tax IDs](https://docs.stripe.com/changelog/acacia/2024-09-30/adds-tax-id-type-hr_oib-croatian-personal-id-number.md) — non-breaking; Billing, Checkout, Tax
+- 2024-09-30.acacia: [Adds support for Affirm transaction IDs](https://docs.stripe.com/changelog/acacia/2024-09-30/affirm-transaction-id-dashboard.md) — non-breaking; Payments
+- 2024-09-30.acacia: [Adds support for retrieving thin events](https://docs.stripe.com/changelog/acacia/2024-09-30/api-v2-thin-events.md) — non-breaking; Billing
+- 2024-09-30.acacia: [Adds option to automatically finalize invoices](https://docs.stripe.com/changelog/acacia/2024-09-30/automatically-finalizes-at-invoice.md) — non-breaking; Invoicing
+- 2024-09-30.acacia: [Adds an event for triggered billing alerts](https://docs.stripe.com/changelog/acacia/2024-09-30/billing-alert-trigger-event.md) — non-breaking; Billing
+- 2024-09-30.acacia: [Adds support for listening to triggered billing alerts](https://docs.stripe.com/changelog/acacia/2024-09-30/billing-alert-webhook-listener.md) — non-breaking; Billing
+- 2024-09-30.acacia: [Adds an Alerts API for usage-based billing](https://docs.stripe.com/changelog/acacia/2024-09-30/billing-alerts-api.md) — non-breaking; Billing
+- 2024-09-30.acacia: [Adds contextual filters to billing alerts](https://docs.stripe.com/changelog/acacia/2024-09-30/billing-alerts-contextualizing-filters.md) — breaking; Billing
+- 2024-09-30.acacia: [Adds support for subscriptions and subscription items to billing alerts](https://docs.stripe.com/changelog/acacia/2024-09-30/billing-alerts-subscription-items-subscriptions.md) — non-breaking; Billing, Invoicing
+- 2024-09-30.acacia: [Adds webhook events for when an invoice is due or overdue](https://docs.stripe.com/changelog/acacia/2024-09-30/billing-due-date-webhooks.md) — non-breaking; Billing
+- 2024-09-30.acacia: [Adds support for using the Multibanco payment method with  billing](https://docs.stripe.com/changelog/acacia/2024-09-30/billing-mutlibanco-support.md) — non-breaking; Billing
+- 2024-09-30.acacia: [Makes it optional to update the products and prices of a subscription](https://docs.stripe.com/changelog/acacia/2024-09-30/billing-portal-updates-optional.md) — non-breaking; Billing
+- 2024-09-30.acacia: [Adds support for identifying the unique payer for the BLIK payment method](https://docs.stripe.com/changelog/acacia/2024-09-30/buyer-id-blik.md) — non-breaking; Payments
+- 2024-09-30.acacia: [Adds support for in-person payment methods, including Interac cards](https://docs.stripe.com/changelog/acacia/2024-09-30/card-interac-present-support.md) — non-breaking; Terminal
+- 2024-09-30.acacia: [Updates the default value for shipping address validation](https://docs.stripe.com/changelog/acacia/2024-09-30/card-shipping-status-submitted-address-validation.md) — breaking; Issuing
+- 2024-09-30.acacia: [Adds country field for Charges that use Klarna](https://docs.stripe.com/changelog/acacia/2024-09-30/charges-klarna-payer-details-country.md) — non-breaking; Payments
+- 2024-09-30.acacia: [Adds a method to update the metadata for Checkout Sessions](https://docs.stripe.com/changelog/acacia/2024-09-30/checkout-update-method.md) — non-breaking; Checkout
+- 2024-09-30.acacia: [Adds support for email types to Credit Notes](https://docs.stripe.com/changelog/acacia/2024-09-30/credit-note-email-type.md) — non-breaking; Invoicing
+- 2024-09-30.acacia: [Makes \`LineItem.description\` optional](https://docs.stripe.com/changelog/acacia/2024-09-30/description-optional-checkout-session-line-item.md) — non-breaking; Checkout
+- 2024-09-30.acacia: [Displays Amazon Pay dispute type on Disputes](https://docs.stripe.com/changelog/acacia/2024-09-30/display-amazonpay-dispute-type.md) — non-breaking; Payments
+- 2024-09-30.acacia: [Displays \`authorization_code\` for Charges](https://docs.stripe.com/changelog/acacia/2024-09-30/displays-authorization-code-for-charges.md) — non-breaking; Payments
+- 2024-09-30.acacia: [Displays CHIPS tracking details for outbound wire payments and transfers](https://docs.stripe.com/changelog/acacia/2024-09-30/displays-chips-tracking-details-treasury-outbound-wires.md) — non-breaking; Treasury
+- 2024-09-30.acacia: [Adds support for identifying the case type for card disputes](https://docs.stripe.com/changelog/acacia/2024-09-30/disputes-case-type-card.md) — non-breaking; Payments
+- 2024-09-30.acacia: [Adds a new enum value representing a ReceivedDebit failure due to an international transaction](https://docs.stripe.com/changelog/acacia/2024-09-30/ef-features.md) — non-breaking; Treasury
+- 2024-09-30.acacia: [Adds new error code for invalid mandate prefixes to Bacs Direct Debit and SEPA Direct Debit payments](https://docs.stripe.com/changelog/acacia/2024-09-30/error-code-invalid-mandate-reference-prefix.md) — non-breaking; Payments
+- 2024-09-30.acacia: [Adds error code for exceeded transaction limits](https://docs.stripe.com/changelog/acacia/2024-09-30/error-code-transaction-limit.md) — non-breaking; Invoicing, Payments
+- 2024-09-30.acacia: [Expands filtering support for Financial Connections Sessions](https://docs.stripe.com/changelog/acacia/2024-09-30/financial-connections-additional-filters.md) — non-breaking; Financialconnections
+- 2024-09-30.acacia: [Adds support for filtering by account subcategories on Financial Connections](https://docs.stripe.com/changelog/acacia/2024-09-30/financial-connections-filters.md) — non-breaking; Financialconnections
+- 2024-09-30.acacia: [Adds parameter to link Verification Sessions to Customers](https://docs.stripe.com/changelog/acacia/2024-09-30/identity-verification-session-related-customer.md) — non-breaking; Identity
+- 2024-09-30.acacia: [Adds retrieve and archive methods for Invoice Rendering Templates](https://docs.stripe.com/changelog/acacia/2024-09-30/invoice-rendering-template-methods.md) — non-breaking; Invoicing
+- 2024-09-30.acacia: [Adds support for templates to Invoices and Customers](https://docs.stripe.com/changelog/acacia/2024-09-30/invoice-rendering-template-parameter.md) — non-breaking; Invoicing
+- 2024-09-30.acacia: [Adds Invoice Rendering Templates for Invoices](https://docs.stripe.com/changelog/acacia/2024-09-30/invoice-rendering-template-resource.md) — non-breaking; Invoicing
+- 2024-09-30.acacia: [Adds version support for Invoice Rendering Templates](https://docs.stripe.com/changelog/acacia/2024-09-30/invoice-rendering-template-version.md) — non-breaking; Invoicing
+- 2024-09-30.acacia: [Adds support for bulk invoice line item operations](https://docs.stripe.com/changelog/acacia/2024-09-30/invoicing-bulk-line-item-operations.md) — non-breaking; Invoicing
+- 2024-09-30.acacia: [Adds address validation for physical cards](https://docs.stripe.com/changelog/acacia/2024-09-30/issuing-address-validation.md) — non-breaking; Issuing
+- 2024-09-30.acacia: [Adds a new webhook event for when funds are deducted as part of a dispute](https://docs.stripe.com/changelog/acacia/2024-09-30/issuing-webhook-fund-deduction.md) — non-breaking; Issuing
+- 2024-09-30.acacia: [Makes status details for Test Clock test helpers required](https://docs.stripe.com/changelog/acacia/2024-09-30/make-testclock-status-details-required.md) — non-breaking; Billing
+- 2024-09-30.acacia: [Adds support for three new payment methods: Multibanco, Twint, and Zip](https://docs.stripe.com/changelog/acacia/2024-09-30/payment-links-new-payment-methods.md) — non-breaking; Paymentlinks
+- 2024-09-30.acacia: [Add support for \`custom_unit_amount\` during product creation](https://docs.stripe.com/changelog/acacia/2024-09-30/products-custom-unit-amount.md) — non-breaking; Checkout, Paymentlinks
+- 2024-09-30.acacia: [Adds support for requiring a customer tax ID on Checkout and Payment Links](https://docs.stripe.com/changelog/acacia/2024-09-30/requiring-customer-tax-id-checkout-session-paymentlink.md) — non-breaking; Checkout, Paymentlinks
+- 2024-09-30.acacia: [Adds new method to retrieve a Tax Calculation](https://docs.stripe.com/changelog/acacia/2024-09-30/retrieves-tax-calculation-api.md) — non-breaking; Tax
+- 2024-09-30.acacia: [Adds customer ID to payment method preview on a confirmation token](https://docs.stripe.com/changelog/acacia/2024-09-30/support-customer-payment-method-preview.md) — non-breaking; Elements
+- 2024-09-30.acacia: [Adds support for the Payment Element on a Customer Session](https://docs.stripe.com/changelog/acacia/2024-09-30/support-payment-element-customer-session.md) — non-breaking; Elements
+- 2024-09-30.acacia: [Adds option to retrieve CVC tokens on Confirmation Tokens](https://docs.stripe.com/changelog/acacia/2024-09-30/support-payment-method-options-confirmation.md) — non-breaking; Elements
+- 2024-09-30.acacia: [Adds \`target_frozen_time\` for advancing \`test_helpers.test_clock\` objects](https://docs.stripe.com/changelog/acacia/2024-09-30/support-status-details-test-clock.md) — non-breaking; Billing
+- 2024-09-30.acacia: [Adds support for specifying US state sales tax elections while creating tax registrations](https://docs.stripe.com/changelog/acacia/2024-09-30/support-us-state-sales-tax-elections-api.md) — non-breaking; Tax
+- 2024-09-30.acacia: [Adds Switzerland UID as a supported customer tax ID](https://docs.stripe.com/changelog/acacia/2024-09-30/switzerland-tax-uid.md) — non-breaking; Invoicing, Tax
+- 2024-09-30.acacia: [Adds support for posting time on tax transaction creation](https://docs.stripe.com/changelog/acacia/2024-09-30/tax-posting-time-on-creation.md) — non-breaking; Tax
+- 2024-09-30.acacia: [Adds support for tax settings and registrations for Embedded Components](https://docs.stripe.com/changelog/acacia/2024-09-30/tax-registrations-settings-embedded-components.md) — non-breaking; Connect, Tax
+- 2024-09-30.acacia: [Adds details about offline collection on \`card_present\` PaymentMethod objects](https://docs.stripe.com/changelog/acacia/2024-09-30/terminal-offline-details-card-present-paymentmethods.md) — non-breaking; Terminal
+- 2024-09-30.acacia: [Adds the Stripe S700 reader as a valid device type](https://docs.stripe.com/changelog/acacia/2024-09-30/terminal-reader-s700.md) — non-breaking; Terminal
+- 2024-09-30.acacia: [Adds support for configuring the reboot time setting](https://docs.stripe.com/changelog/acacia/2024-09-30/terminal-reboot-window.md) — non-breaking; Terminal
+- 2024-09-30.acacia: [Updates consent modeling for saving cards with Terminal](https://docs.stripe.com/changelog/acacia/2024-09-30/terminal-remove-customer-consent-require-allow-redisplay.md) — breaking; Terminal
+- 2024-09-30.acacia: [Adds Twint to the PaymentMethodConfiguration API](https://docs.stripe.com/changelog/acacia/2024-09-30/twint-support-payment-method-configuration.md) — non-breaking; Payments
+- 2024-09-30.acacia: [Adds Meter Event v2 API endpoints](https://docs.stripe.com/changelog/acacia/2024-09-30/usage-based-billing-v2-meter-events-api.md) — non-breaking; Billing
+- 2024-10-28.acacia: [Adds support for Alma in France](https://docs.stripe.com/changelog/acacia/2024-10-28/alma.md) — non-breaking; Checkout, Elements, Paymentlinks, Payments
+- 2024-10-28.acacia: [Supports domain registration for Amazon Pay](https://docs.stripe.com/changelog/acacia/2024-10-28/amazon-pay-domain-registration.md) — non-breaking; Elements
+- 2024-10-28.acacia: [Adds Credit Grant APIs and resources](https://docs.stripe.com/changelog/acacia/2024-10-28/billing-credits-apis.md) — non-breaking; Billing, Invoicing
+- 2024-10-28.acacia: [Adds support for pre-tax credit amount information to credit notes](https://docs.stripe.com/changelog/acacia/2024-10-28/billing-credits-credit-note.md) — non-breaking; Billing, Invoicing
+- 2024-10-28.acacia: [Adds support for pre-tax credit amount information to invoices](https://docs.stripe.com/changelog/acacia/2024-10-28/billing-credits-invoice.md) — non-breaking; Billing, Invoicing
+- 2024-10-28.acacia: [Makes business profile optional for customer portal configuration](https://docs.stripe.com/changelog/acacia/2024-10-28/customer-portal-config-business-profile.md) — non-breaking; Billing
+- 2024-10-28.acacia: [Adds scheduled subscription downgrades in the customer portal](https://docs.stripe.com/changelog/acacia/2024-10-28/customer-portal-schedule-downgrades.md) — non-breaking; Billing
+- 2024-10-28.acacia: [Adds support for disabling Stripe user authentication for certain embedded components](https://docs.stripe.com/changelog/acacia/2024-10-28/disable-stripe-user-authentication-account-sessions.md) — non-breaking; Connect
+- 2024-10-28.acacia: [Adds Event Destinations v2 API endpoint](https://docs.stripe.com/changelog/acacia/2024-10-28/event-destinations-api.md) — non-breaking; All products
+- 2024-10-28.acacia: [Adds a metadata field to the Vault and Forward API](https://docs.stripe.com/changelog/acacia/2024-10-28/forwarding-api-metadata-field.md) — non-breaking; Payments
+- 2024-10-28.acacia: [Adds event type for updated receipt data in Issuing transactions](https://docs.stripe.com/changelog/acacia/2024-10-28/issuing-transactions-updated-receipt-event.md) — non-breaking; Issuing
+- 2024-10-28.acacia: [Adds pricing groups to the Accounts API](https://docs.stripe.com/changelog/acacia/2024-10-28/pricing-groups-account-objects.md) — non-breaking; Connect, Payments
+- 2024-10-28.acacia: [Adds created, updated, and failed events for all refund types](https://docs.stripe.com/changelog/acacia/2024-10-28/refund-webhook-update.md) — non-breaking; Payments
+- 2024-10-28.acacia: [Adds support for scheduling invoice finalization](https://docs.stripe.com/changelog/acacia/2024-10-28/schedule-invoice-finalization.md) — non-breaking; Invoicing
+- 2024-10-28.acacia: [Adds support for new South Korean payment methods](https://docs.stripe.com/changelog/acacia/2024-10-28/south-korean-payment-methods.md) — non-breaking; Billing, Checkout, Elements, Invoicing, Paymentlinks, Payments
+- 2024-10-28.acacia: [Adds support for tax ID types in several new countries](https://docs.stripe.com/changelog/acacia/2024-10-28/tax-ids.md) — non-breaking; Tax
+- 2024-10-28.acacia: [Adds support for new countries to the Tax Registration API](https://docs.stripe.com/changelog/acacia/2024-10-28/tax-registration-new-countries.md) — non-breaking; Tax
+- 2024-10-28.acacia: [Adds support for collecting retail delivery fees](https://docs.stripe.com/changelog/acacia/2024-10-28/tax-retail-delivery-fee.md) — non-breaking; Tax
+- 2024-10-28.acacia: [Adds option to automatically validate customer tax location during an update](https://docs.stripe.com/changelog/acacia/2024-10-28/tax-validate-location-auto.md) — non-breaking; Tax
+- 2024-10-28.acacia: [Adds Polish PLN currency support to Terminal tipping configuration](https://docs.stripe.com/changelog/acacia/2024-10-28/terminal-tipping-pln.md) — non-breaking; Terminal
+- 2024-10-28.acacia: [Adds a test helper that updates the shipping status for physical cards](https://docs.stripe.com/changelog/acacia/2024-10-28/testmode-helper-shipping-status.md) — non-breaking; Issuing
+- 2024-10-28.acacia: [Uses Visa’s Compelling Evidence 3.0 to respond to qualifying disputes](https://docs.stripe.com/changelog/acacia/2024-10-28/visa-compelling-evidence-3-0.md) — non-breaking; All products
+- 2024-11-20.acacia: [Converts properties on the Account object from a String to an enum](https://docs.stripe.com/changelog/acacia/2024-11-20/account-disabled-reason.md) — non-breaking; Connect
+- 2024-11-20.acacia: [Adds indicator for connected accounts that must log in before using embedded components](https://docs.stripe.com/changelog/acacia/2024-11-20/account-sessions-stripe-authentication-response.md) — non-breaking; Connect
+- 2024-11-20.acacia: [Adds support for enabling Adaptive Pricing per Checkout Session](https://docs.stripe.com/changelog/acacia/2024-11-20/adaptive-pricing-param.md) — non-breaking; Checkout
+- 2024-11-20.acacia: [Adds support for merchant amount and currency for test mode authorizations](https://docs.stripe.com/changelog/acacia/2024-11-20/add-merchant-currency-and-merchant-amount-on-create-testmode-authorization-method.md) — non-breaking; Issuing
+- 2024-11-20.acacia: [Adds support for advanced card features on Checkout Sessions](https://docs.stripe.com/changelog/acacia/2024-11-20/advanced-card-features.md) — non-breaking; Checkout
+- 2024-11-20.acacia: [Adds support for authorizers to Person API](https://docs.stripe.com/changelog/acacia/2024-11-20/authorizer-person-api.md) — non-breaking; Connect
+- 2024-11-20.acacia: [Adds support for SEPA Direct Debit and Bacs Direct Debit mandate reference prefixes in Checkout Sessions](https://docs.stripe.com/changelog/acacia/2024-11-20/checkout-sessions-sepa-debit-bacs-debit-mandate-options.md) — non-breaking; Checkout
+- 2024-11-20.acacia: [Specifying an originating payment method for Inbound Transfers is now optional](https://docs.stripe.com/changelog/acacia/2024-11-20/inbound-transfers-optional-pm.md) — non-breaking; Treasury
+- 2024-11-20.acacia: [Adds support for issuing fraud challenges](https://docs.stripe.com/changelog/acacia/2024-11-20/issuing-fraud-challenges.md) — non-breaking; Issuing
+- 2024-11-20.acacia: [Adds tax ID support for Liechtenstein VAT](https://docs.stripe.com/changelog/acacia/2024-11-20/li_vat.md) — non-breaking; Tax
+- 2024-11-20.acacia: [Allows Link card-only integrations to accept non-card payments under Link card brand](https://docs.stripe.com/changelog/acacia/2024-11-20/link-card-brand.md) — non-breaking; Payments
+- 2024-11-20.acacia: [Adds additional beneficiary information for bank transfer payments](https://docs.stripe.com/changelog/acacia/2024-11-20/new-bank-transfer-beneficiary-information.md) — non-breaking; Payments
+- 2024-11-20.acacia: [Trace payouts with a unique identifier](https://docs.stripe.com/changelog/acacia/2024-11-20/payout-trace-id-api.md) — non-breaking; Payouts
+- 2024-11-20.acacia: [Adds network decline code field for Swish and BLIK refunds](https://docs.stripe.com/changelog/acacia/2024-11-20/refunds-network-decline-code.md) — non-breaking; Payments
+- 2024-11-20.acacia: [Adds support for Service Tax type](https://docs.stripe.com/changelog/acacia/2024-11-20/service_tax.md) — non-breaking; Tax
+- 2024-11-20.acacia: [Use configurable capture methods and set up future usage for South Korean payment methods](https://docs.stripe.com/changelog/acacia/2024-11-20/south-korea-payment-methods.md) — non-breaking; Checkout
+- 2024-11-20.acacia: [Customize the submit button recurring Payment Links and Checkout Sessions](https://docs.stripe.com/changelog/acacia/2024-11-20/submit-type-recurring-cpl.md) — non-breaking; Checkout, Paymentlinks
+- 2024-12-18.acacia: [Adds disabled reason to invoices, subscriptions, and schedules](https://docs.stripe.com/changelog/acacia/2024-12-18/add-disabled-reason.md) — non-breaking; Tax, Billing, Invoicing
+- 2024-12-18.acacia: [Modify trial subscriptions created by Payment Links](https://docs.stripe.com/changelog/acacia/2024-12-18/add-trial-days-update-payment-links-api.md) — non-breaking; Paymentlinks
+- 2024-12-18.acacia: [Adds support for reinstating Billing Credits on Invoice voiding](https://docs.stripe.com/changelog/acacia/2024-12-18/billing-credits-invoice-voiding.md) — non-breaking; Billing, Invoicing
+- 2024-12-18.acacia: [Adds field-level permissions for revenue and worker count in an Account’s business profile](https://docs.stripe.com/changelog/acacia/2024-12-18/business-profile-revenue-worker-count.md) — non-breaking; Connect
+- 2024-12-18.acacia: [Supports redisplaying payment methods for Cards and Sources](https://docs.stripe.com/changelog/acacia/2024-12-18/cards-sources-allow-redisplay.md) — non-breaking; Payments
+- 2024-12-18.acacia: [Adds network transaction ID to charges](https://docs.stripe.com/changelog/acacia/2024-12-18/charge-display-network-transaction-id.md) — non-breaking; Payments
+- 2024-12-18.acacia: [Adds funding details to Amazon Pay and Revolut Pay charges](https://docs.stripe.com/changelog/acacia/2024-12-18/charge-pm-details.md) — non-breaking; Payments
+- 2024-12-18.acacia: [Creates Issuing authorizations when Stripe is unavailable](https://docs.stripe.com/changelog/acacia/2024-12-18/issuing-auths-when-stripe-unavailable.md) — non-breaking; Issuing
+- 2024-12-18.acacia: [Issuing authorizations now include merchant tax ID number](https://docs.stripe.com/changelog/acacia/2024-12-18/issuing-merchant-tax-id.md) — non-breaking; Issuing
+- 2024-12-18.acacia: [Adds support for SEPA Direct Debit and Bacs Direct Debit mandate reference prefix](https://docs.stripe.com/changelog/acacia/2024-12-18/mandate-reference-prefix.md) — non-breaking; Checkout, Payments
+- 2024-12-18.acacia: [Adds network advice and decline codes](https://docs.stripe.com/changelog/acacia/2024-12-18/network-advice-code-network-decline-code.md) — non-breaking; Payments
+- 2024-12-18.acacia: [Adds additional beneficiary information for bank transfer payments](https://docs.stripe.com/changelog/acacia/2024-12-18/new-bank-transfer-beneficiary-information.md) — non-breaking; Payments
+- 2024-12-18.acacia: [Adds new balance transaction types to support minimum balance](https://docs.stripe.com/changelog/acacia/2024-12-18/payout-minimum-balance.md) — non-breaking; Payouts
+- 2024-12-18.acacia: [Billing Portal Configuration always returns period end date in responses](https://docs.stripe.com/changelog/acacia/2024-12-18/portal-config-schedule-at-period-end-required.md) — non-breaking; Billing
+- 2024-12-18.acacia: [Adds regulated status field to card objects in several APIs](https://docs.stripe.com/changelog/acacia/2024-12-18/regulated-status.md) — non-breaking; Payments
+- 2024-12-18.acacia: [Adds support for tax ID types in 19 new countries](https://docs.stripe.com/changelog/acacia/2024-12-18/tax-ids-19-new-countries.md) — non-breaking; Tax
+- 2024-12-18.acacia: [Adds support for 21 new countries to the Tax Registration API](https://docs.stripe.com/changelog/acacia/2024-12-18/tax-registration-21-new-countries.md) — non-breaking; Tax
+- 2024-12-18.acacia: [Adds SDK support for trace IDs](https://docs.stripe.com/changelog/acacia/2024-12-18/trace-id-sdk.md) — non-breaking; Payments
+- 2024-12-18.acacia: [Adds signature request as a replacement option for the Vault and Forward API](https://docs.stripe.com/changelog/acacia/2024-12-18/vault-and-forward-request-signature-replacement.md) — non-breaking; All products
+- 2024-12-18.acacia: [Adds support for responding to Visa compliance disputes](https://docs.stripe.com/changelog/acacia/2024-12-18/visa-compliance.md) — non-breaking; Payments
+- 2025-01-27.acacia: [Modify phone number collection on Payment Links](https://docs.stripe.com/changelog/acacia/2025-01-27/add-phone-number-collection-update-payment-links-api.md) — non-breaking; Paymentlinks
+- 2025-01-27.acacia: [Adds advice code to Charges](https://docs.stripe.com/changelog/acacia/2025-01-27/charge-outcome-advice-code.md) — non-breaking; Payments
+- 2025-01-27.acacia: [Adds discounts field to Checkout Sessions](https://docs.stripe.com/changelog/acacia/2025-01-27/checkout-sessions-discounts-field.md) — non-breaking; Checkout
+- 2025-01-27.acacia: [Adds Sudan to allowed shipping countries for Checkout](https://docs.stripe.com/changelog/acacia/2025-01-27/checkout-sudan-shipping-support.md) — non-breaking; Checkout
+- 2025-01-27.acacia: [Adds directorship declaration to the Accounts API](https://docs.stripe.com/changelog/acacia/2025-01-27/directorship-declaration.md) — non-breaking; Connect
+- 2025-01-27.acacia: [Makes Issuing and Treasury embedded components generally available](https://docs.stripe.com/changelog/acacia/2025-01-27/issuing-treasury-embedded-components.md) — non-breaking; Issuing, Treasury
+- 2025-01-27.acacia: [Adds support for multiple financial accounts per business](https://docs.stripe.com/changelog/acacia/2025-01-27/multi-fa.md) — non-breaking; Treasury
+- 2025-01-27.acacia: [Adds support for ownership exemption reason to the Accounts API](https://docs.stripe.com/changelog/acacia/2025-01-27/ownership-exemption-reason-accounts-api.md) — non-breaking; Connect
+- 2025-01-27.acacia: [Adds support for the Pay by Bank local payment method](https://docs.stripe.com/changelog/acacia/2025-01-27/pay-by-bank-lpm.md) — non-breaking; Checkout, Payments
+- 2025-01-27.acacia: [Adds PayPal country property to the PaymentMethods and Charge objects](https://docs.stripe.com/changelog/acacia/2025-01-27/paypal-country.md) — non-breaking; Payments
+- 2025-01-27.acacia: [Adds proof of ultimate beneficial ownership as a document type](https://docs.stripe.com/changelog/acacia/2025-01-27/proof-of-ultimate-beneficial-ownership-document-support.md) — non-breaking; Connect
+- 2025-01-27.acacia: [Adds support for collecting tips in JPY currency to Terminal](https://docs.stripe.com/changelog/acacia/2025-01-27/terminal-jp-supported-country.md) — non-breaking; Terminal
+- 2025-02-24.acacia: [Makes shipping information an optional parameter for Afterpay payments](https://docs.stripe.com/changelog/acacia/2025-02-24/afterpay-shipping-details-optional.md) — non-breaking; Payments
+- 2025-02-24.acacia: [Credit grants can now be applied to specific prices](https://docs.stripe.com/changelog/acacia/2025-02-24/billing-credits-price-level-applicability.md) — non-breaking; Billing
+- 2025-02-24.acacia: [Credit grants can now be prioritized](https://docs.stripe.com/changelog/acacia/2025-02-24/billing-credits-priority.md) — non-breaking; Billing
+- 2025-02-24.acacia: [Adds support for blocking specific card brands in Checkout Sessions](https://docs.stripe.com/changelog/acacia/2025-02-24/checkout_add_brands_blocked.md) — non-breaking; Checkout
+- 2025-02-24.acacia: [Checkout Sessions now group customer information in one field](https://docs.stripe.com/changelog/acacia/2025-02-24/checkout-sessions-collected-info.md) — non-breaking; Checkout
+- 2025-02-24.acacia: [Makes billing country and email fields optional for Klarna payments](https://docs.stripe.com/changelog/acacia/2025-02-24/cs_make_billing_country_and_email_field_optional_for_klarna_payments.md) — non-breaking; Payments
+- 2025-02-24.acacia: [Adds metadata field to the Products API for creating an inline default price](https://docs.stripe.com/changelog/acacia/2025-02-24/products-default-price-data-metadata-field.md) — non-breaking; Billing
+- 2025-02-24.acacia: [Versioning in Stripe JS](https://docs.stripe.com/changelog/acacia/2025-02-24/stripe-js-versioning.md) — non-breaking; Checkout, Elements
+- 2025-02-24.acacia: [Adds ability to schedule debit payments for a specific date](https://docs.stripe.com/changelog/acacia/2025-02-24/target-date.md) — non-breaking; Payments
+- 2025-03-31.basil: [Adds BalanceTransaction types related to pay with Stripe balance](https://docs.stripe.com/changelog/basil/2025-03-31/add_pay_with_stripe_balance_bt_types.md) — non-breaking; Connect, Payments
+- 2025-03-31.basil: [Adds presentment details for Adaptive Pricing](https://docs.stripe.com/changelog/basil/2025-03-31/add_presentment_details.md) — non-breaking; Checkout
+- 2025-03-31.basil: [Adds support for the Billie local payment method](https://docs.stripe.com/changelog/basil/2025-03-31/add-billie.md) — non-breaking; Checkout, Connect, Elements, Paymentlinks, Payments, Sigma
+- 2025-03-31.basil: [Adds custom UI mode to Checkout Sessions](https://docs.stripe.com/changelog/basil/2025-03-31/add-checkout-session-custom-ui-mode.md) — non-breaking; Checkout
+- 2025-03-31.basil: [Adds the initCheckout method](https://docs.stripe.com/changelog/basil/2025-03-31/add-init-checkout.md) — non-breaking; Checkout, Elements
+- 2025-03-31.basil: [Adds support for multiple (partial) payments on invoices](https://docs.stripe.com/changelog/basil/2025-03-31/add-support-for-multiple-partial-payments-on-invoices.md) — breaking; Billing, Invoicing, Payments
+- 2025-03-31.basil: [Invoicing resources now specify how they were generated](https://docs.stripe.com/changelog/basil/2025-03-31/adds-new-parent-field-to-invoicing-objects.md) — breaking; Billing, Invoicing
+- 2025-03-31.basil: [Adds new error codes for required verifications](https://docs.stripe.com/changelog/basil/2025-03-31/adds-requirement-error-codes.md) — breaking; Connect
+- 2025-03-31.basil: [Expanded availability of Account KYC data](https://docs.stripe.com/changelog/basil/2025-03-31/availability_of_additional_kyc_data.md) — non-breaking; Connect
+- 2025-03-31.basil: [Adds new webhook event types for billing credits](https://docs.stripe.com/changelog/basil/2025-03-31/billing-credit-webhooks.md) — non-breaking; Billing
+- 2025-03-31.basil: [Adds new webhook event types for Billing Meters](https://docs.stripe.com/changelog/basil/2025-03-31/billing-meter-webhooks.md) — non-breaking; Billing
+- 2025-03-31.basil: [Adds optional items to Checkout Sessions and Payment Links](https://docs.stripe.com/changelog/basil/2025-03-31/checkout_optional_items.md) — non-breaking; Checkout, Paymentlinks
+- 2025-03-31.basil: [Checkout Sessions have lower latency and new update semantics](https://docs.stripe.com/changelog/basil/2025-03-31/checkout-legacy-subscription-upgrade.md) — breaking; Checkout
+- 2025-03-31.basil: [Checkout Session removes shipping details](https://docs.stripe.com/changelog/basil/2025-03-31/checkout-session-remove-shipping-details.md) — breaking; Checkout
+- 2025-03-31.basil: [Checkout Session allows shipping option updates](https://docs.stripe.com/changelog/basil/2025-03-31/checkout-session-shipping-options-update-param.md) — non-breaking; Checkout
+- 2025-03-31.basil: [Adds permissions parameter to Checkout Sessions](https://docs.stripe.com/changelog/basil/2025-03-31/cs_add_checkout_session_permissions.md) — non-breaking; Checkout
+- 2025-03-31.basil: [Updates the default layout for Payment Element](https://docs.stripe.com/changelog/basil/2025-03-31/default-layout-of-payment-element.md) — breaking; Elements
+- 2025-03-31.basil: [Adds default value to custom fields on Payment Links](https://docs.stripe.com/changelog/basil/2025-03-31/default-value-payment-links-custom-fields.md) — non-breaking; Paymentlinks
+- 2025-03-31.basil: [Removes manual capture method for Interac cards](https://docs.stripe.com/changelog/basil/2025-03-31/deprecate-interac-present-manual-capture-method.md) — breaking; Payments, Terminal
+- 2025-03-31.basil: [Removes legacy usage-based billing](https://docs.stripe.com/changelog/basil/2025-03-31/deprecate-legacy-usage-based-billing.md) — breaking; Billing, Invoicing
+- 2025-03-31.basil: [Removes coupon and promotion code parameters with stackable discounts](https://docs.stripe.com/changelog/basil/2025-03-31/deprecate-singular-coupon-promotion-code.md) — breaking; Billing
+- 2025-03-31.basil: [Removes total count expansion for list API methods](https://docs.stripe.com/changelog/basil/2025-03-31/deprecate-total-count-expansion.md) — breaking; All products
+- 2025-03-31.basil: [Adds ability to configure saved payment methods for one-time payments on the hosted invoice page](https://docs.stripe.com/changelog/basil/2025-03-31/hosted-payment-method-save.md) — non-breaking; Connect, Invoicing
+- 2025-03-31.basil: [Adds jurisdiction level and taxability reason to manual tax amounts on invoices](https://docs.stripe.com/changelog/basil/2025-03-31/invoice-manual-tax-amount-fields.md) — non-breaking; Invoicing
+- 2025-03-31.basil: [Replaces Upcoming Invoice API methods with the Create Preview Invoice API](https://docs.stripe.com/changelog/basil/2025-03-31/invoice-preview-api-deprecations.md) — breaking; Billing, Invoicing
+- 2025-03-31.basil: [Replaces top-level price fields with improved price modeling on Invoice Items and Invoice Line Items](https://docs.stripe.com/changelog/basil/2025-03-31/invoice-pricing-configurations.md) — breaking; Billing, Invoicing
+- 2025-03-31.basil: [Replaces top-level tax-related properties with improved tax modeling on Invoices, Invoice Line Items, and Credit Note Line Items](https://docs.stripe.com/changelog/basil/2025-03-31/invoice-tax-configurations.md) — breaking; Billing, Invoicing
+- 2025-03-31.basil: [Adds expired status for Issuing Authorizations](https://docs.stripe.com/changelog/basil/2025-03-31/issuing-authorizations-expired.md) — breaking; Issuing
+- 2025-03-31.basil: [HTTP Accept headers for webhooks now specify JSON during Issuing authorizations](https://docs.stripe.com/changelog/basil/2025-03-31/issuing-json-webhook.md) — breaking; Issuing
+- 2025-03-31.basil: [Adds support for Klarna in the hosted invoice page](https://docs.stripe.com/changelog/basil/2025-03-31/klarna-send-invoice.md) — non-breaking; Billing
+- 2025-03-31.basil: [Makes the client parameter optional for WeChat Pay until confirmation](https://docs.stripe.com/changelog/basil/2025-03-31/lient-param-optional-wechatpay-before-confirmation.md) — non-breaking; Invoicing
+- 2025-03-31.basil: [Adds support for last aggregation formula on meters](https://docs.stripe.com/changelog/basil/2025-03-31/meters-last-agg-formula.md) — non-breaking; Billing
+- 2025-03-31.basil: [Payment Methods won’t allow modifying fields for Naver Pay after the object is first created](https://docs.stripe.com/changelog/basil/2025-03-31/naver-pay-payment-method.md) — breaking; Payments
+- 2025-03-31.basil: [Adds support for saving and reusing Naver Pay payment methods](https://docs.stripe.com/changelog/basil/2025-03-31/naver-pay-recurring.md) — non-breaking; Billing, Checkout, Elements, Paymentlinks, Payments
+- 2025-03-31.basil: [Introduces new customer balance transaction types](https://docs.stripe.com/changelog/basil/2025-03-31/new-customer-transaction-types.md) — non-breaking; Billing
+- 2025-03-31.basil: [Adds reason code for Issuing authorizations created while Stripe is unavailable](https://docs.stripe.com/changelog/basil/2025-03-31/new-network-fallback-issuing-authorization-reason-code.md) — breaking; Issuing
+- 2025-03-31.basil: [Adds support for the New Zealand BECS Direct Debit local payment method](https://docs.stripe.com/changelog/basil/2025-03-31/nz-bank-account.md) — non-breaking; Billing, Checkout, Connect, Elements, Invoicing, Paymentlinks, Payments
+- 2025-03-31.basil: [Changes the political exposure property of the Person object from a string to an enum](https://docs.stripe.com/changelog/basil/2025-03-31/political-exposure-persons-api.md) — breaking; Connect
+- 2025-03-31.basil: [Removes support for the page parameter](https://docs.stripe.com/changelog/basil/2025-03-31/remove-page-event-destinations.md) — non-breaking; All products
+- 2025-03-31.basil: [Partially capturing or canceling payments no longer creates a Refund](https://docs.stripe.com/changelog/basil/2025-03-31/remove-refund-from-partial-capture-and-payment-cancellation-flow.md) — breaking; Payments
+- 2025-03-31.basil: [Removes support for discount coupons that don’t have a specified end time](https://docs.stripe.com/changelog/basil/2025-03-31/restrict-coupon-duration.md) — breaking; Billing
+- 2025-03-31.basil: [Adds support for the Satispay local payment method](https://docs.stripe.com/changelog/basil/2025-03-31/satispay-lpm.md) — non-breaking; Checkout, Connect, Elements, Paymentlinks, Payments, Sigma
+- 2025-03-31.basil: [Adds new error code for failures with the Setup Intents API using mobile wallets](https://docs.stripe.com/changelog/basil/2025-03-31/terminal-mobile-wallets-setup-intents-error-code.md) — non-breaking; Payments, Terminal
+- 2025-03-31.basil: [Adds ability to configure WiFi for Terminal readers](https://docs.stripe.com/changelog/basil/2025-03-31/terminal-wifi-configuration.md) — non-breaking; Terminal
+- 2025-03-31.basil: [Updates the Vault and Forward API to return a 402 status code for upstream request timeouts](https://docs.stripe.com/changelog/basil/2025-03-31/vault-forward-api-returns-402.md) — breaking; Payments
+- 2025-04-30.basil: [Adds Pix to payment method configurations](https://docs.stripe.com/changelog/basil/2025-04-30/add_pix_to_payment_method_configuration.md) — non-breaking; Payments
+- 2025-04-30.basil: [Adds a minority-owned business designation field to the business profile hash](https://docs.stripe.com/changelog/basil/2025-04-30/add-minority-owned-business-designation-to-business-profile.md) — non-breaking; Connect, Issuing
+- 2025-04-30.basil: [Adds tax ID to Payment Method billing details](https://docs.stripe.com/changelog/basil/2025-04-30/add-tax-id-to-billing-details.md) — non-breaking; Payments
+- 2025-04-30.basil: [Adds support for tax ID types in ten new countries](https://docs.stripe.com/changelog/basil/2025-04-30/add-tax-ids.md) — non-breaking; Tax
+- 2025-04-30.basil: [Adds a demographic information hash to the Persons API](https://docs.stripe.com/changelog/basil/2025-04-30/add-us-cfpb-data-to-person.md) — non-breaking; Connect, Issuing
+- 2025-04-30.basil: [Adds context field to event payload](https://docs.stripe.com/changelog/basil/2025-04-30/additional-context-organization-events.md) — non-breaking; All products
+- 2025-04-30.basil: [Tax Registration API now supports twelve new countries](https://docs.stripe.com/changelog/basil/2025-04-30/additional-tax-registration-countries.md) — non-breaking; Tax
+- 2025-04-30.basil: [Adds Affirm as a supported payment method for one-time invoices and subscriptions](https://docs.stripe.com/changelog/basil/2025-04-30/affirm-send-invoice.md) — non-breaking; Billing
+- 2025-04-30.basil: [Adds capture method option to Billie payments](https://docs.stripe.com/changelog/basil/2025-04-30/billie-capture-method-option.md) — non-breaking; Payments
+- 2025-04-30.basil: [Adds wallet options to Checkout Sessions](https://docs.stripe.com/changelog/basil/2025-04-30/checkout-link-wallet-options.md) — non-breaking; Checkout
+- 2025-04-30.basil: [Adds a new ping event type for testing an event destination](https://docs.stripe.com/changelog/basil/2025-04-30/cs_document_event_destination_ping_event.md) — non-breaking; All products
+- 2025-04-30.basil: [Adds support for card installments on Confirmation Token](https://docs.stripe.com/changelog/basil/2025-04-30/ct-pmo-card-installments.md) — non-breaking; Elements, Payments
+- 2025-04-30.basil: [Adds a field explaining why refunds are pending](https://docs.stripe.com/changelog/basil/2025-04-30/refund-pending-reason.md) — non-breaking; Payments
+- 2025-04-30.basil: [Adds registration date to the Accounts API](https://docs.stripe.com/changelog/basil/2025-04-30/us_cfpb.md) — non-breaking; Capital, Issuing
+- 2025-05-28.basil: [Adds balance types to the Balance Transactions API](https://docs.stripe.com/changelog/basil/2025-05-28/add-balance-type-to-balance-transactions.md) — non-breaking; Issuing, Payments, Payouts, Treasury
+- 2025-05-28.basil: [Adds metadata field on Tax Calculation line items](https://docs.stripe.com/changelog/basil/2025-05-28/add-metadata-on-tax-calculation-line-item.md) — non-breaking; Tax
+- 2025-05-28.basil: [Adds refund and dispute prefunding balances to the Balance API](https://docs.stripe.com/changelog/basil/2025-05-28/add-refund-and-dispute-prefunding-to-balances.md) — non-breaking; Payments
+- 2025-05-28.basil: [Adds account capability for the Pix payment method for US-based sellers](https://docs.stripe.com/changelog/basil/2025-05-28/adds-pix-capability-for-us-sellers.md) — non-breaking; Payments
+- 2025-05-28.basil: [Adds option to Checkout Sessions to let customers remove saved payment methods](https://docs.stripe.com/changelog/basil/2025-05-28/checkout-payment-method-remove.md) — non-breaking; Checkout
+- 2025-05-28.basil: [Adds forms to Terminal readers to collect user information](https://docs.stripe.com/changelog/basil/2025-05-28/collect-inputs.md) — non-breaking; Terminal
+- 2025-05-28.basil: [Adds two new Connect embedded components for Disputes](https://docs.stripe.com/changelog/basil/2025-05-28/disputes-embedded-components.md) — non-breaking; Connect
+- 2025-05-28.basil: [Extracts sex and place of birth from government-issued ID documents](https://docs.stripe.com/changelog/basil/2025-05-28/extract-sex-and-place-of-birth.md) — non-breaking; Identity
+- 2025-05-28.basil: [Adds South Korean payment methods to the Payment Method Configurations API](https://docs.stripe.com/changelog/basil/2025-05-28/korea-payment-method-configuration.md) — non-breaking; Connect
+- 2025-05-28.basil: [Adds support for setting up future usage of Naver Pay in Checkout Sessions](https://docs.stripe.com/changelog/basil/2025-05-28/naver-pay-update.md) — non-breaking; Payments
+- 2025-05-28.basil: [Adds support for partial payments on invoices](https://docs.stripe.com/changelog/basil/2025-05-28/partial-payments.md) — non-breaking; Billing, Invoicing
+- 2025-05-28.basil: [Adds network decline codes for PayPal refunds](https://docs.stripe.com/changelog/basil/2025-05-28/paypal_refund_network_decline_code.md) — non-breaking; Payments
+- 2025-05-28.basil: [Reintroduces billing thresholds](https://docs.stripe.com/changelog/basil/2025-05-28/reintroduce-billing-thresholds.md) — non-breaking; Billing, Invoicing
+- 2025-05-28.basil: [Adds capture method option to Satispay payments](https://docs.stripe.com/changelog/basil/2025-05-28/satispay-capture-method-option.md) — non-breaking; Payments
+- 2025-05-28.basil: [Adds support for WeChat Pay for Setup Intents](https://docs.stripe.com/changelog/basil/2025-05-28/setup-intents-wechat-pay.md) — non-breaking; Payments
+- 2025-05-28.basil: [Adds simulated S700 device type to Reader API](https://docs.stripe.com/changelog/basil/2025-05-28/simulated-s700-device-type.md) — non-breaking; Terminal
+- 2025-06-30.basil: [Adds the ability to provide proof-of-address documents for connected accounts](https://docs.stripe.com/changelog/basil/2025-06-30/accounts-proof-of-address.md) — non-breaking; Connect, Issuing, Treasury
+- 2025-06-30.basil: [Adds new plan types for Japan installments](https://docs.stripe.com/changelog/basil/2025-06-30/add_jp_installments_plan_types.md) — non-breaking; Payments
+- 2025-06-30.basil: [Adds billing mode for more flexible subscriptions behavior](https://docs.stripe.com/changelog/basil/2025-06-30/billing-mode.md) — non-breaking; Billing
+- 2025-06-30.basil: [Adds support for crypto payment method](https://docs.stripe.com/changelog/basil/2025-06-30/crypto-payment-method.md) — non-breaking; Crypto
+- 2025-06-30.basil: [Adds optional filter by status when listing Financial Accounts](https://docs.stripe.com/changelog/basil/2025-06-30/financial-accounts-status-filter.md) — non-breaking; Treasury
+- 2025-06-30.basil: [Adds more flexible schedules for monthly and weekly payouts](https://docs.stripe.com/changelog/basil/2025-06-30/flexible-schedules-payouts.md) — non-breaking; Connect, Payouts
+- 2025-06-30.basil: [Adds BUUT as a supported bank when using iDEAL](https://docs.stripe.com/changelog/basil/2025-06-30/ideal-buut-support.md) — non-breaking; Payments
+- 2025-06-30.basil: [Verification Sessions can now collect verification information for a related Person](https://docs.stripe.com/changelog/basil/2025-06-30/identity-related-person.md) — non-breaking; Connect, Identity
+- 2025-06-30.basil: [Adds support for saving Klarna payment methods](https://docs.stripe.com/changelog/basil/2025-06-30/klarna-saved-payment-methods.md) — non-breaking; Billing, Payments
+- 2025-06-30.basil: [Adds support for collecting card details and confirming Payment Intents to server-driven Terminal integrations](https://docs.stripe.com/changelog/basil/2025-06-30/terminal-server-support-cards-payments.md) — non-breaking; Terminal
+- 2025-06-30.basil: [Adds Visa compliance disputes](https://docs.stripe.com/changelog/basil/2025-06-30/visa-compliance-disputes.md) — non-breaking; Payments
+- 2025-07-30.basil: [Adds support for ad-hoc products and prices when creating Payment Links](https://docs.stripe.com/changelog/basil/2025-07-30/ad-hoc-prices-for-payment-links.md) — non-breaking; Paymentlinks
+- 2025-07-30.basil: [Adds support for new tipping currencies to the Terminal Configuration object](https://docs.stripe.com/changelog/basil/2025-07-30/add_terminal_tipping_currency_aed_bgn_huf_chf_ron.md) — non-breaking; Terminal
+- 2025-07-30.basil: [Adds transaction ID to Charges for Cash App](https://docs.stripe.com/changelog/basil/2025-07-30/add-cashapp-transaction-id-to-charges.md) — non-breaking; Payments
+- 2025-07-30.basil: [Adds a new value to payment review closed reasons](https://docs.stripe.com/changelog/basil/2025-07-30/add-new-enum-to-payment-review-close-reason.md) — non-breaking; Radar
+- 2025-07-30.basil: [Adds a duration parameter for schedule phases](https://docs.stripe.com/changelog/basil/2025-07-30/add-schedule-phase-duration.md) — non-breaking; Billing
+- 2025-07-30.basil: [Adds support for the America/Coyhaique time zone](https://docs.stripe.com/changelog/basil/2025-07-30/america_coyhaique_timezone.md) — non-breaking; All products
+- 2025-07-30.basil: [Adds support for billing thresholds on flexible billing mode Subscriptions](https://docs.stripe.com/changelog/basil/2025-07-30/billing-thresholds.md) — non-breaking; Billing
+- … 256 more not shown here: [Stripe's changelog](https://docs.stripe.com/changelog).
+
+</details>
+
+**Also check outside the code**
+
+- Webhook endpoint API versions configured in the Stripe dashboard, including replayed events.
+- API versions pinned by other services, workers, and consumers of webhook payloads.
+
+</details>
+
+<details><summary>Run details</summary>
+
+Uptide version not retained · claude-sonnet-4-6 · 6.5k/2.2k tokens · $0.05 · 1 min
+
+Uptide commit: \`not retained\`
+Branch: \`uptide/stripe-22.6.2\`
+
+</details>
+"
+`;
+
+exports[`stripe > snapshots the full PR description and compact terminal/comment summary 2`] = `
+"## Upgrade stripe 14.25.0 → 22.6.2
+
+| | |
+|---|---|
+| **Risk** | High: behavior changes |
+| **Changes** | 4 sites in 1 file · 0 by rule · 4 by agent |
+| **Types** | ✅ 4 errors after the bump → 0 |
+| **Behavior** | ⚠️ not checked |
+| **Tests** | ⚠️ no test script in the repository |
+
+### What changed
+
+**1. Stripe API version** · 2 sites · by agent
+**2. Subscription billing period moved to items** · 2 sites · by agent
+"
+`;

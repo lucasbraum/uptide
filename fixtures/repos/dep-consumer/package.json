@@ -1,0 +1,12 @@
+{
+  "name": "dep-consumer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Consumer of fixtures/deps: widget@1 installed next to @scope/core@1, which widget@2 no longer accepts. Not runnable.",
+  "dependencies": {
+    "@scope/core": "1.0.0",
+    "widget": "1.0.0"
+  },
+  "license": "MIT"
+}

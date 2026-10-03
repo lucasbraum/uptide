@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm lint
+      # No private planning document, pointer or identifier in what would be published. The
+      # private repository carries the denylist as a file and must have it; a public one gets
+      # it from a secret, and a fork without the secret still has names and pointers checked.
+      - name: Public tree is clean
+        run: node scripts/public-tree.mjs . ${{ github.event.repository.private && '--require-denylist' || '' }}
+        env:
+          UPTIDE_PRIVATE_DENYLIST: ${{ secrets.UPTIDE_PRIVATE_DENYLIST }}
+      - run: pnpm build
+      - run: pnpm typecheck
+      - run: pnpm test
+      - name: Verify the local bot PR loop
+        if: matrix.node == 22
+        env:
+          UPTIDE_NETWORK: '1'
+        run: pnpm --filter @uptide/core exec vitest run src/action/action.test.ts
+
+  smoke:
+    # The packed CLI, installed in a clean Node container, against npm, pnpm and yarn fixtures.
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm smoke ${{ matrix.node }}

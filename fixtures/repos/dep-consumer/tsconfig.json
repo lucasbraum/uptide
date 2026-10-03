@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": [],
+    "baseUrl": ".",
+    "paths": {
+      "widget": ["../../deps/widget-v1/index.d.ts"],
+      "@scope/core": ["../../deps/scope-core-v1/index.d.ts"]
+    }
+  },
+  "include": ["src"]
+}

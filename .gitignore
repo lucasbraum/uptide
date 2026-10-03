@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.turbo/
+coverage/
+*.tsbuildinfo
+.DS_Store
+eval-out/
+# Hand-written declaration fixtures are inputs, not build output.
+!fixtures/**/dist/
+!fixtures/**/dist/**
+# Copied in by packages/cli/scripts/prepack.mjs for the tarball only.
+/packages/cli/README.md
+/packages/cli/LICENSE
+*.tgz
+# Private planning: pasted into briefs, never committed (scripts/public-export-exclude.txt).
+/docs/plan-*.md

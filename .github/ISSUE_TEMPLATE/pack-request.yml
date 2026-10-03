@@ -1,0 +1,23 @@
+name: Dependency request
+description: Ask for a migration pack for another dependency
+labels: [pack]
+body:
+  - type: input
+    id: dependency
+    attributes:
+      label: Dependency and upgrade
+      placeholder: openai 4 → 5
+    validations:
+      required: true
+  - type: textarea
+    id: breaks
+    attributes:
+      label: What the upgrade breaks
+      description: The changes that cost you time, with the official migration guide if there is one
+    validations:
+      required: true
+  - type: textarea
+    id: example
+    attributes:
+      label: A public repository that still needs it
+      description: A pack is accepted with ground truth from a public repository

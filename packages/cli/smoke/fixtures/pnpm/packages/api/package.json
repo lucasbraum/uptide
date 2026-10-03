@@ -1,0 +1,19 @@
+{
+  "name": "@smoke/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@smoke/shared": "workspace:*",
+    "stripe": "14.25.0",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.0",
+    "typescript": "catalog:"
+  },
+  "license": "MIT",
+  "scripts": {
+    "preinstall": "node -e \"require('node:fs').writeFileSync('/tmp/UPTIDE_INSTALL_SCRIPT_RAN', 'bad')\""
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "total": 143,
+  "bySeverity": {
+    "breaking": 37,
+    "additive": 106
+  },
+  "byKind": {
+    "type": 12,
+    "added": 104,
+    "removed": 8,
+    "signature": 18,
+    "widened": 1
+  },
+  "breaking": [
+    "type \"./drawer\":default @0.7",
+    "type \"./stack\":default @0.7",
+    "type \"./tabs\":default @0.7",
+    "type Drawer @0.7",
+    "removed DynamicRouteTemplate",
+    "removed DynamicRoutes",
+    "removed DynamicTemplateToHrefString",
+    "signature ExpoRoot @0.7",
+    "signature ExpoRouter.__routes",
+    "type Href",
+    "signature LinkProps",
+    "type LinkProps#href @0.7",
+    "signature LinkProps#onPress @0.7",
+    "type Navigator.Slot",
+    "type Navigator.useContext",
+    "removed RouteParamInput -> RouteInputParams @0.8",
+    "type RouteSegments @0.7",
+    "signature Router#navigate @0.6",
+    "signature Router#push @0.6",
+    "signature Router#replace @0.6",
+    "signature Router#setParams @0.5",
+    "removed Routes",
+    "signature ScrollViewStyleReset @0.7",
+    "type SingleRoutePart @0.7",
+    "signature Slot @0.7",
+    "type Stack @0.7",
+    "removed StaticRoutes",
+    "removed StrictRouteParamsInputs",
+    "removed StrictRouteParamsOutput",
+    "type Tabs @0.7",
+    "signature Unmatched @0.7",
+    "signature getMockConfig @0.7",
+    "signature useGlobalSearchParams",
+    "signature useLocalSearchParams",
+    "signature useNavigation @0.5",
+    "signature useRootNavigationState",
+    "signature useSegments"
+  ]
+}

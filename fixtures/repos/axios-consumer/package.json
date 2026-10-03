@@ -1,0 +1,11 @@
+{
+  "name": "axios-consumer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Hand-written consumer pinned to axios 0.27.2, using the symbols known to change in 1.x. Not runnable.",
+  "dependencies": {
+    "axios": "0.27.2"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,9 @@
+{
+  "name": "widget",
+  "version": "2.0.0",
+  "types": "./index.d.ts",
+  "dependencies": {
+    "@scope/core": "^2"
+  },
+  "license": "MIT"
+}

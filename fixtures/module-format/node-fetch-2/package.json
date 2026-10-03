@@ -1,0 +1,10 @@
+{
+  "name": "node-fetch",
+  "version": "2.7.0",
+  "main": "lib/index.js",
+  "module": "lib/index.mjs",
+  "engines": {
+    "node": "4.x || >=6.0.0"
+  },
+  "license": "MIT"
+}

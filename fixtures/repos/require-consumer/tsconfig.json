@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "allowJs": true,
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": [],
+    "esModuleInterop": true,
+    "baseUrl": ".",
+    "paths": { "synthetic": ["../../synthetic/dist/index.d.ts"] }
+  },
+  "include": ["src"]
+}

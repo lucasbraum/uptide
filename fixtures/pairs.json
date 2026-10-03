@@ -1,0 +1,10 @@
+[
+  { "name": "stripe", "from": "14.25.0", "to": "17.7.0" },
+  { "name": "openai", "from": "4.104.0", "to": "5.12.0" },
+  { "name": "zod", "from": "3.23.8", "to": "4.0.0" },
+  { "name": "axios", "from": "0.27.2", "to": "1.7.0" },
+  { "name": "expo-camera", "from": "15.0.16", "to": "16.0.10" },
+  { "name": "expo-router", "from": "3.5.24", "to": "4.0.20" },
+  { "name": "@aws-sdk/client-s3", "from": "3.400.0", "to": "3.700.0" },
+  { "name": "next", "from": "14.2.0", "to": "15.0.0" }
+]

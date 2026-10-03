@@ -1,0 +1,10 @@
+{
+  "name": "file-type",
+  "version": "16.2.0",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "engines": {
+    "node": ">=8"
+  },
+  "license": "MIT"
+}

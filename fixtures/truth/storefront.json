@@ -1,0 +1,187 @@
+{
+  "$comment": "Ground truth for fixtures/repos/storefront, the synthetic workspace: zod bumped to 4.6.5 and stripe to 23.0.0 in a scratch copy, pnpm install with scripts off, tsc --noEmit per workspace; `errors` are the diagnostics new at the target (both from the committed versions (zod 3.25.76, stripe 14.25.0); the baseline has one error of its own, packages/shared/src/errors.ts:19, in both programs). To score a check against it, install the fixture's dependencies with scripts off and run `pnpm eval:check fixtures/repos/storefront --truth=fixtures/truth/storefront.json`.",
+  "repo": "storefront",
+  "cases": [
+    {
+      "package": "zod",
+      "target": "4.6.5",
+      "workspace": "packages/shared",
+      "errors": [
+        {
+          "file": "packages/shared/src/address.ts",
+          "line": 4,
+          "code": 2769
+        },
+        {
+          "file": "packages/shared/src/address.ts",
+          "line": 5,
+          "code": 2769
+        },
+        {
+          "file": "packages/shared/src/address.ts",
+          "line": 7,
+          "code": 2769
+        },
+        {
+          "file": "packages/shared/src/address.ts",
+          "line": 10,
+          "code": 2769
+        },
+        {
+          "file": "packages/shared/src/monitoring.ts",
+          "line": 6,
+          "code": 2339
+        },
+        {
+          "file": "packages/shared/src/product.ts",
+          "line": 5,
+          "code": 2769
+        },
+        {
+          "file": "packages/shared/src/product.ts",
+          "line": 6,
+          "code": 2769
+        },
+        {
+          "file": "packages/shared/src/product.ts",
+          "line": 8,
+          "code": 2353
+        },
+        {
+          "file": "packages/shared/src/product.ts",
+          "line": 17,
+          "code": 2353
+        }
+      ]
+    },
+    {
+      "package": "zod",
+      "target": "4.6.5",
+      "workspace": "packages/api",
+      "errors": [
+        {
+          "file": "packages/api/src/queue/consumer.ts",
+          "line": 2,
+          "code": 2724
+        },
+        {
+          "file": "packages/api/src/queue/consumer.ts",
+          "line": 12,
+          "code": 2344
+        },
+        {
+          "file": "packages/api/src/queue/consumer.ts",
+          "line": 19,
+          "code": 2345
+        },
+        {
+          "file": "packages/api/src/routes/customers.ts",
+          "line": 5,
+          "code": 2769
+        },
+        {
+          "file": "packages/api/src/routes/customers.ts",
+          "line": 6,
+          "code": 2769
+        },
+        {
+          "file": "packages/api/src/routes/customers.ts",
+          "line": 7,
+          "code": 2769
+        },
+        {
+          "file": "packages/api/src/routes/customers.ts",
+          "line": 12,
+          "code": 2769
+        },
+        {
+          "file": "packages/api/src/routes/customers.ts",
+          "line": 13,
+          "code": 2353
+        },
+        {
+          "file": "packages/api/src/routes/orders.ts",
+          "line": 5,
+          "code": 2769
+        },
+        {
+          "file": "packages/api/src/routes/orders.ts",
+          "line": 6,
+          "code": 2353
+        },
+        {
+          "file": "packages/api/src/routes/orders.ts",
+          "line": 10,
+          "code": 2769
+        },
+        {
+          "file": "packages/api/src/routes/orders.ts",
+          "line": 13,
+          "code": 2769
+        },
+        {
+          "file": "packages/api/src/routes/orders.ts",
+          "line": 17,
+          "code": 2769
+        },
+        {
+          "file": "packages/api/src/routes/orders.ts",
+          "line": 18,
+          "code": 2769
+        },
+        {
+          "file": "packages/api/src/routes/webhooks.ts",
+          "line": 4,
+          "code": 2769
+        },
+        {
+          "file": "packages/api/src/routes/webhooks.ts",
+          "line": 8,
+          "code": 2769
+        },
+        {
+          "file": "packages/api/src/routes/webhooks.ts",
+          "line": 9,
+          "code": 2353
+        },
+        {
+          "file": "packages/api/src/routes/webhooks.ts",
+          "line": 14,
+          "code": 2769
+        },
+        {
+          "file": "packages/api/src/routes/webhooks.ts",
+          "line": 15,
+          "code": 2769
+        }
+      ]
+    },
+    {
+      "package": "stripe",
+      "target": "23.0.0",
+      "workspace": "packages/api",
+      "errors": [
+        {
+          "file": "packages/api/src/billing/client.ts",
+          "line": 9,
+          "code": 2322
+        },
+        {
+          "file": "packages/api/src/billing/renewal.test.ts",
+          "line": 7,
+          "code": 2352
+        },
+        {
+          "file": "packages/api/src/billing/renewal.ts",
+          "line": 12,
+          "code": 2339
+        },
+        {
+          "file": "packages/api/src/billing/renewal.ts",
+          "line": 13,
+          "code": 2339
+        }
+      ]
+    }
+  ]
+}

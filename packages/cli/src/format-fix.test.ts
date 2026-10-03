@@ -1,0 +1,62 @@
+import { describe, expect, it } from 'vitest';
+import { formatFixSummary } from './format-fix.js';
+import { fixReport } from './test-utils.js';
+
+describe('formatFixSummary', () => {
+  it('says the five facts, where the branch is, and the exact next commands', () => {
+    const report = {
+      ...fixReport(true),
+      from: '14.25.0',
+      target: '23.0.0',
+      package: 'stripe',
+      branch: 'uptide/stripe-23.0.0',
+      targetSource: 'latest on npm' as const,
+      timingMs: 517_000,
+      source: '/home/me/acme-app',
+      base: 'main',
+      remote: 'https://github.com/me/acme-app',
+      prBody: '/home/me/acme-app/.git/uptide/uptide__stripe-23.0.0/pr-body.md',
+      html: '/home/me/acme-app/.git/uptide/uptide__stripe-23.0.0/report.html',
+    };
+    const out = formatFixSummary(report, {
+      color: false,
+      invocation: 'npx uptide@next',
+      cwd: '/home/me/acme-app',
+    });
+    expect(out).toBe(
+      [
+        'uptide fix · stripe 14.25.0 → 23.0.0 (latest on npm) · verification passed · 8m 37s',
+        '',
+        '  Risk      Medium: no tests',
+        '  Changes   0 sites in 0 files · 0 by rule · 0 by agent',
+        '  Types     ✅ 0 errors after the bump → 0',
+        '  Behavior  ⚠️ not checked',
+        '  Tests     ⚠️ no tests ran',
+        '',
+        'Branch uptide/stripe-23.0.0 (in your repository, not checked out)',
+        '  git diff main..uptide/stripe-23.0.0 --stat',
+        '',
+        'Next',
+        '  npx uptide@next pr --branch uptide/stripe-23.0.0      push the branch and open a draft PR on me/acme-app',
+        '  open .git/uptide/uptide__stripe-23.0.0/report.html    the migration report',
+        '  .git/uptide/uptide__stripe-23.0.0/pr-body.md          the PR description',
+        '',
+      ].join('\n'),
+    );
+  });
+
+  it('points a failed run at verify, and a published one at its PR', () => {
+    const failed = formatFixSummary(
+      { ...fixReport(false), branch: 'uptide/zod-4.6.5' },
+      { color: false },
+    );
+    expect(failed).toContain('verification failed');
+    expect(failed).toContain('npx uptide verify --branch uptide/zod-4.6.5');
+    expect(failed).not.toContain(' pr --branch');
+    const published = formatFixSummary(
+      { ...fixReport(true), prUrl: 'https://github.com/o/r/pull/9' },
+      { color: false },
+    );
+    expect(published).toContain('https://github.com/o/r/pull/9    the pull request');
+  });
+});

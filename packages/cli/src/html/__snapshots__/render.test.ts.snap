@@ -1,0 +1,308 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`HTML report > renders clean from report JSON without requiring JS 1`] = `
+"<!doctype html>
+<html lang="en">
+<body>
+<main>
+<header>
+<div class="brand">UPTIDE / CHECK</div>
+<h1>demo</h1>
+<div class="meta">
+<span>pnpm</span>
+<span>1 workspace analyzed</span>
+<time datetime="2026-10-02T12:00:00Z">Oct 2, 2026, 5:00 AM PDT</time>
+<span>Uptide CLI 0.1.0</span>
+<span>25s</span>
+</div>
+<p class="muted">No confirmed breaking changes.</p>
+</header>
+<div class="filters" hidden role="search" aria-label="Filter findings">
+<button type="button" data-filter="all" aria-pressed="true">All</button>
+<button type="button" data-filter="breaking" aria-pressed="false">Breaking</button>
+<button type="button" data-filter="deprecated" aria-pressed="false">Deprecated</button>
+<button type="button" data-filter="unverified" aria-pressed="false">Unverified</button>
+<input id="search" type="search" aria-label="Search file paths and change rules" placeholder="Search files or rules…">
+</div>
+<section aria-label="Dependency summary" class="summary">
+<p class="more safe">✓ Nothing to upgrade. No findings in the analyzed scope.</p>
+</section>
+<p id="empty-filter" class="notice" hidden>No findings match these filters.</p>
+<details class="notes">
+<summary>Analysis notes · 2 notes</summary>
+<ul>
+<li>Workspaces analyzed: ..</li>
+<li>Workspace analysis gaps: none reported.</li>
+</ul>
+</details>
+<section class="next">
+<h2>Next</h2>
+<p class="muted">every site and reason</p>
+<div class="command">
+<code>npx uptide check --details --cwd /repo</code>
+<button type="button" data-copy hidden aria-label="Copy command">Copy</button>
+</div>
+</section>
+<footer>Local report · No network requests · Contains source excerpts from reported sites only. Review before sharing.</footer>
+</main>
+</body>
+</html>"
+`;
+
+exports[`HTML report > renders skipped from report JSON without requiring JS 1`] = `
+"<!doctype html>
+<html lang="en">
+<body>
+<main>
+<header>
+<div class="brand">UPTIDE / CHECK</div>
+<h1>demo</h1>
+<div class="meta">
+<span>pnpm</span>
+<span>2 workspaces analyzed</span>
+<time datetime="2026-10-02T12:00:00Z">Oct 2, 2026, 5:00 AM PDT</time>
+<span>Uptide CLI 0.1.0</span>
+<span>25s</span>
+</div>
+<p class="muted">No confirmed breaking changes.</p>
+</header>
+<div class="filters" hidden role="search" aria-label="Filter findings">
+<button type="button" data-filter="all" aria-pressed="true">All</button>
+<button type="button" data-filter="breaking" aria-pressed="false">Breaking</button>
+<button type="button" data-filter="deprecated" aria-pressed="false">Deprecated</button>
+<button type="button" data-filter="unverified" aria-pressed="false">Unverified</button>
+<input id="search" type="search" aria-label="Search file paths and change rules" placeholder="Search files or rules…">
+</div>
+<section aria-label="Dependency summary" class="summary">
+<a class="dep" href="#dependency-0" data-package="dependency-0">
+<div>
+<strong>stripe (packages/api)</strong>
+<span class="mono muted">14.25.0 → 22.6.2 · major</span>
+</div>
+<div class="unverified">– not analyzed: Registry unreachable</div>
+</a>
+</section>
+<p id="empty-filter" class="notice" hidden>No findings match these filters.</p>
+<section class="package" id="dependency-0">
+<header>
+<h2>stripe (packages/api)</h2>
+<span class="mono muted">14.25.0 → 22.6.2</span>
+</header>
+<p class="more">– not analyzed: Registry unreachable</p>
+</section>
+<details class="notes">
+<summary>Analysis notes · 3 notes</summary>
+<ul>
+<li>Workspaces analyzed: ., packages/api.</li>
+<li>Registry unreachable; workspace analysis incomplete</li>
+<li>Workspace analysis gaps: packages/api: stripe — REGISTRY_UNREACHABLE.</li>
+</ul>
+</details>
+<section class="next">
+<h2>Next</h2>
+<p class="muted">every site and reason</p>
+<div class="command">
+<code>npx uptide check --details --cwd /repo</code>
+<button type="button" data-copy hidden aria-label="Copy command">Copy</button>
+</div>
+</section>
+<footer>Local report · No network requests · Contains source excerpts from reported sites only. Review before sharing.</footer>
+</main>
+</body>
+</html>"
+`;
+
+exports[`HTML report > renders stripe from report JSON without requiring JS 1`] = `
+"<!doctype html>
+<html lang="en">
+<body>
+<main>
+<header>
+<div class="brand">UPTIDE / CHECK</div>
+<h1>demo</h1>
+<div class="meta">
+<span>pnpm</span>
+<span>3 workspaces analyzed</span>
+<time datetime="2026-10-02T12:00:00Z">Oct 2, 2026, 5:00 AM PDT</time>
+<span>Uptide CLI 0.1.0</span>
+<span>25s</span>
+</div>
+<p class="muted">4 breaking changes in 3 files. 1 fixable by rule, 3 by agent.</p>
+</header>
+<div class="filters" hidden role="search" aria-label="Filter findings">
+<button type="button" data-filter="all" aria-pressed="true">All</button>
+<button type="button" data-filter="breaking" aria-pressed="false">Breaking</button>
+<button type="button" data-filter="deprecated" aria-pressed="false">Deprecated</button>
+<button type="button" data-filter="unverified" aria-pressed="false">Unverified</button>
+<input id="search" type="search" aria-label="Search file paths and change rules" placeholder="Search files or rules…">
+</div>
+<section aria-label="Dependency summary" class="summary">
+<a class="dep" href="#dependency-0" data-package="dependency-0">
+<div>
+<strong>stripe (packages/api)</strong>
+<span class="mono muted">14.25.0 → 23.0.0 · major</span>
+</div>
+<div class="breaking">✗ 4 breaking in 3 files<div class="muted">1 by rule · 3 by agent</div>
+</div>
+</a>
+</section>
+<p id="empty-filter" class="notice" hidden>No findings match these filters.</p>
+<section class="package" id="dependency-0">
+<header>
+<h2>stripe (packages/api)</h2>
+<span class="mono muted">14.25.0 → 23.0.0</span>
+</header>
+<details class="group" data-severity="breaking" data-rule="fixture-cast">
+<summary>
+<strong class="breaking">Test fixture casts widened</strong>
+<span class="counts">1 site · 1 by rule</span>
+<span class="counts">
+</span>
+</summary>[site]</details>
+<details class="group" data-severity="breaking" data-rule="subscription-period">
+<summary>
+<strong class="breaking">Subscription billing period moved to items</strong>
+<span class="counts">2 sites · 2 by agent</span>
+<span class="counts">
+</span>
+</summary>[site][site]</details>
+<details class="group" data-severity="breaking" data-rule="api-version">
+<summary>
+<strong class="breaking">apiVersion no longer matches the SDK</strong>
+<span class="counts">1 site · 1 by agent</span>
+<span class="counts">The configured API version does not match the target Stripe SDK. Review the API behavior changes before updating it.</span>
+</summary>
+<p class="group-note muted">1 API change since 2023-10-16 affects your code</p>[site]</details>
+</section>
+<details class="notes">
+<summary>Analysis notes · 2 notes</summary>
+<ul>
+<li>Workspaces analyzed: ., packages/api, packages/shared.</li>
+<li>Workspace analysis gaps: none reported.</li>
+</ul>
+</details>
+<section class="next">
+<h2>Next</h2>
+<p class="muted">migrate on a new branch, verify, no push</p>
+<div class="command">
+<code>npx uptide fix --only stripe --cwd /repo</code>
+<button type="button" data-copy hidden aria-label="Copy command">Copy</button>
+</div>
+<p class="muted">every site and reason</p>
+<div class="command">
+<code>npx uptide check --details --cwd /repo</code>
+<button type="button" data-copy hidden aria-label="Copy command">Copy</button>
+</div>
+</section>
+<footer>Local report · No network requests · Contains source excerpts from reported sites only. Review before sharing.</footer>
+</main>
+</body>
+</html>"
+`;
+
+exports[`HTML report > renders zod from report JSON without requiring JS 1`] = `
+"<!doctype html>
+<html lang="en">
+<body>
+<main>
+<header>
+<div class="brand">UPTIDE / CHECK</div>
+<h1>demo</h1>
+<div class="meta">
+<span>pnpm</span>
+<span>3 workspaces analyzed</span>
+<time datetime="2026-10-02T12:00:00Z">Oct 2, 2026, 5:00 AM PDT</time>
+<span>Uptide CLI 0.1.0</span>
+<span>25s</span>
+</div>
+<p class="muted">28 breaking changes in 7 files. 24 fixable by rule, 4 by agent. 15 deprecated calls (not blocking).</p>
+</header>
+<div class="filters" hidden role="search" aria-label="Filter findings">
+<button type="button" data-filter="all" aria-pressed="true">All</button>
+<button type="button" data-filter="breaking" aria-pressed="false">Breaking</button>
+<button type="button" data-filter="deprecated" aria-pressed="false">Deprecated</button>
+<button type="button" data-filter="unverified" aria-pressed="false">Unverified</button>
+<input id="search" type="search" aria-label="Search file paths and change rules" placeholder="Search files or rules…">
+</div>
+<section aria-label="Dependency summary" class="summary">
+<a class="dep" href="#dependency-0" data-package="dependency-0">
+<div>
+<strong>zod</strong>
+<span class="mono muted">3.25.76 → 4.6.5 · major</span>
+</div>
+<div class="breaking">✗ 28 breaking in 7 files<div class="muted">24 by rule · 4 by agent</div>
+</div>
+</a>
+</section>
+<p id="empty-filter" class="notice" hidden>No findings match these filters.</p>
+<section class="package" id="dependency-0">
+<header>
+<h2>zod</h2>
+<span class="mono muted">3.25.76 → 4.6.5</span>
+</header>
+<details class="group" data-severity="breaking" data-rule="error-params">
+<summary>
+<strong class="breaking">New error API (required_error → error)</strong>
+<span class="counts">24 sites · 24 by rule</span>
+<span class="counts">Replace required_error and invalid_type_error with the new error parameter, preserving custom messages.</span>
+</summary>[site][site][site][site][site][site][site][site][site][site][site][site][site][site][site][site][site][site][site][site][site][site][site][site]</details>
+<details class="group" data-severity="breaking" data-rule="types">
+<summary>
+<strong class="breaking">ZodTypeDef removed</strong>
+<span class="counts">3 sites · 3 by agent · 1 fix</span>
+<span class="counts">Update the type references that are no longer supported by the target version.</span>
+</summary>[site][site][site]</details>
+<details class="group" data-severity="breaking" data-rule="ip">
+<summary>
+<strong class="breaking">.ip() removed</strong>
+<span class="counts">1 site · 1 by agent</span>
+<span class="counts">Replace the removed IP validator with the supported target API.</span>
+</summary>[site]</details>
+<details class="deprecated-section">
+<summary class="deprecated">Deprecated calls · 15 sites</summary>
+<details class="group" data-severity="deprecated" data-rule="string-format">
+<summary>
+<strong class="deprecated">Top-level string formats</strong>
+<span class="counts">13 sites · 8 by rule · 5 by agent</span>
+<span class="counts">Use top-level string format schemas instead of chained string methods.</span>
+</summary>[site][site][site][site][site][site][site][site][site][site][site][site][site]</details>
+<details class="group" data-severity="deprecated" data-rule="ZodError#flatten">
+<summary>
+<strong class="deprecated">ZodError#flatten deprecated</strong>
+<span class="counts">1 site · 1 by agent</span>
+<span class="counts">Use the \`z.treeifyError(err)\` function instead.</span>
+</summary>[site]</details>
+<details class="group" data-severity="deprecated" data-rule="ZodIssue">
+<summary>
+<strong class="deprecated">ZodIssue deprecated</strong>
+<span class="counts">1 site · 1 by agent</span>
+<span class="counts">Use \`z.core.$ZodIssue\` from \`@zod/core\` instead, especially if you are building a library on top of Zod.</span>
+</summary>[site]</details>
+</details>
+</section>
+<details class="notes">
+<summary>Analysis notes · 3 notes</summary>
+<ul>
+<li>Workspaces analyzed: ., packages/api, packages/shared.</li>
+<li>Workspace analysis gaps: none reported.</li>
+<li>1 type error that already existed before the upgrade was ignored.</li>
+</ul>
+</details>
+<section class="next">
+<h2>Next</h2>
+<p class="muted">migrate on a new branch, verify, no push</p>
+<div class="command">
+<code>npx uptide fix --only zod --cwd /repo</code>
+<button type="button" data-copy hidden aria-label="Copy command">Copy</button>
+</div>
+<p class="muted">every site and reason</p>
+<div class="command">
+<code>npx uptide check --details --cwd /repo</code>
+<button type="button" data-copy hidden aria-label="Copy command">Copy</button>
+</div>
+</section>
+<footer>Local report · No network requests · Contains source excerpts from reported sites only. Review before sharing.</footer>
+</main>
+</body>
+</html>"
+`;

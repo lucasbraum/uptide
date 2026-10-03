@@ -1,0 +1,49 @@
+/** Everything the CLI touches outside its own process state, so tests can run it in memory. */
+export interface Io {
+  out(text: string): void;
+  err(text: string): void;
+  env: Record<string, string | undefined>;
+  cwd: string;
+  /** stdout is a terminal: color is on unless something turns it off. */
+  outTty: boolean;
+  /** stderr is a terminal: progress may redraw one line. */
+  errTty: boolean;
+  now(): number;
+}
+
+export function processIo(): Io {
+  return {
+    out: (text) => void process.stdout.write(text),
+    err: (text) => void process.stderr.write(text),
+    env: process.env,
+    cwd: process.cwd(),
+    outTty: process.stdout.isTTY === true,
+    errTty: process.stderr.isTTY === true,
+    now: () => Date.now(),
+  };
+}
+
+export interface UiFlags {
+  ci?: boolean;
+  /** commander's `--no-color` sets this to false. */
+  color?: boolean;
+}
+
+export interface Ui {
+  color: boolean;
+  /** One redrawn line with a spinner; off in CI, in pipes and with NO_COLOR-style plain output. */
+  interactive: boolean;
+}
+
+/**
+ * `--ci` (or a `CI` environment) means plain lines only. NO_COLOR follows no-color.org: any
+ * non-empty value disables color; FORCE_COLOR turns it on for a pipe.
+ */
+export function uiOf(io: Io, flags: UiFlags): Ui {
+  const ci =
+    flags.ci === true || (io.env.CI !== undefined && io.env.CI !== '' && io.env.CI !== '0');
+  const noColor = io.env.NO_COLOR !== undefined && io.env.NO_COLOR !== '';
+  const forced = io.env.FORCE_COLOR !== undefined && io.env.FORCE_COLOR !== '0';
+  const color = !ci && flags.color !== false && !noColor && (io.outTty || forced);
+  return { color, interactive: !ci && io.errTty && io.env.TERM !== 'dumb' };
+}

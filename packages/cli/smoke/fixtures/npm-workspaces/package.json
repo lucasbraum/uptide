@@ -1,0 +1,12 @@
+{
+  "name": "smoke-npm-workspaces",
+  "version": "0.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "license": "MIT",
+  "scripts": {
+    "preinstall": "node -e \"require('node:fs').writeFileSync('/tmp/UPTIDE_INSTALL_SCRIPT_RAN', 'bad')\""
+  }
+}

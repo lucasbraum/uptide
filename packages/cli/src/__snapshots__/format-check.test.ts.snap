@@ -1,0 +1,86 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`formatCheck, the first screen > gives each kind of verdict one row, and no row to what needs no decision 1`] = `
+"sharp   0.33.0 → 0.35.0   minor                   ✗ 2 breaking in 2 files    2 manual
+twilio  5.0.1 → 5.3.0     minor · latest on npm   ✓ no impact (12 call sites)
+lodash  5.0.1 → 5.3.0     minor · latest on npm   – not analyzed: types in @types/lodash
+joi     5.0.1 → 5.3.0     minor · latest on npm   ✓ no impact in 12 sites, 2 not analyzed
+pg      5.0.1 → 5.3.0     minor · latest on npm   ? 1 of 1 site not analyzed
+
+sharp
+  ✗ sharp.cache removed   2 sites   manual
+
+Next
+  npx uptide check --details    every site and reason
+"
+`;
+
+exports[`formatCheck, the first screen > summarizes a real workspace: a row per dependency, a line per rule, the next commands 1`] = `
+"uptide check · storefront (pnpm, 2 packages) · 25s
+
+zod                    3.25.76 → 4.6.5    major · latest on npm   ✗ 28 breaking in 7 files    24 by rule · 4 by agent
+stripe (packages/api)  14.25.0 → 23.0.0   major · latest on npm   ✗ 4 breaking in 3 files     1 by rule · 3 by agent
+
+zod
+  ✗ New error API (required_error → error)   24 sites          by rule
+  ✗ ZodTypeDef removed                       1 fix, 3 errors   by agent
+  ✗ .ip() removed                            monitoring.ts:6   by agent
+  ! 15 deprecated calls (.uuid, .datetime, .email, ...)   8 by rule
+
+stripe
+  ✗ Test fixture casts widened                   renewal.test.ts:7   by rule
+  ✗ Subscription billing period moved to items   2 sites             by agent
+  ✗ apiVersion no longer matches the SDK         client.ts:9         by agent
+    1 API change since 2023-10-16 affects your code
+
+Next
+  npx uptide@next fix --only zod       migrate on a new branch, verify, no push
+  npx uptide@next fix --only stripe    migrate on a new branch, verify, no push
+  npx uptide@next check --details      every site and reason
+"
+`;
+
+exports[`formatCheck, the first screen > summarizes the pnpm smoke fixture, by default and with --details 1`] = `
+"uptide check · smoke-pnpm (pnpm, 2 packages) · 3.1s
+
+zod  3.23.8 → 4.6.5   major · latest on npm   ✗ 4 breaking in 2 files    4 by rule
+
+zod
+  ✗ New error API (required_error → error)   4 sites   by rule
+
+Next
+  npx uptide@next fix --only zod                migrate on a new branch, verify, no push
+  npx uptide@next check --only zod --details    every site and reason
+"
+`;
+
+exports[`formatCheck, the first screen > summarizes the pnpm smoke fixture, by default and with --details 2`] = `
+"uptide check · smoke-pnpm (pnpm, 2 packages) · 3.1s
+
+(shared across workspaces)
+
+zod  3.23.8 → 4.6.5   (1 major behind)   · catalog · packages/api, packages/shared
+
+  BREAKING  4 call sites in 2 files
+  ✗ packages/api/src/signup.ts:4       email: z.string({ required_error: 'Email is required' }),
+      string compiler rejects this usage: No overload matches this call. mechanical
+      compiler: No overload matches this call.
+  ✗ packages/api/src/signup.ts:5       plan: z.enum(['free', 'pro'], { invalid_type_error: 'Unknown plan' }),
+      enum overload removed or changed                               mechanical
+      compiler: No overload matches this call.
+  ✗ packages/shared/src/index.ts:8     age: z.number({ invalid_type_error: 'Age must be a number' }).int(),
+      number compiler rejects this usage: Object literal may only specify known properties, and 'invalid_type_error' does not exist in type '$ZodNumberParams'. mechanical (80%)
+      compiler: Object literal may only specify known properties, and 'invalid_type_error' does not exist in type '$ZodNumberParams'.
+  ✗ packages/shared/src/index.ts:5     required_error: 'Name is required',
+      TS2769: No overload matches this call.                         mechanical
+      compiler: No overload matches this call.
+  ⚙ 31 unused exports removed (use --all)
+
+Summary: 1 package needs attention · 4 breaking · 0 deprecated · 0 unaffected
+         4 of 4 findings are mechanical
+
+Next
+  npx uptide@next fix --only zod      migrate on a new branch, verify, no push
+  npx uptide@next check --only zod    the summary, one line per change
+"
+`;

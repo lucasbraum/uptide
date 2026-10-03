@@ -1,0 +1,26 @@
+[
+  {
+    "name": "axios",
+    "installed": "0.27.2",
+    "target": "1.7.0",
+    "status": "breaking",
+    "callSitesChecked": 25,
+    "notes": [],
+    "compile": {
+      "baselineErrors": 0,
+      "unresolvedInTarget": [],
+      "unresolvedFiles": [],
+      "unattributed": []
+    },
+    "findings": [
+      "src/client.ts:11 AxiosInterceptorManager#use signature breaking assisted 0.6 :: explicit type arguments will no longer compile [tsc: Argument of type '(config: AxiosRequestConfig) => AxiosRequestConfig<any>' is not assignable to parameter of type '(value: InternalAxiosRequestConfig<any>) => InternalAxiosRequestConfig<any> | Promise<InternalAxiosRequestConfig<any>>'.]",
+      "src/client.ts:17 AxiosRequestHeaders narrowed breaking assisted 0.7 :: compiler rejects this usage: Type '{ Authorization: string; }' is not assignable to type 'AxiosRequestHeaders'. [tsc: Type '{ Authorization: string; }' is not assignable to type 'AxiosRequestHeaders'.]",
+      "src/client.ts:28 AxiosError#status type breaking assisted 1 :: type incompatible [tsc: This comparison appears to be unintentional because the types 'number | undefined' and 'string' have no overlap.]",
+      "src/client.ts:12 AxiosRequestHeaders narrowed info none 0.3 :: diff says narrowed but your code compiles against the target",
+      "src/client.ts:12 AxiosRequestConfig#headers widened info none 0.3 :: widened type is read by the consumer; compiles against target; possible runtime change",
+      "src/client.ts:22 AxiosRequestHeaders narrowed info none 0.3 :: diff says narrowed but your code compiles against the target",
+      "src/client.ts:29 AxiosRequestConfig#signal widened info none 0.3 :: widened type is read by the consumer; compiles against target; possible runtime change"
+    ],
+    "additive": 10
+  }
+]

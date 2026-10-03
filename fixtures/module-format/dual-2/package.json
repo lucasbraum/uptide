@@ -1,0 +1,12 @@
+{
+  "name": "dual",
+  "version": "2.0.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "license": "MIT"
+}

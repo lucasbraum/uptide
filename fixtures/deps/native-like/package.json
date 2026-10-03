@@ -1,0 +1,9 @@
+{
+  "name": "sharp-like",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "install": "node-gyp rebuild"
+  },
+  "license": "MIT"
+}

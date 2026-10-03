@@ -1,0 +1,30 @@
+{
+  "total": 331,
+  "bySeverity": {
+    "additive": 317,
+    "breaking": 14
+  },
+  "byKind": {
+    "added": 280,
+    "narrowed": 13,
+    "widened": 26,
+    "type": 6,
+    "signature": 6
+  },
+  "breaking": [
+    "narrowed Axios#interceptors#request @0.7",
+    "narrowed AxiosError#config @0.7",
+    "type AxiosError#status",
+    "signature AxiosError.new()",
+    "narrowed AxiosInstance#defaults @0.7",
+    "narrowed AxiosInstance#interceptors#request @0.7",
+    "signature AxiosInterceptorManager#use @0.6",
+    "narrowed AxiosRequestHeaders @0.7",
+    "narrowed AxiosResponse#config @0.7",
+    "narrowed AxiosResponseHeaders @0.7",
+    "narrowed AxiosStatic#defaults @0.7",
+    "narrowed AxiosStatic#interceptors#request @0.7",
+    "type CanceledError#config @0.7",
+    "type CanceledError#status"
+  ]
+}

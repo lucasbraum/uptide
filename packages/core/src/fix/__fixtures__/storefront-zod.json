@@ -1,0 +1,2010 @@
+{
+  "lockfile": {
+    "added": ["packages:zod@4.6.5", "snapshots:zod@4.6.5"],
+    "removed": ["packages:zod@3.25.76", "snapshots:zod@3.25.76"],
+    "changed": [],
+    "allowed": [
+      "packages:zod@3.25.76",
+      "packages:zod@4.6.5",
+      "snapshots:zod@3.25.76",
+      "snapshots:zod@4.6.5"
+    ],
+    "manager": "pnpm",
+    "file": "pnpm-lock.yaml"
+  },
+  "repo": "/repo",
+  "package": "zod",
+  "from": "3.25.76",
+  "target": "4.6.5",
+  "targetSource": "latest on npm",
+  "uptideVersion": "0.1.0",
+  "uptideCommit": "35a44fd8d67ea3246b114585c84451777efd332b",
+  "uptideDirty": true,
+  "verifiedAt": "2026-10-03T22:29:15.705Z",
+  "head": "64d42628e97516638a0ef5654c4e1fd1cc6fa137",
+  "branch": "uptide/zod-4.6.5",
+  "sites": [
+    {
+      "finding": {
+        "change": {
+          "package": "zod",
+          "from": "3.25.76",
+          "to": "4.6.5",
+          "path": "TS2345",
+          "kind": "type",
+          "severity": "breaking",
+          "source": "types",
+          "confidence": 1,
+          "evidence": "checker",
+          "notes": "1 error caused by `parsed` (packages/api/src/queue/consumer.ts:17), whose type changed from `SafeParseReturnType<unknown, TMessage>` to `ZodSafeParseResult<unknown>`. Fix here first."
+        },
+        "usage": {
+          "file": "packages/api/src/queue/consumer.ts",
+          "line": 19,
+          "column": 1,
+          "endLine": 17,
+          "endColumn": 1,
+          "symbolPath": "cause:parsed",
+          "access": "read",
+          "snippet": "",
+          "via": "inferred",
+          "compileCode": 2345,
+          "compileError": "Argument of type 'unknown' is not assignable to parameter of type 'TMessage'."
+        },
+        "downstream": [
+          {
+            "file": "packages/api/src/queue/consumer.ts",
+            "line": 19,
+            "code": 2345,
+            "message": "Argument of type 'unknown' is not assignable to parameter of type 'TMessage'."
+          }
+        ],
+        "severity": "breaking",
+        "confidence": 1,
+        "fixability": "unknown",
+        "reason": "compile error not attributed to a known API change"
+      },
+      "outcome": "agent",
+      "reason": "diagnostic resolved by an earlier accepted edit in this file",
+      "rule": "types",
+      "resolvedBy": "packages/api/src/queue/consumer.ts:2:24"
+    },
+    {
+      "finding": {
+        "change": {
+          "package": "zod",
+          "from": "3.25.76",
+          "to": "4.6.5",
+          "path": "ZodType",
+          "source": "types",
+          "confidence": 0.6,
+          "kind": "signature",
+          "before": "class: abstract class<Output = any, Def extends ZodTypeDef = ZodTypeDef, Input = Output>",
+          "after": "variable: const core.$constructor<ZodType>",
+          "notes": "declaration kind changed from class to variable; a value+type pair may still construct, but extends/instanceof may break",
+          "severity": "breaking",
+          "evidence": "text"
+        },
+        "usage": {
+          "file": "packages/api/src/queue/consumer.ts",
+          "line": 12,
+          "column": 30,
+          "endLine": 12,
+          "endColumn": 37,
+          "symbolPath": "ZodType",
+          "access": "typeRef",
+          "snippet": "private readonly schema: ZodType<TMessage, ZodTypeDef, unknown>,",
+          "via": "direct",
+          "package": "zod",
+          "compileError": "Type 'unknown' does not satisfy the constraint '$ZodTypeInternals<TMessage, ZodTypeDef>'.",
+          "compileCode": 2344
+        },
+        "severity": "breaking",
+        "confidence": 0.6,
+        "fixability": "assisted",
+        "reason": "declaration kind changed from class to variable; a value+type pair may still construct, but extends/instanceof may break"
+      },
+      "outcome": "agent",
+      "reason": "diagnostic resolved by an earlier accepted edit in this file",
+      "rule": "types",
+      "resolvedBy": "packages/api/src/queue/consumer.ts:2:24"
+    },
+    {
+      "finding": {
+        "change": {
+          "package": "zod",
+          "from": "3.25.76",
+          "to": "4.6.5",
+          "path": "TS2724",
+          "kind": "type",
+          "severity": "breaking",
+          "source": "types",
+          "confidence": 1,
+          "evidence": "checker",
+          "notes": "'_' has no exported member named '_'. Did you mean '_'?"
+        },
+        "usage": {
+          "file": "packages/api/src/queue/consumer.ts",
+          "line": 2,
+          "column": 24,
+          "endLine": 2,
+          "endColumn": 34,
+          "symbolPath": "TS2724",
+          "access": "read",
+          "snippet": "import type { ZodType, ZodTypeDef } from 'zod';",
+          "via": "inferred",
+          "compileError": "'\"zod\"' has no exported member named 'ZodTypeDef'. Did you mean 'ZodType'?"
+        },
+        "severity": "breaking",
+        "confidence": 1,
+        "fixability": "unknown",
+        "reason": "compile error not attributed to a known API change"
+      },
+      "outcome": "agent",
+      "reason": "claude-sonnet-4-6: removed TS2724; no new diagnostics. In Zod v4, `ZodTypeDef` no longer exists as an exported type, and `ZodType` now takes only two type parameters: `Output` and `Input` (both defaulting to `unknown`). The fix is to:\n1. Remove `ZodTypeDef` from the import (it's the only broken export; `ZodType` is still valid).\n2. Remove the middle `ZodTypeDef` type parameter from the `ZodType<TMessage, ZodTypeDef, unknown>` generic usage, replacing it with `ZodType<TMessage, unknown>` (Output=TMessage, Input=unknown), which preserves the same input/output contract without weakening types or casting to `any`.",
+      "rule": "types",
+      "attempts": [
+        {
+          "attempt": 1,
+          "outcome": "accepted",
+          "before": [
+            {
+              "file": "packages/api/src/queue/consumer.ts",
+              "line": 2,
+              "column": 24,
+              "code": 2724,
+              "message": "'\"zod\"' has no exported member named 'ZodTypeDef'. Did you mean 'ZodType'?"
+            },
+            {
+              "file": "packages/api/src/queue/consumer.ts",
+              "line": 12,
+              "column": 60,
+              "code": 2344,
+              "message": "Type 'unknown' does not satisfy the constraint '$ZodTypeInternals<TMessage, ZodTypeDef>'."
+            },
+            {
+              "file": "packages/api/src/queue/consumer.ts",
+              "line": 19,
+              "column": 23,
+              "code": 2345,
+              "message": "Argument of type 'unknown' is not assignable to parameter of type 'TMessage'.\n  'TMessage' could be instantiated with an arbitrary type which could be unrelated to 'unknown'."
+            },
+            {
+              "file": "packages/shared/src/errors.ts",
+              "line": 19,
+              "column": 9,
+              "code": 2322,
+              "message": "Type 'string' is not assignable to type 'number'."
+            },
+            {
+              "file": "packages/shared/src/monitoring.ts",
+              "line": 6,
+              "column": 24,
+              "code": 2339,
+              "message": "Property 'ip' does not exist on type 'ZodString'."
+            }
+          ],
+          "after": [
+            {
+              "file": "packages/shared/src/errors.ts",
+              "line": 19,
+              "column": 9,
+              "code": 2322,
+              "message": "Type 'string' is not assignable to type 'number'."
+            },
+            {
+              "file": "packages/shared/src/monitoring.ts",
+              "line": 6,
+              "column": 24,
+              "code": 2339,
+              "message": "Property 'ip' does not exist on type 'ZodString'."
+            }
+          ],
+          "inputTokens": 1290,
+          "outputTokens": 342,
+          "costUsd": 0.009,
+          "explanation": "In Zod v4, `ZodTypeDef` no longer exists as an exported type, and `ZodType` now takes only two type parameters: `Output` and `Input` (both defaulting to `unknown`). The fix is to:\n1. Remove `ZodTypeDef` from the import (it's the only broken export; `ZodType` is still valid).\n2. Remove the middle `ZodTypeDef` type parameter from the `ZodType<TMessage, ZodTypeDef, unknown>` generic usage, replacing it with `ZodType<TMessage, unknown>` (Output=TMessage, Input=unknown), which preserves the same input/output contract without weakening types or casting to `any`.",
+          "diff": "--- a/packages/api/src/queue/consumer.ts\n+++ b/packages/api/src/queue/consumer.ts\n@@ -2 +2 @@\n-import type { ZodType, ZodTypeDef } from 'zod';\n+import type { ZodType } from 'zod';\n@@ -13 +13 @@\n-    private readonly schema: ZodType<TMessage, ZodTypeDef, unknown>,\n+    private readonly schema: ZodType<TMessage, unknown>,\n"
+        }
+      ],
+      "diff": "--- a/packages/api/src/queue/consumer.ts\n+++ b/packages/api/src/queue/consumer.ts\n@@ -2 +2 @@\n-import type { ZodType, ZodTypeDef } from 'zod';\n+import type { ZodType } from 'zod';\n@@ -13 +13 @@\n-    private readonly schema: ZodType<TMessage, ZodTypeDef, unknown>,\n+    private readonly schema: ZodType<TMessage, unknown>,\n"
+    },
+    {
+      "finding": {
+        "change": {
+          "package": "zod",
+          "from": "3.25.76",
+          "to": "4.6.5",
+          "path": "boolean",
+          "source": "types",
+          "confidence": 0.7,
+          "kind": "signature",
+          "before": "(params?: RawCreateParams & { coerce?: boolean }) => ZodBoolean",
+          "after": "(params?: core.$ZodBooleanParams | string): ZodBoolean",
+          "severity": "breaking",
+          "evidence": "text",
+          "notes": "parameter 'params' type changed"
+        },
+        "usage": {
+          "file": "packages/api/src/routes/customers.ts",
+          "line": 13,
+          "column": 21,
+          "endLine": 13,
+          "endColumn": 28,
+          "symbolPath": "boolean",
+          "access": "call",
+          "snippet": "marketingOptIn: z.boolean({ invalid_type_error: 'Opt-in must be true or false' }).optional(),",
+          "via": "direct",
+          "package": "zod",
+          "compileError": "Object literal may only specify known properties, and 'invalid_type_error' does not exist in type '{ error?: string | $ZodErrorMap<$ZodIssueInvalidType<unknown>> | undefined; message?: string | undefined; }'.",
+          "compileCode": 2353
+        },
+        "severity": "breaking",
+        "confidence": 0.7,
+        "fixability": "mechanical",
+        "reason": "parameter 'params' type changed"
+      },
+      "outcome": "mechanical",
+      "reason": "preserve missing/invalid input messages with error",
+      "diff": "- marketingOptIn: z.boolean({ invalid_type_error: 'Opt-in must be true or false' }).optional(),\n+ marketingOptIn: z.boolean({ error: (iss) => iss.input === undefined ? undefined : 'Opt-in must be true or false' }).optional(),",
+      "rule": "error-params"
+    },
+    {
+      "finding": {
+        "change": {
+          "package": "zod",
+          "from": "3.25.76",
+          "to": "4.6.5",
+          "path": "string",
+          "source": "types",
+          "confidence": 1,
+          "kind": "signature",
+          "before": "(params?: RawCreateParams & { coerce?: true }) => ZodString",
+          "after": "(params?: core.$ZodStringParams | string): ZodString; <T extends string>(params?: core.$ZodStringParams | string): core.$ZodType<T, T>",
+          "severity": "breaking",
+          "evidence": "text",
+          "notes": "overload removed or changed"
+        },
+        "usage": {
+          "file": "packages/api/src/routes/customers.ts",
+          "line": 12,
+          "column": 11,
+          "endLine": 12,
+          "endColumn": 17,
+          "symbolPath": "string",
+          "access": "call",
+          "snippet": "name: z.string({ invalid_type_error: 'Name must be a string' }).optional(),",
+          "via": "direct",
+          "package": "zod",
+          "compileError": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'invalid_type_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'invalid_type_error' does not exist in type '$ZodStringParams'.",
+          "compileCode": 2769
+        },
+        "severity": "breaking",
+        "confidence": 1,
+        "fixability": "mechanical",
+        "reason": "overload removed or changed"
+      },
+      "outcome": "mechanical",
+      "reason": "preserve missing/invalid input messages with error",
+      "diff": "- name: z.string({ invalid_type_error: 'Name must be a string' }).optional(),\n+ name: z.string({ error: (iss) => iss.input === undefined ? undefined : 'Name must be a string' }).optional(),",
+      "rule": "error-params"
+    },
+    {
+      "finding": {
+        "change": {
+          "package": "zod",
+          "from": "3.25.76",
+          "to": "4.6.5",
+          "path": "string",
+          "source": "types",
+          "confidence": 1,
+          "kind": "signature",
+          "before": "(params?: RawCreateParams & { coerce?: true }) => ZodString",
+          "after": "(params?: core.$ZodStringParams | string): ZodString; <T extends string>(params?: core.$ZodStringParams | string): core.$ZodType<T, T>",
+          "severity": "breaking",
+          "evidence": "text",
+          "notes": "overload removed or changed"
+        },
+        "usage": {
+          "file": "packages/api/src/routes/customers.ts",
+          "line": 7,
+          "column": 15,
+          "endLine": 7,
+          "endColumn": 21,
+          "symbolPath": "string",
+          "access": "call",
+          "snippet": "password: z.string({ required_error: 'Password is required' }).min(12),",
+          "via": "direct",
+          "package": "zod",
+          "compileError": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.",
+          "compileCode": 2769
+        },
+        "severity": "breaking",
+        "confidence": 1,
+        "fixability": "mechanical",
+        "reason": "overload removed or changed"
+      },
+      "outcome": "mechanical",
+      "reason": "preserve missing/invalid input messages with error",
+      "diff": "- password: z.string({ required_error: 'Password is required' }).min(12),\n+ password: z.string({ error: (iss) => iss.input === undefined ? 'Password is required' : undefined }).min(12),",
+      "rule": "error-params"
+    },
+    {
+      "finding": {
+        "change": {
+          "package": "zod",
+          "from": "3.25.76",
+          "to": "4.6.5",
+          "path": "string",
+          "source": "types",
+          "confidence": 1,
+          "kind": "signature",
+          "before": "(params?: RawCreateParams & { coerce?: true }) => ZodString",
+          "after": "(params?: core.$ZodStringParams | string): ZodString; <T extends string>(params?: core.$ZodStringParams | string): core.$ZodType<T, T>",
+          "severity": "breaking",
+          "evidence": "text",
+          "notes": "overload removed or changed"
+        },
+        "usage": {
+          "file": "packages/api/src/routes/customers.ts",
+          "line": 6,
+          "column": 11,
+          "endLine": 6,
+          "endColumn": 17,
+          "symbolPath": "string",
+          "access": "call",
+          "snippet": "name: z.string({ required_error: 'Name is required' }).min(2, 'Name is too short'),",
+          "via": "direct",
+          "package": "zod",
+          "compileError": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.",
+          "compileCode": 2769
+        },
+        "severity": "breaking",
+        "confidence": 1,
+        "fixability": "mechanical",
+        "reason": "overload removed or changed"
+      },
+      "outcome": "mechanical",
+      "reason": "preserve missing/invalid input messages with error",
+      "diff": "- name: z.string({ required_error: 'Name is required' }).min(2, 'Name is too short'),\n+ name: z.string({ error: (iss) => iss.input === undefined ? 'Name is required' : undefined }).min(2, 'Name is too short'),",
+      "rule": "error-params"
+    },
+    {
+      "finding": {
+        "change": {
+          "package": "zod",
+          "from": "3.25.76",
+          "to": "4.6.5",
+          "path": "string",
+          "source": "types",
+          "confidence": 1,
+          "kind": "signature",
+          "before": "(params?: RawCreateParams & { coerce?: true }) => ZodString",
+          "after": "(params?: core.$ZodStringParams | string): ZodString; <T extends string>(params?: core.$ZodStringParams | string): core.$ZodType<T, T>",
+          "severity": "breaking",
+          "evidence": "text",
+          "notes": "overload removed or changed"
+        },
+        "usage": {
+          "file": "packages/api/src/routes/customers.ts",
+          "line": 5,
+          "column": 12,
+          "endLine": 5,
+          "endColumn": 18,
+          "symbolPath": "string",
+          "access": "call",
+          "snippet": "email: z.string({ required_error: 'Email is required' }).email('Email is not valid'),",
+          "via": "direct",
+          "package": "zod",
+          "compileError": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.",
+          "compileCode": 2769
+        },
+        "severity": "breaking",
+        "confidence": 1,
+        "fixability": "mechanical",
+        "reason": "overload removed or changed"
+      },
+      "outcome": "mechanical",
+      "reason": "preserve missing/invalid input messages with error",
+      "diff": "- email: z.string({ required_error: 'Email is required' }).email('Email is not valid'),\n+ email: z.string({ error: (iss) => iss.input === undefined ? 'Email is required' : undefined }).email('Email is not valid'),",
+      "rule": "error-params"
+    },
+    {
+      "finding": {
+        "change": {
+          "package": "zod",
+          "from": "3.25.76",
+          "to": "4.6.5",
+          "path": "string",
+          "source": "types",
+          "confidence": 1,
+          "kind": "signature",
+          "before": "(params?: RawCreateParams & { coerce?: true }) => ZodString",
+          "after": "(params?: core.$ZodStringParams | string): ZodString; <T extends string>(params?: core.$ZodStringParams | string): core.$ZodType<T, T>",
+          "severity": "breaking",
+          "evidence": "text",
+          "notes": "overload removed or changed"
+        },
+        "usage": {
+          "file": "packages/api/src/routes/orders.ts",
+          "line": 18,
+          "column": 13,
+          "endLine": 18,
+          "endColumn": 19,
+          "symbolPath": "string",
+          "access": "call",
+          "snippet": "reason: z.string({ required_error: 'Reason is required' }).min(5, 'Say why in a few words'),",
+          "via": "direct",
+          "package": "zod",
+          "compileError": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.",
+          "compileCode": 2769
+        },
+        "severity": "breaking",
+        "confidence": 1,
+        "fixability": "mechanical",
+        "reason": "overload removed or changed"
+      },
+      "outcome": "mechanical",
+      "reason": "preserve missing/invalid input messages with error",
+      "diff": "- reason: z.string({ required_error: 'Reason is required' }).min(5, 'Say why in a few words'),\n+ reason: z.string({ error: (iss) => iss.input === undefined ? 'Reason is required' : undefined }).min(5, 'Say why in a few words'),",
+      "rule": "error-params"
+    },
+    {
+      "finding": {
+        "change": {
+          "package": "zod",
+          "from": "3.25.76",
+          "to": "4.6.5",
+          "path": "string",
+          "source": "types",
+          "confidence": 1,
+          "kind": "signature",
+          "before": "(params?: RawCreateParams & { coerce?: true }) => ZodString",
+          "after": "(params?: core.$ZodStringParams | string): ZodString; <T extends string>(params?: core.$ZodStringParams | string): core.$ZodType<T, T>",
+          "severity": "breaking",
+          "evidence": "text",
+          "notes": "overload removed or changed"
+        },
+        "usage": {
+          "file": "packages/api/src/routes/orders.ts",
+          "line": 17,
+          "column": 14,
+          "endLine": 17,
+          "endColumn": 20,
+          "symbolPath": "string",
+          "access": "call",
+          "snippet": "orderId: z.string({ required_error: 'Order is required' }).uuid(),",
+          "via": "direct",
+          "package": "zod",
+          "compileError": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.",
+          "compileCode": 2769
+        },
+        "severity": "breaking",
+        "confidence": 1,
+        "fixability": "mechanical",
+        "reason": "overload removed or changed"
+      },
+      "outcome": "mechanical",
+      "reason": "preserve missing/invalid input messages with error",
+      "diff": "- orderId: z.string({ required_error: 'Order is required' }).uuid(),\n+ orderId: z.string({ error: (iss) => iss.input === undefined ? 'Order is required' : undefined }).uuid(),",
+      "rule": "error-params"
+    },
+    {
+      "finding": {
+        "change": {
+          "package": "zod",
+          "from": "3.25.76",
+          "to": "4.6.5",
+          "path": "string",
+          "source": "types",
+          "confidence": 1,
+          "kind": "signature",
+          "before": "(params?: RawCreateParams & { coerce?: true }) => ZodString",
+          "after": "(params?: core.$ZodStringParams | string): ZodString; <T extends string>(params?: core.$ZodStringParams | string): core.$ZodType<T, T>",
+          "severity": "breaking",
+          "evidence": "text",
+          "notes": "overload removed or changed"
+        },
+        "usage": {
+          "file": "packages/api/src/routes/orders.ts",
+          "line": 13,
+          "column": 11,
+          "endLine": 13,
+          "endColumn": 17,
+          "symbolPath": "string",
+          "access": "call",
+          "snippet": "note: z.string({ invalid_type_error: 'Note must be a string' }).max(500).optional(),",
+          "via": "direct",
+          "package": "zod",
+          "compileError": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'invalid_type_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'invalid_type_error' does not exist in type '$ZodStringParams'.",
+          "compileCode": 2769
+        },
+        "severity": "breaking",
+        "confidence": 1,
+        "fixability": "mechanical",
+        "reason": "overload removed or changed"
+      },
+      "outcome": "mechanical",
+      "reason": "preserve missing/invalid input messages with error",
+      "diff": "- note: z.string({ invalid_type_error: 'Note must be a string' }).max(500).optional(),\n+ note: z.string({ error: (iss) => iss.input === undefined ? undefined : 'Note must be a string' }).max(500).optional(),",
+      "rule": "error-params"
+    },
+    {
+      "finding": {
+        "change": {
+          "package": "zod",
+          "from": "3.25.76",
+          "to": "4.6.5",
+          "path": "string",
+          "source": "types",
+          "confidence": 1,
+          "kind": "signature",
+          "before": "(params?: RawCreateParams & { coerce?: true }) => ZodString",
+          "after": "(params?: core.$ZodStringParams | string): ZodString; <T extends string>(params?: core.$ZodStringParams | string): core.$ZodType<T, T>",
+          "severity": "breaking",
+          "evidence": "text",
+          "notes": "overload removed or changed"
+        },
+        "usage": {
+          "file": "packages/api/src/routes/orders.ts",
+          "line": 10,
+          "column": 17,
+          "endLine": 10,
+          "endColumn": 23,
+          "symbolPath": "string",
+          "access": "call",
+          "snippet": "customerId: z.string({ required_error: 'Customer is required' }).uuid(),",
+          "via": "direct",
+          "package": "zod",
+          "compileError": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.",
+          "compileCode": 2769
+        },
+        "severity": "breaking",
+        "confidence": 1,
+        "fixability": "mechanical",
+        "reason": "overload removed or changed"
+      },
+      "outcome": "mechanical",
+      "reason": "preserve missing/invalid input messages with error",
+      "diff": "- customerId: z.string({ required_error: 'Customer is required' }).uuid(),\n+ customerId: z.string({ error: (iss) => iss.input === undefined ? 'Customer is required' : undefined }).uuid(),",
+      "rule": "error-params"
+    },
+    {
+      "finding": {
+        "change": {
+          "package": "zod",
+          "from": "3.25.76",
+          "to": "4.6.5",
+          "path": "number",
+          "source": "types",
+          "confidence": 0.7,
+          "kind": "signature",
+          "before": "(params?: RawCreateParams & { coerce?: boolean }) => ZodNumber",
+          "after": "(params?: core.$ZodNumberParams | string): ZodNumber",
+          "severity": "breaking",
+          "evidence": "text",
+          "notes": "parameter 'params' type changed"
+        },
+        "usage": {
+          "file": "packages/api/src/routes/orders.ts",
+          "line": 6,
+          "column": 15,
+          "endLine": 6,
+          "endColumn": 21,
+          "symbolPath": "number",
+          "access": "call",
+          "snippet": "quantity: z.number({ required_error: 'Quantity is required' }).int().positive(),",
+          "via": "direct",
+          "package": "zod",
+          "compileError": "Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodNumberParams'.",
+          "compileCode": 2353
+        },
+        "severity": "breaking",
+        "confidence": 0.7,
+        "fixability": "mechanical",
+        "reason": "parameter 'params' type changed"
+      },
+      "outcome": "mechanical",
+      "reason": "preserve missing/invalid input messages with error",
+      "diff": "- quantity: z.number({ required_error: 'Quantity is required' }).int().positive(),\n+ quantity: z.number({ error: (iss) => iss.input === undefined ? 'Quantity is required' : undefined }).int().positive(),",
+      "rule": "error-params"
+    },
+    {
+      "finding": {
+        "change": {
+          "package": "zod",
+          "from": "3.25.76",
+          "to": "4.6.5",
+          "path": "string",
+          "source": "types",
+          "confidence": 1,
+          "kind": "signature",
+          "before": "(params?: RawCreateParams & { coerce?: true }) => ZodString",
+          "after": "(params?: core.$ZodStringParams | string): ZodString; <T extends string>(params?: core.$ZodStringParams | string): core.$ZodType<T, T>",
+          "severity": "breaking",
+          "evidence": "text",
+          "notes": "overload removed or changed"
+        },
+        "usage": {
+          "file": "packages/api/src/routes/orders.ts",
+          "line": 5,
+          "column": 16,
+          "endLine": 5,
+          "endColumn": 22,
+          "symbolPath": "string",
+          "access": "call",
+          "snippet": "productId: z.string({ required_error: 'Product is required' }).uuid(),",
+          "via": "direct",
+          "package": "zod",
+          "compileError": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.",
+          "compileCode": 2769
+        },
+        "severity": "breaking",
+        "confidence": 1,
+        "fixability": "mechanical",
+        "reason": "overload removed or changed"
+      },
+      "outcome": "mechanical",
+      "reason": "preserve missing/invalid input messages with error",
+      "diff": "- productId: z.string({ required_error: 'Product is required' }).uuid(),\n+ productId: z.string({ error: (iss) => iss.input === undefined ? 'Product is required' : undefined }).uuid(),",
+      "rule": "error-params"
+    },
+    {
+      "finding": {
+        "change": {
+          "package": "zod",
+          "from": "3.25.76",
+          "to": "4.6.5",
+          "path": "string",
+          "source": "types",
+          "confidence": 1,
+          "kind": "signature",
+          "before": "(params?: RawCreateParams & { coerce?: true }) => ZodString",
+          "after": "(params?: core.$ZodStringParams | string): ZodString; <T extends string>(params?: core.$ZodStringParams | string): core.$ZodType<T, T>",
+          "severity": "breaking",
+          "evidence": "text",
+          "notes": "overload removed or changed"
+        },
+        "usage": {
+          "file": "packages/api/src/routes/webhooks.ts",
+          "line": 15,
+          "column": 19,
+          "endLine": 15,
+          "endColumn": 25,
+          "symbolPath": "string",
+          "access": "call",
+          "snippet": "trackingCode: z.string({ required_error: 'Tracking code is required' }).min(6),",
+          "via": "direct",
+          "package": "zod",
+          "compileError": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.",
+          "compileCode": 2769
+        },
+        "severity": "breaking",
+        "confidence": 1,
+        "fixability": "mechanical",
+        "reason": "overload removed or changed"
+      },
+      "outcome": "mechanical",
+      "reason": "preserve missing/invalid input messages with error",
+      "diff": "- trackingCode: z.string({ required_error: 'Tracking code is required' }).min(6),\n+ trackingCode: z.string({ error: (iss) => iss.input === undefined ? 'Tracking code is required' : undefined }).min(6),",
+      "rule": "error-params"
+    },
+    {
+      "finding": {
+        "change": {
+          "package": "zod",
+          "from": "3.25.76",
+          "to": "4.6.5",
+          "path": "string",
+          "source": "types",
+          "confidence": 1,
+          "kind": "signature",
+          "before": "(params?: RawCreateParams & { coerce?: true }) => ZodString",
+          "after": "(params?: core.$ZodStringParams | string): ZodString; <T extends string>(params?: core.$ZodStringParams | string): core.$ZodType<T, T>",
+          "severity": "breaking",
+          "evidence": "text",
+          "notes": "overload removed or changed"
+        },
+        "usage": {
+          "file": "packages/api/src/routes/webhooks.ts",
+          "line": 14,
+          "column": 9,
+          "endLine": 14,
+          "endColumn": 15,
+          "symbolPath": "string",
+          "access": "call",
+          "snippet": "id: z.string({ required_error: 'Event id is required' }),",
+          "via": "direct",
+          "package": "zod",
+          "compileError": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.",
+          "compileCode": 2769
+        },
+        "severity": "breaking",
+        "confidence": 1,
+        "fixability": "mechanical",
+        "reason": "overload removed or changed"
+      },
+      "outcome": "mechanical",
+      "reason": "preserve missing/invalid input messages with error",
+      "diff": "- id: z.string({ required_error: 'Event id is required' }),\n+ id: z.string({ error: (iss) => iss.input === undefined ? 'Event id is required' : undefined }),",
+      "rule": "error-params"
+    },
+    {
+      "finding": {
+        "change": {
+          "package": "zod",
+          "from": "3.25.76",
+          "to": "4.6.5",
+          "path": "number",
+          "source": "types",
+          "confidence": 0.7,
+          "kind": "signature",
+          "before": "(params?: RawCreateParams & { coerce?: boolean }) => ZodNumber",
+          "after": "(params?: core.$ZodNumberParams | string): ZodNumber",
+          "severity": "breaking",
+          "evidence": "text",
+          "notes": "parameter 'params' type changed"
+        },
+        "usage": {
+          "file": "packages/api/src/routes/webhooks.ts",
+          "line": 9,
+          "column": 20,
+          "endLine": 9,
+          "endColumn": 26,
+          "symbolPath": "number",
+          "access": "call",
+          "snippet": "amountCents: z.number({ required_error: 'Amount is required' }).int(),",
+          "via": "direct",
+          "package": "zod",
+          "compileError": "Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodNumberParams'.",
+          "compileCode": 2353
+        },
+        "severity": "breaking",
+        "confidence": 0.7,
+        "fixability": "mechanical",
+        "reason": "parameter 'params' type changed"
+      },
+      "outcome": "mechanical",
+      "reason": "preserve missing/invalid input messages with error",
+      "diff": "- amountCents: z.number({ required_error: 'Amount is required' }).int(),\n+ amountCents: z.number({ error: (iss) => iss.input === undefined ? 'Amount is required' : undefined }).int(),",
+      "rule": "error-params"
+    },
+    {
+      "finding": {
+        "change": {
+          "package": "zod",
+          "from": "3.25.76",
+          "to": "4.6.5",
+          "path": "string",
+          "source": "types",
+          "confidence": 1,
+          "kind": "signature",
+          "before": "(params?: RawCreateParams & { coerce?: true }) => ZodString",
+          "after": "(params?: core.$ZodStringParams | string): ZodString; <T extends string>(params?: core.$ZodStringParams | string): core.$ZodType<T, T>",
+          "severity": "breaking",
+          "evidence": "text",
+          "notes": "overload removed or changed"
+        },
+        "usage": {
+          "file": "packages/api/src/routes/webhooks.ts",
+          "line": 8,
+          "column": 16,
+          "endLine": 8,
+          "endColumn": 22,
+          "symbolPath": "string",
+          "access": "call",
+          "snippet": "orderId: z.string({ required_error: 'Order id is required' }).uuid(),",
+          "via": "direct",
+          "package": "zod",
+          "compileError": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.",
+          "compileCode": 2769
+        },
+        "severity": "breaking",
+        "confidence": 1,
+        "fixability": "mechanical",
+        "reason": "overload removed or changed"
+      },
+      "outcome": "mechanical",
+      "reason": "preserve missing/invalid input messages with error",
+      "diff": "- orderId: z.string({ required_error: 'Order id is required' }).uuid(),\n+ orderId: z.string({ error: (iss) => iss.input === undefined ? 'Order id is required' : undefined }).uuid(),",
+      "rule": "error-params"
+    },
+    {
+      "finding": {
+        "change": {
+          "package": "zod",
+          "from": "3.25.76",
+          "to": "4.6.5",
+          "path": "string",
+          "source": "types",
+          "confidence": 1,
+          "kind": "signature",
+          "before": "(params?: RawCreateParams & { coerce?: true }) => ZodString",
+          "after": "(params?: core.$ZodStringParams | string): ZodString; <T extends string>(params?: core.$ZodStringParams | string): core.$ZodType<T, T>",
+          "severity": "breaking",
+          "evidence": "text",
+          "notes": "overload removed or changed"
+        },
+        "usage": {
+          "file": "packages/api/src/routes/webhooks.ts",
+          "line": 4,
+          "column": 9,
+          "endLine": 4,
+          "endColumn": 15,
+          "symbolPath": "string",
+          "access": "call",
+          "snippet": "id: z.string({ required_error: 'Event id is required' }),",
+          "via": "direct",
+          "package": "zod",
+          "compileError": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.",
+          "compileCode": 2769
+        },
+        "severity": "breaking",
+        "confidence": 1,
+        "fixability": "mechanical",
+        "reason": "overload removed or changed"
+      },
+      "outcome": "mechanical",
+      "reason": "preserve missing/invalid input messages with error",
+      "diff": "- id: z.string({ required_error: 'Event id is required' }),\n+ id: z.string({ error: (iss) => iss.input === undefined ? 'Event id is required' : undefined }),",
+      "rule": "error-params"
+    },
+    {
+      "finding": {
+        "change": {
+          "package": "zod",
+          "from": "3.25.76",
+          "to": "4.6.5",
+          "path": "string",
+          "source": "types",
+          "confidence": 1,
+          "kind": "signature",
+          "before": "(params?: RawCreateParams & { coerce?: true }) => ZodString",
+          "after": "(params?: core.$ZodStringParams | string): ZodString; <T extends string>(params?: core.$ZodStringParams | string): core.$ZodType<T, T>",
+          "severity": "breaking",
+          "evidence": "text",
+          "notes": "overload removed or changed"
+        },
+        "usage": {
+          "file": "packages/shared/src/address.ts",
+          "line": 10,
+          "column": 14,
+          "endLine": 10,
+          "endColumn": 20,
+          "symbolPath": "string",
+          "access": "call",
+          "snippet": "country: z.string({ required_error: 'Country is required' }).length(2),",
+          "via": "direct",
+          "package": "zod",
+          "compileError": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.",
+          "compileCode": 2769
+        },
+        "severity": "breaking",
+        "confidence": 1,
+        "fixability": "mechanical",
+        "reason": "overload removed or changed"
+      },
+      "outcome": "mechanical",
+      "reason": "preserve missing/invalid input messages with error",
+      "diff": "- country: z.string({ required_error: 'Country is required' }).length(2),\n+ country: z.string({ error: (iss) => iss.input === undefined ? 'Country is required' : undefined }).length(2),",
+      "rule": "error-params"
+    },
+    {
+      "finding": {
+        "change": {
+          "package": "zod",
+          "from": "3.25.76",
+          "to": "4.6.5",
+          "path": "TS2769",
+          "kind": "type",
+          "severity": "breaking",
+          "source": "types",
+          "confidence": 1,
+          "evidence": "checker",
+          "notes": "No overload matches this call."
+        },
+        "usage": {
+          "file": "packages/shared/src/address.ts",
+          "line": 7,
+          "column": 5,
+          "endLine": 7,
+          "endColumn": 19,
+          "symbolPath": "TS2769",
+          "access": "read",
+          "snippet": "required_error: 'Postal code is required',",
+          "via": "inferred",
+          "compileError": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'."
+        },
+        "severity": "breaking",
+        "confidence": 1,
+        "fixability": "mechanical",
+        "reason": "compile error not attributed to a known API change"
+      },
+      "outcome": "mechanical",
+      "reason": "preserve missing/invalid input messages with error",
+      "diff": "- required_error: 'Postal code is required',\n- invalid_type_error: 'Postal code must be a string',\n+ error: (iss) => iss.input === undefined ? 'Postal code is required' : 'Postal code must be a string',\n+ ",
+      "rule": "error-params"
+    },
+    {
+      "finding": {
+        "change": {
+          "package": "zod",
+          "from": "3.25.76",
+          "to": "4.6.5",
+          "path": "string",
+          "source": "types",
+          "confidence": 1,
+          "kind": "signature",
+          "before": "(params?: RawCreateParams & { coerce?: true }) => ZodString",
+          "after": "(params?: core.$ZodStringParams | string): ZodString; <T extends string>(params?: core.$ZodStringParams | string): core.$ZodType<T, T>",
+          "severity": "breaking",
+          "evidence": "text",
+          "notes": "overload removed or changed"
+        },
+        "usage": {
+          "file": "packages/shared/src/address.ts",
+          "line": 5,
+          "column": 11,
+          "endLine": 5,
+          "endColumn": 17,
+          "symbolPath": "string",
+          "access": "call",
+          "snippet": "city: z.string({ required_error: 'City is required' }),",
+          "via": "direct",
+          "package": "zod",
+          "compileError": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.",
+          "compileCode": 2769
+        },
+        "severity": "breaking",
+        "confidence": 1,
+        "fixability": "mechanical",
+        "reason": "overload removed or changed"
+      },
+      "outcome": "mechanical",
+      "reason": "preserve missing/invalid input messages with error",
+      "diff": "- city: z.string({ required_error: 'City is required' }),\n+ city: z.string({ error: (iss) => iss.input === undefined ? 'City is required' : undefined }),",
+      "rule": "error-params"
+    },
+    {
+      "finding": {
+        "change": {
+          "package": "zod",
+          "from": "3.25.76",
+          "to": "4.6.5",
+          "path": "string",
+          "source": "types",
+          "confidence": 1,
+          "kind": "signature",
+          "before": "(params?: RawCreateParams & { coerce?: true }) => ZodString",
+          "after": "(params?: core.$ZodStringParams | string): ZodString; <T extends string>(params?: core.$ZodStringParams | string): core.$ZodType<T, T>",
+          "severity": "breaking",
+          "evidence": "text",
+          "notes": "overload removed or changed"
+        },
+        "usage": {
+          "file": "packages/shared/src/address.ts",
+          "line": 4,
+          "column": 12,
+          "endLine": 4,
+          "endColumn": 18,
+          "symbolPath": "string",
+          "access": "call",
+          "snippet": "line1: z.string({ required_error: 'Address line is required' }).min(1),",
+          "via": "direct",
+          "package": "zod",
+          "compileError": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.",
+          "compileCode": 2769
+        },
+        "severity": "breaking",
+        "confidence": 1,
+        "fixability": "mechanical",
+        "reason": "overload removed or changed"
+      },
+      "outcome": "mechanical",
+      "reason": "preserve missing/invalid input messages with error",
+      "diff": "- line1: z.string({ required_error: 'Address line is required' }).min(1),\n+ line1: z.string({ error: (iss) => iss.input === undefined ? 'Address line is required' : undefined }).min(1),",
+      "rule": "error-params"
+    },
+    {
+      "finding": {
+        "change": {
+          "package": "zod",
+          "from": "3.25.76",
+          "to": "4.6.5",
+          "path": "ZodString#ip",
+          "kind": "removed",
+          "before": "(options?: string | { version?: IpVersion; message?: string | undefined }): ZodString",
+          "source": "types",
+          "confidence": 1,
+          "severity": "breaking"
+        },
+        "usage": {
+          "file": "packages/shared/src/monitoring.ts",
+          "line": 6,
+          "column": 24,
+          "endLine": 6,
+          "endColumn": 26,
+          "symbolPath": "ZodString#ip",
+          "access": "call",
+          "snippet": "clientIp: z.string().ip(),",
+          "via": "direct",
+          "package": "zod",
+          "compileError": "Property 'ip' does not exist on type 'ZodString'.",
+          "compileCode": 2339
+        },
+        "severity": "breaking",
+        "confidence": 1,
+        "fixability": "manual",
+        "reason": "removed"
+      },
+      "outcome": "agent",
+      "reason": "claude-sonnet-4-6: removed TS2339; no new diagnostics. The `ZodString#ip()` method was removed in Zod 4. Per the migration guide, when the previous validator accepted both IPv4 and IPv6 (which is the default behaviour of `.ip()` with no `version` option), we replace it with `z.union([z.ipv4(), z.ipv6()])`. These are now top-level factories rather than chained string methods. No options or custom error message were present in the original call, so the replacement is straightforward.",
+      "rule": "ip",
+      "attempts": [
+        {
+          "attempt": 1,
+          "outcome": "accepted",
+          "before": [
+            {
+              "file": "packages/shared/src/errors.ts",
+              "line": 19,
+              "column": 9,
+              "code": 2322,
+              "message": "Type 'string' is not assignable to type 'number'."
+            },
+            {
+              "file": "packages/shared/src/monitoring.ts",
+              "line": 6,
+              "column": 24,
+              "code": 2339,
+              "message": "Property 'ip' does not exist on type 'ZodString'."
+            }
+          ],
+          "after": [
+            {
+              "file": "packages/shared/src/errors.ts",
+              "line": 19,
+              "column": 9,
+              "code": 2322,
+              "message": "Type 'string' is not assignable to type 'number'."
+            }
+          ],
+          "inputTokens": 1273,
+          "outputTokens": 234,
+          "costUsd": 0.007329,
+          "explanation": "The `ZodString#ip()` method was removed in Zod 4. Per the migration guide, when the previous validator accepted both IPv4 and IPv6 (which is the default behaviour of `.ip()` with no `version` option), we replace it with `z.union([z.ipv4(), z.ipv6()])`. These are now top-level factories rather than chained string methods. No options or custom error message were present in the original call, so the replacement is straightforward.",
+          "diff": "--- a/packages/shared/src/monitoring.ts\n+++ b/packages/shared/src/monitoring.ts\n@@ -6 +6 @@\n-  clientIp: z.string().ip(),\n+  clientIp: z.union([z.ipv4(), z.ipv6()]),\n"
+        }
+      ],
+      "diff": "--- a/packages/shared/src/monitoring.ts\n+++ b/packages/shared/src/monitoring.ts\n@@ -6 +6 @@\n-  clientIp: z.string().ip(),\n+  clientIp: z.union([z.ipv4(), z.ipv6()]),\n"
+    },
+    {
+      "finding": {
+        "change": {
+          "package": "zod",
+          "from": "3.25.76",
+          "to": "4.6.5",
+          "path": "number",
+          "source": "types",
+          "confidence": 0.7,
+          "kind": "signature",
+          "before": "(params?: RawCreateParams & { coerce?: boolean }) => ZodNumber",
+          "after": "(params?: core.$ZodNumberParams | string): ZodNumber",
+          "severity": "breaking",
+          "evidence": "text",
+          "notes": "parameter 'params' type changed"
+        },
+        "usage": {
+          "file": "packages/shared/src/product.ts",
+          "line": 17,
+          "column": 15,
+          "endLine": 17,
+          "endColumn": 21,
+          "symbolPath": "number",
+          "access": "call",
+          "snippet": "quantity: z.number({ required_error: 'Quantity is required' }).int().nonnegative(),",
+          "via": "direct",
+          "package": "zod",
+          "compileError": "Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodNumberParams'.",
+          "compileCode": 2353
+        },
+        "severity": "breaking",
+        "confidence": 0.7,
+        "fixability": "mechanical",
+        "reason": "parameter 'params' type changed"
+      },
+      "outcome": "mechanical",
+      "reason": "preserve missing/invalid input messages with error",
+      "diff": "- quantity: z.number({ required_error: 'Quantity is required' }).int().nonnegative(),\n+ quantity: z.number({ error: (iss) => iss.input === undefined ? 'Quantity is required' : undefined }).int().nonnegative(),",
+      "rule": "error-params"
+    },
+    {
+      "finding": {
+        "change": {
+          "package": "zod",
+          "from": "3.25.76",
+          "to": "4.6.5",
+          "path": "TS2353",
+          "kind": "type",
+          "severity": "breaking",
+          "source": "types",
+          "confidence": 1,
+          "evidence": "checker",
+          "notes": "Object literal may only specify known properties, and '_' does not exist in type '_'."
+        },
+        "usage": {
+          "file": "packages/shared/src/product.ts",
+          "line": 8,
+          "column": 5,
+          "endLine": 8,
+          "endColumn": 19,
+          "symbolPath": "TS2353",
+          "access": "read",
+          "snippet": "required_error: 'Price is required',",
+          "via": "inferred",
+          "compileError": "Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodNumberParams'."
+        },
+        "severity": "breaking",
+        "confidence": 1,
+        "fixability": "mechanical",
+        "reason": "compile error not attributed to a known API change"
+      },
+      "outcome": "mechanical",
+      "reason": "preserve missing/invalid input messages with error",
+      "diff": "- required_error: 'Price is required',\n- invalid_type_error: 'Price must be a number',\n+ error: (iss) => iss.input === undefined ? 'Price is required' : 'Price must be a number',\n+ ",
+      "rule": "error-params"
+    },
+    {
+      "finding": {
+        "change": {
+          "package": "zod",
+          "from": "3.25.76",
+          "to": "4.6.5",
+          "path": "string",
+          "source": "types",
+          "confidence": 1,
+          "kind": "signature",
+          "before": "(params?: RawCreateParams & { coerce?: true }) => ZodString",
+          "after": "(params?: core.$ZodStringParams | string): ZodString; <T extends string>(params?: core.$ZodStringParams | string): core.$ZodType<T, T>",
+          "severity": "breaking",
+          "evidence": "text",
+          "notes": "overload removed or changed"
+        },
+        "usage": {
+          "file": "packages/shared/src/product.ts",
+          "line": 6,
+          "column": 11,
+          "endLine": 6,
+          "endColumn": 17,
+          "symbolPath": "string",
+          "access": "call",
+          "snippet": "name: z.string({ required_error: 'Name is required' }),",
+          "via": "direct",
+          "package": "zod",
+          "compileError": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.",
+          "compileCode": 2769
+        },
+        "severity": "breaking",
+        "confidence": 1,
+        "fixability": "mechanical",
+        "reason": "overload removed or changed"
+      },
+      "outcome": "mechanical",
+      "reason": "preserve missing/invalid input messages with error",
+      "diff": "- name: z.string({ required_error: 'Name is required' }),\n+ name: z.string({ error: (iss) => iss.input === undefined ? 'Name is required' : undefined }),",
+      "rule": "error-params"
+    },
+    {
+      "finding": {
+        "change": {
+          "package": "zod",
+          "from": "3.25.76",
+          "to": "4.6.5",
+          "path": "string",
+          "source": "types",
+          "confidence": 1,
+          "kind": "signature",
+          "before": "(params?: RawCreateParams & { coerce?: true }) => ZodString",
+          "after": "(params?: core.$ZodStringParams | string): ZodString; <T extends string>(params?: core.$ZodStringParams | string): core.$ZodType<T, T>",
+          "severity": "breaking",
+          "evidence": "text",
+          "notes": "overload removed or changed"
+        },
+        "usage": {
+          "file": "packages/shared/src/product.ts",
+          "line": 5,
+          "column": 10,
+          "endLine": 5,
+          "endColumn": 16,
+          "symbolPath": "string",
+          "access": "call",
+          "snippet": "sku: z.string({ required_error: 'SKU is required' }).min(3),",
+          "via": "direct",
+          "package": "zod",
+          "compileError": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.",
+          "compileCode": 2769
+        },
+        "severity": "breaking",
+        "confidence": 1,
+        "fixability": "mechanical",
+        "reason": "overload removed or changed"
+      },
+      "outcome": "mechanical",
+      "reason": "preserve missing/invalid input messages with error",
+      "diff": "- sku: z.string({ required_error: 'SKU is required' }).min(3),\n+ sku: z.string({ error: (iss) => iss.input === undefined ? 'SKU is required' : undefined }).min(3),",
+      "rule": "error-params"
+    },
+    {
+      "finding": {
+        "severity": "breaking",
+        "confidence": 1,
+        "fixability": "mechanical",
+        "reason": "default error messages changed",
+        "change": {
+          "package": "zod",
+          "from": "3.25.76",
+          "to": "4.6.5",
+          "path": "default error messages",
+          "kind": "type",
+          "severity": "breaking",
+          "source": "types",
+          "confidence": 1
+        },
+        "usage": {
+          "file": "packages/shared/src/monitoring.test.ts",
+          "line": 21,
+          "column": 1,
+          "endLine": 1,
+          "endColumn": 1,
+          "symbolPath": "default error messages",
+          "access": "read",
+          "snippet": "expect(parsed.error?.issues[0]?.message).toBe('Required');",
+          "via": "inferred"
+        }
+      },
+      "outcome": "mechanical",
+      "reason": "zod 4 says \"Invalid input: expected <type>, received undefined\" where zod 3 said \"Required\"; the assertion follows",
+      "rule": "default-messages",
+      "diff": "- expect(parsed.error?.issues[0]?.message).toBe('Required');\n+ expect(parsed.error?.issues[0]?.message).toBe('Invalid input: expected string, received undefined');"
+    }
+  ],
+  "verification": {
+    "baseline": [
+      {
+        "file": "packages/shared/src/errors.ts",
+        "line": 19,
+        "column": 9,
+        "code": 2322,
+        "message": "Type 'string' is not assignable to type 'number'."
+      }
+    ],
+    "target": [
+      {
+        "file": "packages/api/src/queue/consumer.ts",
+        "line": 2,
+        "column": 24,
+        "code": 2724,
+        "message": "'\"zod\"' has no exported member named 'ZodTypeDef'. Did you mean 'ZodType'?"
+      },
+      {
+        "file": "packages/api/src/queue/consumer.ts",
+        "line": 12,
+        "column": 60,
+        "code": 2344,
+        "message": "Type 'unknown' does not satisfy the constraint '$ZodTypeInternals<TMessage, ZodTypeDef>'."
+      },
+      {
+        "file": "packages/api/src/queue/consumer.ts",
+        "line": 19,
+        "column": 23,
+        "code": 2345,
+        "message": "Argument of type 'unknown' is not assignable to parameter of type 'TMessage'.\n  'TMessage' could be instantiated with an arbitrary type which could be unrelated to 'unknown'."
+      },
+      {
+        "file": "packages/api/src/routes/customers.ts",
+        "line": 5,
+        "column": 21,
+        "code": 2769,
+        "message": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'."
+      },
+      {
+        "file": "packages/api/src/routes/customers.ts",
+        "line": 6,
+        "column": 20,
+        "code": 2769,
+        "message": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'."
+      },
+      {
+        "file": "packages/api/src/routes/customers.ts",
+        "line": 7,
+        "column": 24,
+        "code": 2769,
+        "message": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'."
+      },
+      {
+        "file": "packages/api/src/routes/customers.ts",
+        "line": 12,
+        "column": 20,
+        "code": 2769,
+        "message": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'invalid_type_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'invalid_type_error' does not exist in type '$ZodStringParams'."
+      },
+      {
+        "file": "packages/api/src/routes/customers.ts",
+        "line": 13,
+        "column": 31,
+        "code": 2353,
+        "message": "Object literal may only specify known properties, and 'invalid_type_error' does not exist in type '{ error?: string | $ZodErrorMap<$ZodIssueInvalidType<unknown>> | undefined; message?: string | undefined; }'."
+      },
+      {
+        "file": "packages/api/src/routes/orders.ts",
+        "line": 5,
+        "column": 25,
+        "code": 2769,
+        "message": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'."
+      },
+      {
+        "file": "packages/api/src/routes/orders.ts",
+        "line": 6,
+        "column": 24,
+        "code": 2353,
+        "message": "Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodNumberParams'."
+      },
+      {
+        "file": "packages/api/src/routes/orders.ts",
+        "line": 10,
+        "column": 26,
+        "code": 2769,
+        "message": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'."
+      },
+      {
+        "file": "packages/api/src/routes/orders.ts",
+        "line": 13,
+        "column": 20,
+        "code": 2769,
+        "message": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'invalid_type_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'invalid_type_error' does not exist in type '$ZodStringParams'."
+      },
+      {
+        "file": "packages/api/src/routes/orders.ts",
+        "line": 17,
+        "column": 23,
+        "code": 2769,
+        "message": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'."
+      },
+      {
+        "file": "packages/api/src/routes/orders.ts",
+        "line": 18,
+        "column": 22,
+        "code": 2769,
+        "message": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'."
+      },
+      {
+        "file": "packages/api/src/routes/webhooks.ts",
+        "line": 4,
+        "column": 18,
+        "code": 2769,
+        "message": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'."
+      },
+      {
+        "file": "packages/api/src/routes/webhooks.ts",
+        "line": 8,
+        "column": 25,
+        "code": 2769,
+        "message": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'."
+      },
+      {
+        "file": "packages/api/src/routes/webhooks.ts",
+        "line": 9,
+        "column": 29,
+        "code": 2353,
+        "message": "Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodNumberParams'."
+      },
+      {
+        "file": "packages/api/src/routes/webhooks.ts",
+        "line": 14,
+        "column": 18,
+        "code": 2769,
+        "message": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'."
+      },
+      {
+        "file": "packages/api/src/routes/webhooks.ts",
+        "line": 15,
+        "column": 28,
+        "code": 2769,
+        "message": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'."
+      },
+      {
+        "file": "packages/shared/src/address.ts",
+        "line": 4,
+        "column": 21,
+        "code": 2769,
+        "message": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'."
+      },
+      {
+        "file": "packages/shared/src/address.ts",
+        "line": 5,
+        "column": 20,
+        "code": 2769,
+        "message": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'."
+      },
+      {
+        "file": "packages/shared/src/address.ts",
+        "line": 7,
+        "column": 5,
+        "code": 2769,
+        "message": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'."
+      },
+      {
+        "file": "packages/shared/src/address.ts",
+        "line": 10,
+        "column": 23,
+        "code": 2769,
+        "message": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'."
+      },
+      {
+        "file": "packages/shared/src/errors.ts",
+        "line": 19,
+        "column": 9,
+        "code": 2322,
+        "message": "Type 'string' is not assignable to type 'number'."
+      },
+      {
+        "file": "packages/shared/src/monitoring.ts",
+        "line": 6,
+        "column": 24,
+        "code": 2339,
+        "message": "Property 'ip' does not exist on type 'ZodString'."
+      },
+      {
+        "file": "packages/shared/src/product.ts",
+        "line": 5,
+        "column": 19,
+        "code": 2769,
+        "message": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'."
+      },
+      {
+        "file": "packages/shared/src/product.ts",
+        "line": 6,
+        "column": 20,
+        "code": 2769,
+        "message": "No overload matches this call.\n  Overload 1 of 2, '(params?: string | $ZodStringParams | undefined): ZodString', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.\n  Overload 2 of 2, '(params?: string | $ZodStringParams | undefined): $ZodType<string, string, $ZodTypeInternals<string, string>>', gave the following error.\n    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'."
+      },
+      {
+        "file": "packages/shared/src/product.ts",
+        "line": 8,
+        "column": 5,
+        "code": 2353,
+        "message": "Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodNumberParams'."
+      },
+      {
+        "file": "packages/shared/src/product.ts",
+        "line": 17,
+        "column": 24,
+        "code": 2353,
+        "message": "Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodNumberParams'."
+      }
+    ],
+    "after": [
+      {
+        "file": "packages/shared/src/errors.ts",
+        "line": 19,
+        "column": 9,
+        "code": 2322,
+        "message": "Type 'string' is not assignable to type 'number'."
+      }
+    ],
+    "newErrors": [],
+    "baselineTests": [
+      {
+        "workspace": "packages/api",
+        "status": "passed",
+        "output": "\n RUN  v3.2.4 <repo>/packages/api\n\n ✓ src/billing/renewal.test.ts (1 test) 1ms\n ✓ src/routes/orders.test.ts (2 tests) 2ms\n\n Test Files  2 passed (2)\n      Tests  3 passed (3)\n   Start at  15:28:50\n   Duration  433ms (transform 280ms, setup 0ms, collect 296ms, tests 3ms, environment 0ms, prepare 105ms)\n\n",
+        "command": "vitest run",
+        "covers": ["packages/api"],
+        "scope": "the `test` script of packages/api",
+        "summary": "3 tests in 2 files"
+      },
+      {
+        "workspace": "packages/shared",
+        "status": "passed",
+        "output": "\n RUN  v3.2.4 <repo>/packages/shared\n\n ✓ src/monitoring.test.ts (2 tests) 3ms\n\n Test Files  1 passed (1)\n      Tests  2 passed (2)\n   Start at  15:28:50\n   Duration  240ms (transform 31ms, setup 0ms, collect 27ms, tests 3ms, environment 0ms, prepare 56ms)\n\n",
+        "command": "vitest run",
+        "covers": ["packages/shared"],
+        "scope": "the `test` script of packages/shared",
+        "summary": "2 tests in 1 file"
+      }
+    ],
+    "tests": [
+      {
+        "workspace": "packages/api",
+        "status": "passed",
+        "output": "\n RUN  v3.2.4 <repo>/packages/api\n\n ✓ src/billing/renewal.test.ts (1 test) 1ms\n ✓ src/routes/orders.test.ts (2 tests) 2ms\n\n Test Files  2 passed (2)\n      Tests  3 passed (3)\n   Start at  15:29:13\n   Duration  310ms (transform 60ms, setup 0ms, collect 97ms, tests 4ms, environment 0ms, prepare 135ms)\n\n",
+        "command": "vitest run",
+        "covers": ["packages/api"],
+        "scope": "the `test` script of packages/api",
+        "summary": "3 tests in 2 files"
+      },
+      {
+        "workspace": "packages/shared",
+        "status": "passed",
+        "output": "\n RUN  v3.2.4 <repo>/packages/shared\n\n ✓ src/monitoring.test.ts (2 tests) 3ms\n\n Test Files  1 passed (1)\n      Tests  2 passed (2)\n   Start at  15:29:14\n   Duration  281ms (transform 32ms, setup 0ms, collect 64ms, tests 3ms, environment 0ms, prepare 48ms)\n\n",
+        "command": "vitest run",
+        "covers": ["packages/shared"],
+        "scope": "the `test` script of packages/shared",
+        "summary": "2 tests in 1 file"
+      }
+    ],
+    "passed": true
+  },
+  "llm": {
+    "available": true,
+    "model": "claude-sonnet-4-6",
+    "inputTokens": 2563,
+    "outputTokens": 576,
+    "costUsd": 0.016329
+  },
+  "behavior": [
+    {
+      "file": "packages/api/src/queue/consumer.ts",
+      "schema": "(reported site)",
+      "inputs": 0,
+      "identical": 0,
+      "validInputs": 0,
+      "differences": [],
+      "skipped": "site is not a top-level schema binding; no application code executed"
+    },
+    {
+      "file": "packages/api/src/routes/customers.ts",
+      "schema": "updateCustomerSchema",
+      "inputs": 200,
+      "identical": 200,
+      "validInputs": 61,
+      "schemaKind": "object",
+      "differences": [],
+      "messageChecks": [
+        {
+          "site": "packages/api/src/routes/customers.ts:13:21",
+          "path": ["marketingOptIn"],
+          "input": "missing",
+          "status": "default",
+          "reason": "no repository-defined message for this input"
+        },
+        {
+          "site": "packages/api/src/routes/customers.ts:13:21",
+          "path": ["marketingOptIn"],
+          "input": "wrong-type",
+          "status": "identical",
+          "before": "Opt-in must be true or false",
+          "after": "Opt-in must be true or false"
+        },
+        {
+          "site": "packages/api/src/routes/customers.ts:12:11",
+          "path": ["name"],
+          "input": "missing",
+          "status": "default",
+          "reason": "no repository-defined message for this input"
+        },
+        {
+          "site": "packages/api/src/routes/customers.ts:12:11",
+          "path": ["name"],
+          "input": "wrong-type",
+          "status": "identical",
+          "before": "Name must be a string",
+          "after": "Name must be a string"
+        }
+      ],
+      "loadedModules": ["packages/api/src/routes/customers.ts"]
+    },
+    {
+      "file": "packages/api/src/routes/customers.ts",
+      "schema": "signUpSchema",
+      "inputs": 0,
+      "identical": 0,
+      "validInputs": 0,
+      "differences": [],
+      "skipped": "unstubbed runtime import: @storefront/shared"
+    },
+    {
+      "file": "packages/api/src/routes/orders.ts",
+      "schema": "cancelOrderSchema",
+      "inputs": 200,
+      "identical": 200,
+      "validInputs": 43,
+      "schemaKind": "object",
+      "differences": [],
+      "messageChecks": [
+        {
+          "site": "packages/api/src/routes/orders.ts:18:13",
+          "path": ["reason"],
+          "input": "missing",
+          "status": "identical",
+          "before": "Reason is required",
+          "after": "Reason is required"
+        },
+        {
+          "site": "packages/api/src/routes/orders.ts:18:13",
+          "path": ["reason"],
+          "input": "wrong-type",
+          "status": "default",
+          "reason": "no repository-defined message for this input"
+        },
+        {
+          "site": "packages/api/src/routes/orders.ts:17:14",
+          "path": ["orderId"],
+          "input": "missing",
+          "status": "identical",
+          "before": "Order is required",
+          "after": "Order is required"
+        },
+        {
+          "site": "packages/api/src/routes/orders.ts:17:14",
+          "path": ["orderId"],
+          "input": "wrong-type",
+          "status": "default",
+          "reason": "no repository-defined message for this input"
+        }
+      ],
+      "loadedModules": ["packages/api/src/routes/orders.ts"]
+    },
+    {
+      "file": "packages/api/src/routes/orders.ts",
+      "schema": "createOrderSchema",
+      "inputs": 0,
+      "identical": 0,
+      "validInputs": 0,
+      "differences": [],
+      "skipped": "unstubbed runtime import: @storefront/shared"
+    },
+    {
+      "file": "packages/api/src/routes/orders.ts",
+      "schema": "lineItemSchema",
+      "inputs": 200,
+      "identical": 200,
+      "validInputs": 56,
+      "schemaKind": "object",
+      "differences": [],
+      "messageChecks": [
+        {
+          "site": "packages/api/src/routes/orders.ts:6:15",
+          "path": ["quantity"],
+          "input": "missing",
+          "status": "identical",
+          "before": "Quantity is required",
+          "after": "Quantity is required"
+        },
+        {
+          "site": "packages/api/src/routes/orders.ts:6:15",
+          "path": ["quantity"],
+          "input": "wrong-type",
+          "status": "default",
+          "reason": "no repository-defined message for this input"
+        },
+        {
+          "site": "packages/api/src/routes/orders.ts:5:16",
+          "path": ["productId"],
+          "input": "missing",
+          "status": "identical",
+          "before": "Product is required",
+          "after": "Product is required"
+        },
+        {
+          "site": "packages/api/src/routes/orders.ts:5:16",
+          "path": ["productId"],
+          "input": "wrong-type",
+          "status": "default",
+          "reason": "no repository-defined message for this input"
+        }
+      ],
+      "loadedModules": ["packages/api/src/routes/orders.ts"]
+    },
+    {
+      "file": "packages/api/src/routes/webhooks.ts",
+      "schema": "shipmentWebhookSchema",
+      "inputs": 200,
+      "identical": 200,
+      "validInputs": 49,
+      "schemaKind": "object",
+      "differences": [],
+      "messageChecks": [
+        {
+          "site": "packages/api/src/routes/webhooks.ts:15:19",
+          "path": ["trackingCode"],
+          "input": "missing",
+          "status": "identical",
+          "before": "Tracking code is required",
+          "after": "Tracking code is required"
+        },
+        {
+          "site": "packages/api/src/routes/webhooks.ts:15:19",
+          "path": ["trackingCode"],
+          "input": "wrong-type",
+          "status": "default",
+          "reason": "no repository-defined message for this input"
+        },
+        {
+          "site": "packages/api/src/routes/webhooks.ts:14:9",
+          "path": ["id"],
+          "input": "missing",
+          "status": "identical",
+          "before": "Event id is required",
+          "after": "Event id is required"
+        },
+        {
+          "site": "packages/api/src/routes/webhooks.ts:14:9",
+          "path": ["id"],
+          "input": "wrong-type",
+          "status": "default",
+          "reason": "no repository-defined message for this input"
+        }
+      ],
+      "loadedModules": ["packages/api/src/routes/webhooks.ts"]
+    },
+    {
+      "file": "packages/api/src/routes/webhooks.ts",
+      "schema": "paymentWebhookSchema",
+      "inputs": 200,
+      "identical": 200,
+      "validInputs": 43,
+      "schemaKind": "object",
+      "differences": [],
+      "messageChecks": [
+        {
+          "site": "packages/api/src/routes/webhooks.ts:9:20",
+          "path": ["payload", "amountCents"],
+          "input": "missing",
+          "status": "identical",
+          "before": "Amount is required",
+          "after": "Amount is required"
+        },
+        {
+          "site": "packages/api/src/routes/webhooks.ts:9:20",
+          "path": ["payload", "amountCents"],
+          "input": "wrong-type",
+          "status": "default",
+          "reason": "no repository-defined message for this input"
+        },
+        {
+          "site": "packages/api/src/routes/webhooks.ts:8:16",
+          "path": ["payload", "orderId"],
+          "input": "missing",
+          "status": "identical",
+          "before": "Order id is required",
+          "after": "Order id is required"
+        },
+        {
+          "site": "packages/api/src/routes/webhooks.ts:8:16",
+          "path": ["payload", "orderId"],
+          "input": "wrong-type",
+          "status": "default",
+          "reason": "no repository-defined message for this input"
+        },
+        {
+          "site": "packages/api/src/routes/webhooks.ts:4:9",
+          "path": ["id"],
+          "input": "missing",
+          "status": "identical",
+          "before": "Event id is required",
+          "after": "Event id is required"
+        },
+        {
+          "site": "packages/api/src/routes/webhooks.ts:4:9",
+          "path": ["id"],
+          "input": "wrong-type",
+          "status": "default",
+          "reason": "no repository-defined message for this input"
+        }
+      ],
+      "loadedModules": ["packages/api/src/routes/webhooks.ts"]
+    },
+    {
+      "file": "packages/shared/src/address.ts",
+      "schema": "addressSchema",
+      "inputs": 200,
+      "identical": 200,
+      "validInputs": 62,
+      "schemaKind": "object",
+      "differences": [],
+      "messageChecks": [
+        {
+          "site": "packages/shared/src/address.ts:10:14",
+          "path": ["country"],
+          "input": "missing",
+          "status": "identical",
+          "before": "Country is required",
+          "after": "Country is required"
+        },
+        {
+          "site": "packages/shared/src/address.ts:10:14",
+          "path": ["country"],
+          "input": "wrong-type",
+          "status": "default",
+          "reason": "no repository-defined message for this input"
+        },
+        {
+          "site": "packages/shared/src/address.ts:7:5",
+          "path": ["postalCode"],
+          "input": "missing",
+          "status": "identical",
+          "before": "Postal code is required",
+          "after": "Postal code is required"
+        },
+        {
+          "site": "packages/shared/src/address.ts:7:5",
+          "path": ["postalCode"],
+          "input": "wrong-type",
+          "status": "identical",
+          "before": "Postal code must be a string",
+          "after": "Postal code must be a string"
+        },
+        {
+          "site": "packages/shared/src/address.ts:5:11",
+          "path": ["city"],
+          "input": "missing",
+          "status": "identical",
+          "before": "City is required",
+          "after": "City is required"
+        },
+        {
+          "site": "packages/shared/src/address.ts:5:11",
+          "path": ["city"],
+          "input": "wrong-type",
+          "status": "default",
+          "reason": "no repository-defined message for this input"
+        },
+        {
+          "site": "packages/shared/src/address.ts:4:12",
+          "path": ["line1"],
+          "input": "missing",
+          "status": "identical",
+          "before": "Address line is required",
+          "after": "Address line is required"
+        },
+        {
+          "site": "packages/shared/src/address.ts:4:12",
+          "path": ["line1"],
+          "input": "wrong-type",
+          "status": "default",
+          "reason": "no repository-defined message for this input"
+        }
+      ],
+      "loadedModules": ["packages/shared/src/address.ts"]
+    },
+    {
+      "file": "packages/shared/src/monitoring.ts",
+      "schema": "accessLogSchema",
+      "inputs": 200,
+      "identical": 200,
+      "validInputs": 53,
+      "schemaKind": "object",
+      "differences": [],
+      "messageChecks": [
+        {
+          "site": "packages/shared/src/monitoring.ts:6:24",
+          "path": ["clientIp"],
+          "input": "missing",
+          "status": "default",
+          "reason": "no repository-defined message for this input"
+        },
+        {
+          "site": "packages/shared/src/monitoring.ts:6:24",
+          "path": ["clientIp"],
+          "input": "wrong-type",
+          "status": "default",
+          "reason": "no repository-defined message for this input"
+        }
+      ],
+      "loadedModules": ["packages/shared/src/monitoring.ts"]
+    },
+    {
+      "file": "packages/shared/src/product.ts",
+      "schema": "stockUpdateSchema",
+      "inputs": 200,
+      "identical": 200,
+      "validInputs": 58,
+      "schemaKind": "object",
+      "differences": [],
+      "messageChecks": [
+        {
+          "site": "packages/shared/src/product.ts:17:15",
+          "path": ["quantity"],
+          "input": "missing",
+          "status": "identical",
+          "before": "Quantity is required",
+          "after": "Quantity is required"
+        },
+        {
+          "site": "packages/shared/src/product.ts:17:15",
+          "path": ["quantity"],
+          "input": "wrong-type",
+          "status": "default",
+          "reason": "no repository-defined message for this input"
+        }
+      ],
+      "loadedModules": ["packages/shared/src/product.ts"]
+    },
+    {
+      "file": "packages/shared/src/product.ts",
+      "schema": "productSchema",
+      "inputs": 200,
+      "identical": 200,
+      "validInputs": 46,
+      "schemaKind": "object",
+      "differences": [],
+      "messageChecks": [
+        {
+          "site": "packages/shared/src/product.ts:8:5",
+          "path": ["priceCents"],
+          "input": "missing",
+          "status": "identical",
+          "before": "Price is required",
+          "after": "Price is required"
+        },
+        {
+          "site": "packages/shared/src/product.ts:8:5",
+          "path": ["priceCents"],
+          "input": "wrong-type",
+          "status": "identical",
+          "before": "Price must be a number",
+          "after": "Price must be a number"
+        },
+        {
+          "site": "packages/shared/src/product.ts:6:11",
+          "path": ["name"],
+          "input": "missing",
+          "status": "identical",
+          "before": "Name is required",
+          "after": "Name is required"
+        },
+        {
+          "site": "packages/shared/src/product.ts:6:11",
+          "path": ["name"],
+          "input": "wrong-type",
+          "status": "default",
+          "reason": "no repository-defined message for this input"
+        },
+        {
+          "site": "packages/shared/src/product.ts:5:10",
+          "path": ["sku"],
+          "input": "missing",
+          "status": "identical",
+          "before": "SKU is required",
+          "after": "SKU is required"
+        },
+        {
+          "site": "packages/shared/src/product.ts:5:10",
+          "path": ["sku"],
+          "input": "wrong-type",
+          "status": "default",
+          "reason": "no repository-defined message for this input"
+        }
+      ],
+      "loadedModules": ["packages/shared/src/product.ts"]
+    }
+  ],
+  "timingMs": 33678,
+  "prBody": "/repo/.git/uptide/uptide__zod-4.6.5/pr-body.md",
+  "notes": [
+    "Review validation behaviour and custom messages; compilation alone cannot prove runtime equivalence.",
+    "Migration reference: https://zod.dev/v4/changelog"
+  ],
+  "packContext": {
+    "from": "3.25.76",
+    "to": "4.6.5",
+    "includeDeprecated": false,
+    "defaultMessages": [
+      {
+        "file": "packages/shared/src/monitoring.test.ts",
+        "line": 21,
+        "text": "Required",
+        "now": "Invalid input: expected <type>, received undefined",
+        "replacement": "received undefined"
+      }
+    ]
+  },
+  "decisions": [
+    "- Zod 4 words its default error messages differently, and a test of the migrated code failed on it. Updated 1 assertion: `packages/shared/src/monitoring.test.ts:21` `\"Required\"` → `\"Invalid input: expected string, received undefined\"`. Confirm that nothing outside the tests reads this text: logs, alerts, dead-letter descriptions, API responses."
+  ],
+  "source": "/repo",
+  "base": "main",
+  "clone": { "path": "/tmp/uptide-runs/run/repo", "kept": false },
+  "html": "/repo/.git/uptide/uptide__zod-4.6.5/report.html"
+}

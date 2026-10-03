@@ -1,0 +1,50 @@
+name: Uptide
+description: Check and migrate zod/stripe dependency upgrade PRs from Renovate or Dependabot.
+inputs:
+  github-token:
+    description: Token with pull-requests write and (for fix) contents write. Dependabot requires appropriately configured bot secrets/token.
+    default: ${{ github.token }}
+  anthropic-api-key:
+    description: Required with fix true. Never passed to consumer installs/tests.
+    required: false
+  fix:
+    description: Verify and push one migration commit on the existing PR branch.
+    default: 'false'
+  only:
+    description: Comma-separated supported dependencies.
+    default: zod,stripe
+  paths:
+    description: Repository-relative source globs or directories, comma/newline separated. Empty includes all.
+    default: ''
+outputs:
+  commit:
+    description: Migration commit SHA (empty if nothing pushed).
+    value: ${{ steps.run.outputs.commit }}
+  skipped:
+    description: Reason the event was skipped.
+    value: ${{ steps.run.outputs.skipped }}
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@v4
+      with:
+        version: 10.17.1
+        run_install: false
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    - name: Install Uptide tooling
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: pnpm install --frozen-lockfile --ignore-scripts
+    - id: run
+      name: Check and optionally migrate PR
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      env:
+        UPTIDE_GITHUB_TOKEN: ${{ inputs.github-token }}
+        UPTIDE_ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
+        UPTIDE_FIX: ${{ inputs.fix }}
+        UPTIDE_ONLY: ${{ inputs.only }}
+        UPTIDE_PATHS: ${{ inputs.paths }}
+      run: pnpm exec tsx scripts/action.ts

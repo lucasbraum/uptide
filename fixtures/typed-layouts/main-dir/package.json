@@ -1,0 +1,6 @@
+{
+  "name": "main-dir",
+  "version": "1.0.0",
+  "main": "lib/entry.js",
+  "license": "MIT"
+}

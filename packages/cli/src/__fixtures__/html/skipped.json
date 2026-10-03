@@ -1,0 +1,36 @@
+{
+  "repo": "/repo/clean",
+  "workspaces": [".", "packages/api"],
+  "packages": [
+    {
+      "workspace": "packages/api",
+      "name": "stripe",
+      "installed": "14.25.0",
+      "latest": "22.6.2",
+      "target": "22.6.2",
+      "majorsBehind": 8,
+      "status": "skipped",
+      "skipReason": "REGISTRY_UNREACHABLE",
+      "notes": ["Registry unreachable; workspace analysis incomplete"],
+      "findings": [],
+      "callSitesChecked": 0,
+      "unanalyzed": [],
+      "timing": {
+        "fetchMs": 0,
+        "diffMs": 0,
+        "usagesMs": 0,
+        "compileMs": 0
+      }
+    }
+  ],
+  "summary": {
+    "packagesNeedingAttention": 0,
+    "breaking": 0,
+    "deprecated": 0,
+    "unverified": 0,
+    "unaffected": 0,
+    "notImported": 0,
+    "partiallyAnalyzed": 0,
+    "autoFixable": 0
+  }
+}

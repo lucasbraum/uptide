@@ -1,0 +1,10 @@
+{
+  "name": "require-consumer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A legacy CommonJS consumer of fixtures/synthetic: JavaScript without checkJs, require() in TypeScript, import = require, dynamic import. Not runnable.",
+  "dependencies": {
+    "synthetic": "1.0.0"
+  },
+  "license": "MIT"
+}

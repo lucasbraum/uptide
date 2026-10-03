@@ -1,0 +1,39 @@
+{
+  "total": 49,
+  "bySeverity": {
+    "breaking": 24,
+    "additive": 25
+  },
+  "byKind": {
+    "removed": 15,
+    "type": 5,
+    "added": 25,
+    "signature": 4
+  },
+  "breaking": [
+    "removed \"./document\":Head#makeStylesheetInert",
+    "type \"./image\":default @0.7",
+    "type \"./link\":default @0.7",
+    "removed AUTOMATIC_FONT_OPTIMIZATION_MANIFEST -> DEV_CLIENT_MIDDLEWARE_MANIFEST @0.8",
+    "removed DEV_MIDDLEWARE_MANIFEST -> TURBOPACK_CLIENT_MIDDLEWARE_MANIFEST @0.8",
+    "type DocumentInitialProps @0.7",
+    "removed GOOGLE_FONT_PROVIDER -> WEBPACK_STATS @0.8",
+    "type GetStaticPathsResult#fallback @0.7",
+    "removed INTERNAL_HEADERS",
+    "removed NextConfig#analyticsId",
+    "type NextConfig#logging @0.7",
+    "removed NextConfig#logging#fetches",
+    "removed NextConfig#logging#fetches#fullUrl",
+    "removed NextConfig#optimizeFonts",
+    "removed NextConfig#outputFileTracing",
+    "removed NextConfig#swcMinify",
+    "removed OPTIMIZED_FONT_PROVIDERS",
+    "removed PageConfig#unstable_excludeFiles",
+    "removed PageConfig#unstable_includeFiles",
+    "removed Router#_getFlightData",
+    "signature cookies @0.7",
+    "signature createServer @0.7",
+    "signature draftMode @0.7",
+    "signature headers @0.7"
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "name": "sibling",
+  "version": "1.0.0",
+  "exports": {
+    ".": {
+      "node": {
+        "require": "./dist/cjs/index.js"
+      }
+    }
+  },
+  "license": "MIT"
+}

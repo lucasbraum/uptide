@@ -1,0 +1,34 @@
+{
+  "name": "synthetic",
+  "version": "2.0.0",
+  "description": "Version 2 of the synthetic fixture: the same package with a handful of deliberate changes.",
+  "private": true,
+  "type": "module",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./utils": {
+      "import": {
+        "types": "./dist/sub/utils.d.ts",
+        "default": "./dist/sub/utils.js"
+      }
+    },
+    "./legacy": {
+      "types": "./dist/sub/legacy.d.ts",
+      "default": "./dist/sub/legacy.js"
+    },
+    "./cjs": {
+      "types": "./dist/sub/cjs.d.ts",
+      "require": "./dist/sub/cjs.cjs"
+    },
+    "./ambient": {
+      "types": "./dist/sub/ambient.d.ts",
+      "default": "./dist/sub/ambient.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "license": "MIT"
+}

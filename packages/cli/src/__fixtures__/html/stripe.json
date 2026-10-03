@@ -1,0 +1,566 @@
+{
+  "repo": "/repo/storefront",
+  "workspaces": [".", "packages/api", "packages/shared"],
+  "packages": [
+    {
+      "workspace": "packages/api",
+      "name": "stripe",
+      "installed": "14.25.0",
+      "latest": "23.0.0",
+      "target": "23.0.0",
+      "majorsBehind": 9,
+      "findings": [
+        {
+          "change": {
+            "package": "stripe",
+            "from": "14.25.0",
+            "to": "23.0.0",
+            "path": "Stripe.Subscription#current_period_start",
+            "kind": "removed",
+            "before": "number",
+            "source": "types",
+            "confidence": 1,
+            "severity": "breaking"
+          },
+          "usage": {
+            "file": "src/billing/renewal.ts",
+            "line": 12,
+            "column": 38,
+            "endLine": 12,
+            "endColumn": 58,
+            "symbolPath": "Stripe.Subscription#current_period_start",
+            "access": "read",
+            "snippet": "startedAt: new Date(subscription.current_period_start * 1000),",
+            "via": "direct",
+            "package": "stripe",
+            "compileError": "Property 'current_period_start' does not exist on type 'Subscription'.",
+            "compileCode": 2339
+          },
+          "severity": "breaking",
+          "confidence": 1,
+          "fixability": "manual",
+          "reason": "removed"
+        },
+        {
+          "change": {
+            "package": "stripe",
+            "from": "14.25.0",
+            "to": "23.0.0",
+            "path": "Stripe.Subscription#current_period_end",
+            "kind": "removed",
+            "before": "number",
+            "source": "types",
+            "confidence": 1,
+            "severity": "breaking"
+          },
+          "usage": {
+            "file": "src/billing/renewal.ts",
+            "line": 13,
+            "column": 37,
+            "endLine": 13,
+            "endColumn": 55,
+            "symbolPath": "Stripe.Subscription#current_period_end",
+            "access": "read",
+            "snippet": "renewsAt: new Date(subscription.current_period_end * 1000),",
+            "via": "direct",
+            "package": "stripe",
+            "compileError": "Property 'current_period_end' does not exist on type 'Subscription'.",
+            "compileCode": 2339
+          },
+          "severity": "breaking",
+          "confidence": 1,
+          "fixability": "manual",
+          "reason": "removed"
+        },
+        {
+          "change": {
+            "package": "stripe",
+            "from": "14.25.0",
+            "to": "23.0.0",
+            "path": "Stripe.StripeConfig",
+            "source": "types",
+            "confidence": 0.7,
+            "kind": "signature",
+            "before": "interface: interface",
+            "after": "type: type = StripeConfig",
+            "notes": "declaration kind changed from interface to type; usable the same way, but declaration merging and extends may differ",
+            "severity": "additive",
+            "evidence": "text"
+          },
+          "usage": {
+            "file": "src/billing/client.ts",
+            "line": 9,
+            "column": 17,
+            "endLine": 9,
+            "endColumn": 23,
+            "symbolPath": "Stripe.new()",
+            "access": "construct",
+            "snippet": "stripe: new Stripe(secretKey, { apiVersion: '2023-10-16' }),",
+            "via": "direct",
+            "package": "stripe"
+          },
+          "severity": "additive",
+          "confidence": 0.7,
+          "fixability": "none",
+          "reason": "Stripe.StripeConfig, the type of Stripe.new(), declaration kind changed from interface to type; usable the same way, but declaration merging and extends may differ"
+        },
+        {
+          "change": {
+            "package": "stripe",
+            "from": "14.25.0",
+            "to": "23.0.0",
+            "path": "Stripe.Stripe",
+            "kind": "removed",
+            "before": "typeof Stripe",
+            "source": "types",
+            "confidence": 1,
+            "severity": "breaking"
+          },
+          "usage": {
+            "file": "src/billing/client.ts",
+            "line": 9,
+            "column": 17,
+            "endLine": 9,
+            "endColumn": 23,
+            "symbolPath": "Stripe.new()",
+            "access": "construct",
+            "snippet": "stripe: new Stripe(secretKey, { apiVersion: '2023-10-16' }),",
+            "via": "direct",
+            "package": "stripe"
+          },
+          "severity": "info",
+          "confidence": 0.3,
+          "fixability": "none",
+          "reason": "diff says removed but your code compiles against the target"
+        },
+        {
+          "change": {
+            "package": "stripe",
+            "from": "14.25.0",
+            "to": "23.0.0",
+            "path": "Stripe.Stripe",
+            "kind": "removed",
+            "before": "typeof Stripe",
+            "source": "types",
+            "confidence": 1,
+            "severity": "breaking"
+          },
+          "usage": {
+            "file": "src/billing/client.ts",
+            "line": 14,
+            "column": 25,
+            "endLine": 14,
+            "endColumn": 39,
+            "symbolPath": "Stripe#paymentIntents",
+            "access": "read",
+            "snippet": "return billing.stripe.paymentIntents.create({",
+            "via": "direct",
+            "package": "stripe"
+          },
+          "severity": "info",
+          "confidence": 0.3,
+          "fixability": "none",
+          "reason": "diff says removed but your code compiles against the target"
+        },
+        {
+          "change": {
+            "package": "stripe",
+            "from": "14.25.0",
+            "to": "23.0.0",
+            "path": "Stripe#paymentIntents",
+            "source": "types",
+            "confidence": 0.7,
+            "kind": "type",
+            "before": "Stripe.PaymentIntentsResource",
+            "after": "PaymentIntentResource",
+            "severity": "breaking",
+            "evidence": "text",
+            "notes": "type changed"
+          },
+          "usage": {
+            "file": "src/billing/client.ts",
+            "line": 14,
+            "column": 25,
+            "endLine": 14,
+            "endColumn": 39,
+            "symbolPath": "Stripe#paymentIntents",
+            "access": "read",
+            "snippet": "return billing.stripe.paymentIntents.create({",
+            "via": "direct",
+            "package": "stripe"
+          },
+          "severity": "info",
+          "confidence": 0.3,
+          "fixability": "none",
+          "reason": "diff says type but your code compiles against the target"
+        },
+        {
+          "change": {
+            "package": "stripe",
+            "from": "14.25.0",
+            "to": "23.0.0",
+            "path": "Stripe.PaymentIntentCreateParams#metadata",
+            "source": "types",
+            "confidence": 0.7,
+            "kind": "type",
+            "before": "Stripe.MetadataParam",
+            "after": "MetadataParam",
+            "severity": "breaking",
+            "evidence": "text",
+            "notes": "type changed"
+          },
+          "usage": {
+            "file": "src/billing/client.ts",
+            "line": 17,
+            "column": 5,
+            "endLine": 17,
+            "endColumn": 13,
+            "symbolPath": "Stripe.PaymentIntentCreateParams#metadata",
+            "access": "write",
+            "snippet": "metadata: { orderId },",
+            "via": "direct",
+            "package": "stripe"
+          },
+          "severity": "info",
+          "confidence": 0.3,
+          "fixability": "none",
+          "reason": "diff says type but your code compiles against the target"
+        },
+        {
+          "change": {
+            "package": "stripe",
+            "from": "14.25.0",
+            "to": "23.0.0",
+            "path": "Stripe.Stripe",
+            "kind": "removed",
+            "before": "typeof Stripe",
+            "source": "types",
+            "confidence": 1,
+            "severity": "breaking"
+          },
+          "usage": {
+            "file": "src/billing/client.ts",
+            "line": 17,
+            "column": 5,
+            "endLine": 17,
+            "endColumn": 13,
+            "symbolPath": "Stripe.PaymentIntentCreateParams#metadata",
+            "access": "write",
+            "snippet": "metadata: { orderId },",
+            "via": "direct",
+            "package": "stripe"
+          },
+          "severity": "info",
+          "confidence": 0.3,
+          "fixability": "none",
+          "reason": "diff says removed but your code compiles against the target"
+        },
+        {
+          "change": {
+            "package": "stripe",
+            "from": "14.25.0",
+            "to": "23.0.0",
+            "path": "Stripe.Subscription#current_period_start",
+            "kind": "removed",
+            "before": "number",
+            "source": "types",
+            "confidence": 1,
+            "severity": "breaking"
+          },
+          "usage": {
+            "file": "src/billing/renewal.test.ts",
+            "line": 9,
+            "column": 7,
+            "endLine": 9,
+            "endColumn": 27,
+            "symbolPath": "Stripe.Subscription#current_period_start",
+            "access": "write",
+            "snippet": "current_period_start: 1_700_000_000,",
+            "via": "direct",
+            "package": "stripe"
+          },
+          "severity": "info",
+          "confidence": 0.3,
+          "fixability": "none",
+          "reason": "diff says removed but your code compiles against the target"
+        },
+        {
+          "change": {
+            "package": "stripe",
+            "from": "14.25.0",
+            "to": "23.0.0",
+            "path": "Stripe.Subscription#current_period_end",
+            "kind": "removed",
+            "before": "number",
+            "source": "types",
+            "confidence": 1,
+            "severity": "breaking"
+          },
+          "usage": {
+            "file": "src/billing/renewal.test.ts",
+            "line": 10,
+            "column": 7,
+            "endLine": 10,
+            "endColumn": 25,
+            "symbolPath": "Stripe.Subscription#current_period_end",
+            "access": "write",
+            "snippet": "current_period_end: 1_702_592_000,",
+            "via": "direct",
+            "package": "stripe"
+          },
+          "severity": "info",
+          "confidence": 0.3,
+          "fixability": "none",
+          "reason": "diff says removed but your code compiles against the target"
+        },
+        {
+          "change": {
+            "package": "stripe",
+            "from": "14.25.0",
+            "to": "23.0.0",
+            "path": "Stripe.Stripe",
+            "kind": "removed",
+            "before": "typeof Stripe",
+            "source": "types",
+            "confidence": 1,
+            "severity": "breaking"
+          },
+          "usage": {
+            "file": "src/billing/renewal.ts",
+            "line": 18,
+            "column": 45,
+            "endLine": 18,
+            "endColumn": 58,
+            "symbolPath": "Stripe#subscriptions",
+            "access": "read",
+            "snippet": "const subscription = await billing.stripe.subscriptions.retrieve(subscriptionId);",
+            "via": "direct",
+            "package": "stripe"
+          },
+          "severity": "info",
+          "confidence": 0.3,
+          "fixability": "none",
+          "reason": "diff says removed but your code compiles against the target"
+        },
+        {
+          "change": {
+            "package": "stripe",
+            "from": "14.25.0",
+            "to": "23.0.0",
+            "path": "Stripe#subscriptions",
+            "source": "types",
+            "confidence": 0.7,
+            "kind": "type",
+            "before": "Stripe.SubscriptionsResource",
+            "after": "SubscriptionResource",
+            "severity": "breaking",
+            "evidence": "text",
+            "notes": "type changed"
+          },
+          "usage": {
+            "file": "src/billing/renewal.ts",
+            "line": 18,
+            "column": 45,
+            "endLine": 18,
+            "endColumn": 58,
+            "symbolPath": "Stripe#subscriptions",
+            "access": "read",
+            "snippet": "const subscription = await billing.stripe.subscriptions.retrieve(subscriptionId);",
+            "via": "direct",
+            "package": "stripe"
+          },
+          "severity": "info",
+          "confidence": 0.3,
+          "fixability": "none",
+          "reason": "diff says type but your code compiles against the target"
+        },
+        {
+          "change": {
+            "package": "stripe",
+            "from": "14.25.0",
+            "to": "23.0.0",
+            "path": "TS2322",
+            "kind": "type",
+            "severity": "breaking",
+            "source": "types",
+            "confidence": 1,
+            "evidence": "checker",
+            "notes": "Type '_' is not assignable to type '_'."
+          },
+          "usage": {
+            "file": "src/billing/client.ts",
+            "line": 9,
+            "column": 37,
+            "endLine": 9,
+            "endColumn": 47,
+            "symbolPath": "TS2322",
+            "access": "read",
+            "snippet": "stripe: new Stripe(secretKey, { apiVersion: '2023-10-16' }),",
+            "via": "inferred",
+            "compileError": "Type '\"2023-10-16\"' is not assignable to type '\"2026-09-30.endive\"'."
+          },
+          "severity": "breaking",
+          "confidence": 1,
+          "fixability": "unknown",
+          "reason": "compile error not attributed to a known API change"
+        },
+        {
+          "change": {
+            "package": "stripe",
+            "from": "14.25.0",
+            "to": "23.0.0",
+            "path": "TS2352",
+            "kind": "type",
+            "severity": "breaking",
+            "source": "types",
+            "confidence": 1,
+            "evidence": "checker",
+            "notes": "Conversion of type '_' to type '_' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to '_' first."
+          },
+          "usage": {
+            "file": "src/billing/renewal.test.ts",
+            "line": 7,
+            "column": 26,
+            "endLine": 11,
+            "endColumn": 29,
+            "symbolPath": "TS2352",
+            "access": "read",
+            "snippet": "const subscription = {",
+            "via": "inferred",
+            "compileError": "Conversion of type '{ id: string; current_period_start: number; current_period_end: number; }' to type 'Subscription' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.\n  Type '{ id: string; current_period_start: number; current_period_end: number; }' is missing the following properties from type 'Subscription': object, application, application_fee_percent, automatic_tax, and 41 more."
+          },
+          "severity": "breaking",
+          "confidence": 1,
+          "fixability": "unknown",
+          "reason": "compile error not attributed to a known API change"
+        }
+      ],
+      "callSitesChecked": 20,
+      "unanalyzed": [],
+      "status": "breaking",
+      "notes": [],
+      "timing": {
+        "fetchMs": 2245,
+        "diffMs": 1119,
+        "usagesMs": 2299,
+        "compileMs": 918,
+        "runtimeMs": 3
+      },
+      "compile": {
+        "baselineErrors": 0,
+        "unresolvedInTarget": [],
+        "unresolvedFiles": [],
+        "unattributed": [
+          {
+            "file": "src/billing/client.ts",
+            "line": 9,
+            "column": 37,
+            "endLine": 9,
+            "endColumn": 47,
+            "code": 2322,
+            "message": "Type '\"2023-10-16\"' is not assignable to type '\"2026-09-30.endive\"'.",
+            "snippet": "stripe: new Stripe(secretKey, { apiVersion: '2023-10-16' }),"
+          },
+          {
+            "file": "src/billing/renewal.test.ts",
+            "line": 7,
+            "column": 26,
+            "endLine": 11,
+            "endColumn": 29,
+            "code": 2352,
+            "message": "Conversion of type '{ id: string; current_period_start: number; current_period_end: number; }' to type 'Subscription' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.\n  Type '{ id: string; current_period_start: number; current_period_end: number; }' is missing the following properties from type 'Subscription': object, application, application_fee_percent, automatic_tax, and 41 more.",
+            "snippet": "const subscription = {"
+          }
+        ]
+      },
+      "runtime": [
+        {
+          "package": "stripe",
+          "node": "v22.20.0",
+          "nodeSource": "current",
+          "changes": [
+            {
+              "kind": "key-removed",
+              "loader": "require",
+              "key": "Stripe",
+              "detail": "`Stripe` is no longer an export of require()"
+            },
+            {
+              "kind": "key-removed",
+              "loader": "require",
+              "key": "default",
+              "detail": "`default` is no longer an export of require()"
+            }
+          ],
+          "usedKeys": [
+            "Stripe",
+            "new()",
+            "StripeConfig",
+            "apiVersion",
+            "paymentIntents",
+            "PaymentIntentsResource",
+            "create",
+            "PaymentIntentCreateParams",
+            "amount",
+            "currency",
+            "metadata",
+            "Subscription",
+            "id",
+            "current_period_start",
+            "current_period_end",
+            "subscriptions",
+            "SubscriptionsResource",
+            "retrieve"
+          ]
+        }
+      ],
+      "plan": [
+        {
+          "rule": "fixture-cast",
+          "title": "Test fixture casts widened",
+          "severity": "breaking",
+          "by": { "rule": 1, "agent": 0, "manual": 0 },
+          "sites": 1,
+          "fixes": 1,
+          "locations": [{ "file": "packages/api/src/billing/renewal.test.ts", "line": 7 }],
+          "detail": "Conversion of type '{ id: string; current_period_start: number; current_period_end: number; }' to type 'Subscription' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first."
+        },
+        {
+          "rule": "subscription-period",
+          "title": "Subscription billing period moved to items",
+          "severity": "breaking",
+          "by": { "rule": 0, "agent": 2, "manual": 0 },
+          "sites": 2,
+          "fixes": 2,
+          "locations": [
+            { "file": "packages/api/src/billing/renewal.ts", "line": 12 },
+            { "file": "packages/api/src/billing/renewal.ts", "line": 13 }
+          ],
+          "detail": "Property 'current_period_end' does not exist on type 'Subscription'."
+        },
+        {
+          "rule": "api-version",
+          "title": "apiVersion no longer matches the SDK",
+          "severity": "breaking",
+          "by": { "rule": 0, "agent": 1, "manual": 0 },
+          "sites": 1,
+          "fixes": 1,
+          "locations": [{ "file": "packages/api/src/billing/client.ts", "line": 9 }],
+          "detail": "Type '\"2023-10-16\"' is not assignable to type '\"2026-09-30.endive\"'.",
+          "note": "1 API change since 2023-10-16 affects your code"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "packagesNeedingAttention": 2,
+    "breaking": 32,
+    "deprecated": 15,
+    "unverified": 0,
+    "unaffected": 0,
+    "notImported": 0,
+    "partiallyAnalyzed": 0,
+    "autoFixable": 38
+  },
+  "timing": { "totalMs": 9423 }
+}

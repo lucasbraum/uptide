@@ -1,0 +1,961 @@
+{
+  "package": "synthetic",
+  "version": "1.0.0",
+  "extractedAt": "2026-09-27T00:00:00.000Z",
+  "adapter": "typescript",
+  "symbols": [
+    {
+      "path": "\"./legacy\":Client",
+      "kind": "class",
+      "signature": "class",
+      "exportedFrom": [
+        "./legacy"
+      ],
+      "file": "dist/sub/legacy.d.ts"
+    },
+    {
+      "path": "\"./legacy\":Client#connect",
+      "kind": "method",
+      "signature": "(): void",
+      "exportedFrom": [
+        "./legacy"
+      ],
+      "file": "dist/sub/legacy.d.ts"
+    },
+    {
+      "path": "\"./legacy\":Client.new()",
+      "kind": "method",
+      "signature": "(host: string, port: number)",
+      "exportedFrom": [
+        "./legacy"
+      ],
+      "file": "dist/sub/legacy.d.ts"
+    },
+    {
+      "path": "\"other-pkg\":Request",
+      "kind": "interface",
+      "signature": "interface",
+      "exportedFrom": [
+        ".",
+        "./utils"
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "\"other-pkg\":Request#synthetic",
+      "kind": "property",
+      "signature": "Item",
+      "optional": true,
+      "exportedFrom": [
+        ".",
+        "./utils"
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Api",
+      "kind": "class",
+      "signature": "class",
+      "exportedFrom": [
+        "./cjs"
+      ],
+      "exportEquals": true,
+      "file": "dist/sub/cjs.d.ts"
+    },
+    {
+      "path": "Api#errors",
+      "kind": "property",
+      "signature": "typeof Api.errors",
+      "exportedFrom": [
+        "./cjs"
+      ],
+      "file": "dist/sub/cjs.d.ts"
+    },
+    {
+      "path": "Api#request",
+      "kind": "method",
+      "signature": "(path: string): Promise<Api.Response>",
+      "exportedFrom": [
+        "./cjs"
+      ],
+      "file": "dist/sub/cjs.d.ts"
+    },
+    {
+      "path": "Api.Response",
+      "kind": "interface",
+      "signature": "interface",
+      "exportedFrom": [
+        "./cjs"
+      ],
+      "file": "dist/sub/cjs.d.ts"
+    },
+    {
+      "path": "Api.Response#data",
+      "kind": "property",
+      "signature": "unknown",
+      "optional": true,
+      "exportedFrom": [
+        "./cjs"
+      ],
+      "file": "dist/sub/cjs.d.ts"
+    },
+    {
+      "path": "Api.Response#ok",
+      "kind": "property",
+      "signature": "boolean",
+      "exportedFrom": [
+        "./cjs"
+      ],
+      "file": "dist/sub/cjs.d.ts"
+    },
+    {
+      "path": "Api.errors",
+      "kind": "namespace",
+      "signature": "namespace",
+      "exportedFrom": [
+        "./cjs"
+      ],
+      "file": "dist/sub/cjs.d.ts"
+    },
+    {
+      "path": "Api.errors.ApiError",
+      "kind": "class",
+      "signature": "class extends Error",
+      "exportedFrom": [
+        "./cjs"
+      ],
+      "file": "dist/sub/cjs.d.ts"
+    },
+    {
+      "path": "Api.errors.ApiError#status",
+      "kind": "property",
+      "signature": "number",
+      "exportedFrom": [
+        "./cjs"
+      ],
+      "file": "dist/sub/cjs.d.ts"
+    },
+    {
+      "path": "Api.new()",
+      "kind": "method",
+      "signature": "(key: string)",
+      "exportedFrom": [
+        "./cjs"
+      ],
+      "file": "dist/sub/cjs.d.ts"
+    },
+    {
+      "path": "Api.version",
+      "kind": "property",
+      "signature": "string",
+      "exportedFrom": [
+        "./cjs"
+      ],
+      "file": "dist/sub/cjs.d.ts"
+    },
+    {
+      "path": "Callable",
+      "kind": "interface",
+      "signature": "interface",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Callable#()",
+      "kind": "method",
+      "signature": "(input: string): Item",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Callable#length",
+      "kind": "property",
+      "signature": "readonly number",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Callable.new()",
+      "kind": "method",
+      "signature": "(input: string): Callable",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Circle",
+      "kind": "interface",
+      "signature": "interface",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/shapes.d.ts"
+    },
+    {
+      "path": "Circle#radius",
+      "kind": "property",
+      "signature": "number",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/shapes.d.ts"
+    },
+    {
+      "path": "Client",
+      "kind": "class",
+      "signature": "class",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/client.d.ts"
+    },
+    {
+      "path": "Client#get",
+      "kind": "method",
+      "signature": "(id: string): Promise<Item>",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/client.d.ts"
+    },
+    {
+      "path": "Client.new()",
+      "kind": "method",
+      "signature": "(url: string)",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/client.d.ts"
+    },
+    {
+      "path": "Headers",
+      "kind": "interface",
+      "signature": "interface",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Headers#\"content-type\"",
+      "kind": "property",
+      "signature": "string",
+      "optional": true,
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Headers#[string]",
+      "kind": "property",
+      "signature": "string | undefined",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "InternalState",
+      "kind": "interface",
+      "signature": "interface",
+      "exportedFrom": [
+        "."
+      ],
+      "visibility": "internal",
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "InternalState#ticks",
+      "kind": "property",
+      "signature": "number",
+      "exportedFrom": [
+        "."
+      ],
+      "visibility": "internal",
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Item",
+      "kind": "interface",
+      "signature": "interface",
+      "exportedFrom": [
+        ".",
+        "./utils"
+      ],
+      "file": "dist/item.d.ts"
+    },
+    {
+      "path": "Item#id",
+      "kind": "property",
+      "signature": "string",
+      "exportedFrom": [
+        ".",
+        "./utils"
+      ],
+      "file": "dist/item.d.ts"
+    },
+    {
+      "path": "Item#legacyId",
+      "kind": "property",
+      "signature": "string",
+      "deprecated": "use id",
+      "optional": true,
+      "exportedFrom": [
+        ".",
+        "./utils"
+      ],
+      "file": "dist/item.d.ts"
+    },
+    {
+      "path": "Item#tags",
+      "kind": "property",
+      "signature": "Set<string>",
+      "exportedFrom": [
+        ".",
+        "./utils"
+      ],
+      "file": "dist/item.d.ts"
+    },
+    {
+      "path": "Level",
+      "kind": "enum",
+      "signature": "enum",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Level.Custom",
+      "kind": "enumMember",
+      "signature": "\"custom\"",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Level.High",
+      "kind": "enumMember",
+      "signature": "1",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Level.Low",
+      "kind": "enumMember",
+      "signature": "0",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Loose",
+      "kind": "type",
+      "signature": "type = 'a' | 'm' | 'z'",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Mode",
+      "kind": "type",
+      "signature": "type = ParseOptions['mode']",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Pair",
+      "kind": "type",
+      "signature": "type<T>",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Pair#left",
+      "kind": "property",
+      "signature": "T",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Pair#right",
+      "kind": "property",
+      "signature": "T",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "ParseOptions",
+      "kind": "interface",
+      "signature": "interface",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "ParseOptions#[string]",
+      "kind": "property",
+      "signature": "unknown",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "ParseOptions#hooks",
+      "kind": "property",
+      "signature": "{…}",
+      "optional": true,
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "ParseOptions#hooks#configure",
+      "kind": "property",
+      "signature": "() => ParseOptions",
+      "optional": true,
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "ParseOptions#hooks#onConfigure",
+      "kind": "property",
+      "signature": "(options: ParseOptions) => void",
+      "optional": true,
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "ParseOptions#hooks#onEnd",
+      "kind": "property",
+      "signature": "(result: Item) => void",
+      "optional": true,
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "ParseOptions#hooks#onStart",
+      "kind": "method",
+      "signature": "(): void",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "ParseOptions#items",
+      "kind": "property",
+      "signature": "Array<{…}>",
+      "optional": true,
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "ParseOptions#items[]#id",
+      "kind": "property",
+      "signature": "string",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "ParseOptions#items[]#quantity",
+      "kind": "property",
+      "signature": "number",
+      "optional": true,
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "ParseOptions#mode",
+      "kind": "property",
+      "signature": "'auto' | 'loose' | 'strict'",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "ParseOptions#named",
+      "kind": "property",
+      "signature": "Item[]",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "ParseOptions#strict",
+      "kind": "property",
+      "signature": "boolean",
+      "optional": true,
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Parser",
+      "kind": "class",
+      "signature": "class<T = Item>",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Parser#name",
+      "kind": "property",
+      "signature": "string",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Parser#options",
+      "kind": "property",
+      "signature": "readonly ParseOptions",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Parser#parse",
+      "kind": "method",
+      "signature": "(input: string): T; (input: Buffer): T",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Parser#reset",
+      "kind": "method",
+      "signature": "(): void",
+      "deprecated": true,
+      "optional": true,
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Parser#size",
+      "kind": "property",
+      "signature": "readonly number",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Parser#version",
+      "kind": "property",
+      "signature": "number",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Parser#warn",
+      "kind": "method",
+      "signature": "protected (message: string): void",
+      "exportedFrom": [
+        "."
+      ],
+      "visibility": "protected",
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Parser.Callback",
+      "kind": "type",
+      "signature": "type = (stats: Stats) => void",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Parser.Internals",
+      "kind": "namespace",
+      "signature": "namespace",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Parser.Internals.flag",
+      "kind": "variable",
+      "signature": "const boolean",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Parser.Stats",
+      "kind": "interface",
+      "signature": "interface",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Parser.Stats#parsed",
+      "kind": "property",
+      "signature": "number",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Parser.create",
+      "kind": "method",
+      "signature": "(options?: ParseOptions): Parser",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Parser.new()",
+      "kind": "method",
+      "signature": "(options?: ParseOptions)",
+      "deprecated": "construct with {@link createParser}",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Parser.version",
+      "kind": "property",
+      "signature": "string",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Shape",
+      "kind": "type",
+      "signature": "type = { kind: 'circle'; radius: number } | { kind: 'square'; side: number }",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Square",
+      "kind": "interface",
+      "signature": "interface",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/shapes.d.ts"
+    },
+    {
+      "path": "Square#side",
+      "kind": "property",
+      "signature": "number",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/shapes.d.ts"
+    },
+    {
+      "path": "Thing",
+      "kind": "interface",
+      "signature": "interface",
+      "exportedFrom": [
+        "./ambient"
+      ],
+      "file": "dist/sub/ambient-extra.d.ts"
+    },
+    {
+      "path": "Thing#a",
+      "kind": "property",
+      "signature": "number",
+      "exportedFrom": [
+        "./ambient"
+      ],
+      "file": "dist/sub/ambient.d.ts"
+    },
+    {
+      "path": "Thing#b",
+      "kind": "property",
+      "signature": "string",
+      "optional": true,
+      "exportedFrom": [
+        "./ambient"
+      ],
+      "file": "dist/sub/ambient-extra.d.ts"
+    },
+    {
+      "path": "VERSION",
+      "kind": "variable",
+      "signature": "const string",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Visitor",
+      "kind": "interface",
+      "signature": "interface",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Visitor#name",
+      "kind": "property",
+      "signature": "readonly string",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "Visitor#visit",
+      "kind": "method",
+      "signature": "(item: Item): void",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "area",
+      "kind": "function",
+      "signature": "(shape: Circle | Square): number",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/shapes.d.ts"
+    },
+    {
+      "path": "chunk",
+      "kind": "function",
+      "signature": "<T>(items: T[], size: number): T[][]",
+      "exportedFrom": [
+        "./utils"
+      ],
+      "file": "dist/sub/utils.d.ts"
+    },
+    {
+      "path": "counter",
+      "kind": "variable",
+      "signature": "let number",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "createClient",
+      "kind": "function",
+      "signature": "(url: string): Client",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/client.d.ts"
+    },
+    {
+      "path": "createParser",
+      "kind": "function",
+      "signature": "(options?: ParseOptions): Parser",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "default",
+      "kind": "variable",
+      "signature": "const {…}",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "default#parse",
+      "kind": "property",
+      "signature": "{ (input: string): Item; (input: string, options: ParseOptions): Item }",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "internalHelper",
+      "kind": "function",
+      "signature": "(): void",
+      "exportedFrom": [
+        "."
+      ],
+      "visibility": "internal",
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "make",
+      "kind": "function",
+      "signature": "(): Thing",
+      "exportedFrom": [
+        "./ambient"
+      ],
+      "file": "dist/sub/ambient.d.ts"
+    },
+    {
+      "path": "makeClient",
+      "kind": "function",
+      "signature": "(url: string): Client",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/client.d.ts",
+      "aliasOf": "createClient"
+    },
+    {
+      "path": "noop",
+      "kind": "function",
+      "signature": "(): void",
+      "exportedFrom": [
+        "./legacy"
+      ],
+      "file": "dist/sub/legacy.d.ts"
+    },
+    {
+      "path": "parse",
+      "kind": "function",
+      "signature": "(input: string): Item; (input: string, options: ParseOptions): Item",
+      "exportedFrom": [
+        ".",
+        "./utils"
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "parseLegacy",
+      "kind": "function",
+      "signature": "(input: string): Item",
+      "deprecated": "use {@link parse} instead",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/index.d.ts"
+    },
+    {
+      "path": "shapes",
+      "kind": "namespace",
+      "signature": "namespace",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/shapes.d.ts"
+    },
+    {
+      "path": "shapes.Circle",
+      "kind": "interface",
+      "signature": "interface",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/shapes.d.ts",
+      "aliasOf": "Circle"
+    },
+    {
+      "path": "shapes.Circle#radius",
+      "kind": "property",
+      "signature": "number",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/shapes.d.ts",
+      "aliasOf": "Circle#radius"
+    },
+    {
+      "path": "shapes.Square",
+      "kind": "interface",
+      "signature": "interface",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/shapes.d.ts",
+      "aliasOf": "Square"
+    },
+    {
+      "path": "shapes.Square#side",
+      "kind": "property",
+      "signature": "number",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/shapes.d.ts",
+      "aliasOf": "Square#side"
+    },
+    {
+      "path": "shapes.area",
+      "kind": "function",
+      "signature": "(shape: Circle | Square): number",
+      "exportedFrom": [
+        "."
+      ],
+      "file": "dist/shapes.d.ts",
+      "aliasOf": "area"
+    },
+    {
+      "path": "slugify",
+      "kind": "function",
+      "signature": "(input: string): string",
+      "exportedFrom": [
+        "./utils"
+      ],
+      "file": "dist/sub/utils.d.ts"
+    }
+  ]
+}

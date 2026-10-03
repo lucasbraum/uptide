@@ -1,0 +1,14 @@
+{
+  "name": "stripe-consumer",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.17.1",
+  "dependencies": {
+    "stripe": "14.25.0"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "@types/node": "22.19.0"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,11 @@
+{
+  "name": "synthetic-consumer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Hand-written consumer of fixtures/synthetic exercising every usage kind. Not runnable.",
+  "dependencies": {
+    "synthetic": "1.0.0"
+  },
+  "license": "MIT"
+}

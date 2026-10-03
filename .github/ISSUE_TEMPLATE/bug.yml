@@ -1,0 +1,60 @@
+name: Bug or wrong result
+description: A crash, a missed breaking change, a false positive, or a wrong migration
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Security problems do not go here: see SECURITY.md.
+        Please do not paste private code. A minimal public reproduction is the fastest path to a fix.
+  - type: input
+    id: version
+    attributes:
+      label: Uptide version
+      description: Output of `npx uptide --version`
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: Command
+      placeholder: npx uptide check --only stripe --target stripe@23.0.0
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What went wrong
+      options:
+        - check missed a breaking change
+        - check reported something that does not break
+        - fix produced a wrong or unverified edit
+        - fix or verify touched something it should not have
+        - crash or unclear error
+        - other
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Node version, package manager and version, OS; the dependency and its from → to versions
+      placeholder: Node 22.9, pnpm 10.17, macOS 15; stripe 14.25.0 → 23.0.0
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Output
+      description: What Uptide printed (add `--details` or `--verbose`). Remove anything private.
+      render: console
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      description: For a wrong result, the `tsc` error or the runtime behavior that shows it
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: A public repository and commit, or the smallest file that shows it
