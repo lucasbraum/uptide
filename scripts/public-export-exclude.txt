@@ -1,9 +1,0 @@
-# Paths that never leave the private repository. The public export skips every path listed
-# here (one per line, repository-relative, a trailing / means the whole directory), and
-# scripts/public-tree.mjs fails when a public file is one of them, looks like one of them,
-# or points at one of them.
-docs/plan-open-source.md
-docs/privacy-audit.md
-docs/requests-for-core.md
-scripts/private-denylist.txt
-fixtures/truth-archive/

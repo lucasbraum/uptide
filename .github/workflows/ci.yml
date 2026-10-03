@@ -21,11 +21,11 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: pnpm lint
-      # No private planning document, pointer or identifier in what would be published. The
-      # private repository carries the denylist as a file and must have it; a public one gets
-      # it from a secret, and a fork without the secret still has names and pointers checked.
-      - name: Public tree is clean
-        run: node scripts/public-tree.mjs . ${{ github.event.repository.private && '--require-denylist' || '' }}
+      # No private planning document and no private identifier in the repository. The
+      # identifiers are a secret: required on pushes and on pull requests from this
+      # repository; a fork has no secrets, so there only the document names are checked.
+      - name: No private material
+        run: node scripts/public-tree.mjs . ${{ (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) && '--require-denylist' || '' }}
         env:
           UPTIDE_PRIVATE_DENYLIST: ${{ secrets.UPTIDE_PRIVATE_DENYLIST }}
       - run: pnpm build
