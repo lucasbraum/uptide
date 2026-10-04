@@ -157,7 +157,11 @@ export function createTypescriptAdapter(opts: TypescriptAdapterOptions = {}): Ty
     async declaredSpecifiers(repo) {
       const { packageJson } = readInstalled(realpathSync(repo.dir));
       return new Map(
-        Object.entries({ ...packageJson.dependencies, ...packageJson.devDependencies }),
+        Object.entries({
+          ...packageJson.dependencies,
+          ...packageJson.devDependencies,
+          ...packageJson.optionalDependencies,
+        }),
       );
     },
     forgetRepo(repo) {

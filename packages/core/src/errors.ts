@@ -98,6 +98,8 @@ export type ErrorCode =
   | 'UNSUPPORTED_VERSION_RANGE'
   | 'ANALYSIS_FAILED'
   | 'TIME_BUDGET'
+  | 'MEMORY_BUDGET'
+  | 'ANALYSIS_STACK_OVERFLOW'
   | 'NO_FIXER'
   | 'RUN_STALE';
 /** Stable across rendering and worker serialization. Human wording is not an API. */

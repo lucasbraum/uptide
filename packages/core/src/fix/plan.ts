@@ -142,6 +142,8 @@ function written(path: string): string {
 
 /** The PR body's wording when the rule is known; plain English for everything else. */
 function titleOf(rule: string, sites: Planned[]): string {
+  if (rule === 'typescript-no-js-api')
+    return 'TypeScript 7 has no JavaScript compiler API in its main entry';
   const evidence = sites
     .map(
       (s) =>

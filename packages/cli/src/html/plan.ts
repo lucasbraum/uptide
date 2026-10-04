@@ -18,6 +18,7 @@ export function renderPlanHtml(plan: UpgradePlan, opts: PlanHtmlOptions): string
   const e = escapeHtml;
   const uptide = opts.invocation ?? 'npx uptide';
   const tone = {
+    unknown: 'unverified',
     none: 'safe',
     small: 'deprecated',
     medium: 'unverified',
@@ -30,7 +31,7 @@ export function renderPlanHtml(plan: UpgradePlan, opts: PlanHtmlOptions): string
           (p) =>
             `<article class="site"><div class="mono">${e(p.name)} ${e(p.installed)} → ${e(p.target)} · ${e(p.tier)}</div><p class="muted">${e(effortLine(p.effort))}</p>${
               opts.fixable && p.effort.level !== 'none'
-                ? `<div class="command"><code>${e(`${uptide} fix --only ${p.name}`)}</code></div>`
+                ? `<div class="command"><code>${e(`${uptide} ${p.effort.level === 'unknown' ? 'check' : 'fix'} ${p.name}`)}</code></div>`
                 : ''
             }</article>`,
         )
@@ -61,6 +62,7 @@ export function renderPlanHtml(plan: UpgradePlan, opts: PlanHtmlOptions): string
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; connect-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><title>Uptide plan · ${e(opts.header?.repo ?? 'repository')}</title><style>${css}</style></head>
 <body><main><header><div class="brand">UPTIDE / PLAN</div><h1>${e(opts.header?.repo ?? 'Upgrade plan')}</h1><div class="meta"><span>${e(opts.header?.manager ?? '')}</span><time datetime="${e(opts.date)}">${e(when)}</time><span>Uptide CLI ${e(opts.version)}</span><span>${elapsed(opts.header?.ms ?? 0)}</span></div><p class="muted">${plan.steps.length} ${plan.steps.length === 1 ? 'step' : 'steps'}, in the order to take them.${plan.notPlanned.length ? ` ${plan.notPlanned.length} not planned.` : ''}</p><p class="muted">${e(TIER_LEGEND)}</p></header>
+${(plan.notes ?? []).map((note) => `<p class="more">${e(note)}</p>`).join('')}
 ${steps || '<p class="more safe">✓ Nothing to plan: every analyzed dependency is up to date.</p>'}${notPlanned}
 <footer>Effort is an estimate from the findings: none (nothing affected), small (rules, or up to 5 sites by hand or agent), medium (up to 25), large (more). Local page · No network requests.</footer></main></body></html>`;
 }

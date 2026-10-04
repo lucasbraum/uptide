@@ -20,6 +20,7 @@ export interface LoadedRepo {
     name?: string;
     dependencies?: Record<string, string>;
     devDependencies?: Record<string, string>;
+    optionalDependencies?: Record<string, string>;
   };
   lockfile: Lockfile | undefined;
   /** name -> exact installed version for this package's direct dependencies (from the lockfile). */
@@ -101,7 +102,11 @@ export function readInstalled(
     readFileSync(join(dir, 'package.json'), 'utf8'),
   ) as LoadedRepo['packageJson'];
   const declared = new Map(
-    Object.entries({ ...packageJson.dependencies, ...packageJson.devDependencies }),
+    Object.entries({
+      ...packageJson.dependencies,
+      ...packageJson.devDependencies,
+      ...packageJson.optionalDependencies,
+    }),
   );
   const lockfile = readLockfile(dir, declared);
   return { dir, packageJson, lockfile, installed: new Map(lockfile?.installed ?? []) };

@@ -71,7 +71,7 @@ for (const fixture of ['npm', 'npm-workspaces', 'pnpm', 'yarn', 'yarn-berry']) {
   sh(repo, 'git', 'commit', '--quiet', '--message', 'baseline');
 
   // Before install: the failure names the command that repairs it.
-  const bare = uptide(repo, 'check', '--ci');
+  const bare = uptide(repo, 'check', 'zod', '--ci');
   expect(
     `${manager} check without node_modules: exit ${bare.code}, wanted 2`,
     bare.code === 2,
@@ -89,11 +89,32 @@ for (const fixture of ['npm', 'npm-workspaces', 'pnpm', 'yarn', 'yarn-berry']) {
   expect(`${manager} status: exit ${status.code}, wanted 0`, status.code === 0, status.err);
   has(`${manager} status`, status.out, '3.23.8 installed');
   has(`${manager} status`, status.out, '14.25.0 installed');
-  has(`${manager} status`, status.out, 'Run `uptide check` for impact.');
+  has(
+    `${manager} status`,
+    status.out,
+    'Run `uptide list`, then `uptide check <package>` for impact.',
+  );
+
+  const inventory = uptide(repo, 'list', '--json');
+  expect(`${manager} list exits 0`, inventory.code === 0, inventory.err);
+  const listed = JSON.parse(inventory.out);
+  expect(
+    `${manager} list includes zod usage`,
+    listed.packages.some((p) => p.name === 'zod' && p.usage.files > 0),
+    inventory.out,
+  );
+  const unnamed = uptide(repo, 'check');
+  expect(
+    `${manager} check requires names`,
+    unnamed.code === 2 && unnamed.err.includes('uptide list'),
+    unnamed.err,
+  );
 
   const check = uptide(
     repo,
     'check',
+    'zod',
+    'stripe',
     '--ci',
     '--target',
     `zod@${ZOD}`,
@@ -125,8 +146,8 @@ for (const fixture of ['npm', 'npm-workspaces', 'pnpm', 'yarn', 'yarn-berry']) {
   has(`${manager} check`, check.out, 'New error API (required_error → error)');
   has(`${manager} check`, check.out, 'by rule');
   has(`${manager} check`, check.out, 'by agent');
-  matches(`${manager} check`, check.out, /\nNext\n(?: {2}.*\n)*? {2}npx uptide\S* fix --only zod /);
-  has(`${manager} check`, check.out, 'check --target zod@');
+  matches(`${manager} check`, check.out, /\nNext\n(?: {2}.*\n)*? {2}npx uptide\S* fix zod /);
+  has(`${manager} check`, check.out, 'check zod stripe --target zod@');
   for (const noise of ['low-confidence', 'pre-existing type error', 'BREAKING'])
     expect(
       `${manager} check: "${noise}" belongs to --details`,
@@ -138,6 +159,8 @@ for (const fixture of ['npm', 'npm-workspaces', 'pnpm', 'yarn', 'yarn-berry']) {
   const details = uptide(
     repo,
     'check',
+    'zod',
+    'stripe',
     '--ci',
     '--details',
     '--target',
@@ -172,7 +195,7 @@ for (const fixture of ['npm', 'npm-workspaces', 'pnpm', 'yarn', 'yarn-berry']) {
     head: sh(repo, 'git', 'rev-parse', 'HEAD').trim(),
     hooks: readdirSync(join(repo, '.git/hooks')).sort().join(','),
   };
-  const fix = uptide(repo, 'fix', '--only', 'zod', '--target', `zod@${ZOD}`, '--no-llm', '--ci');
+  const fix = uptide(repo, 'fix', 'zod', '--target', `zod@${ZOD}`, '--no-llm', '--ci');
   const zodBranch = `uptide/zod-${ZOD}`;
   // The run happened in a temporary clone: the checkout is where and how it was.
   expect(

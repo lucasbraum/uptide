@@ -1,5 +1,6 @@
 import {
   type CheckOptions,
+  type CheckReport,
   type CheckResult,
   check,
   type FixReport,
@@ -21,7 +22,7 @@ export type CheckRequest = Pick<
   | 'allDeps'
   | 'workspaceConcurrency'
   | 'maxTimeMs'
->;
+> & { checkResults?: CheckReport };
 
 export interface FixRequest {
   cwd: string;

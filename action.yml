@@ -11,7 +11,7 @@ inputs:
     description: Verify and push one migration commit on the existing PR branch.
     default: 'false'
   only:
-    description: Comma-separated supported dependencies.
+    description: Comma-separated verified dependencies to select from the PR; never checks every dependency. Use uptide list locally for discovery.
     default: zod,stripe
   paths:
     description: Repository-relative source globs or directories, comma/newline separated. Empty includes all.

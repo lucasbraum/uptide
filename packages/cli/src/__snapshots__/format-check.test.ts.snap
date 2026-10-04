@@ -11,7 +11,7 @@ sharp
   ✗ sharp.cache removed   2 sites   by agent
 
 Next
-  npx uptide check --details    every site and reason
+  npx uptide check sharp twilio lodash joi pg --details    every site and reason
 "
 `;
 
@@ -37,10 +37,10 @@ stripe
     1 API change since 2023-10-16 affects your code
 
 Next
-  npx uptide@next fix --only zod       migrate on a new branch, verify, no push
-  npx uptide@next fix --only stripe    migrate on a new branch, verify, no push
-  npx uptide@next plan                 the order to upgrade in, with the effort
-  npx uptide@next check --details      every site and reason
+  npx uptide@next fix zod                              migrate on a new branch, verify, no push
+  npx uptide@next fix stripe                           migrate on a new branch, verify, no push
+  npx uptide@next plan                                 the order to upgrade in, with the effort
+  npx uptide@next check zod stripe vitest --details    every site and reason
 "
 `;
 
@@ -53,8 +53,8 @@ zod
   ✗ New error API (required_error → error)   4 sites   by rule
 
 Next
-  npx uptide@next fix --only zod                migrate on a new branch, verify, no push
-  npx uptide@next check --only zod --details    every site and reason
+  npx uptide@next fix zod                migrate on a new branch, verify, no push
+  npx uptide@next check zod --details    every site and reason
 "
 `;
 
@@ -84,7 +84,7 @@ Summary: 1 package needs attention · 4 breaking · 0 deprecated · 0 unaffected
          4 of 4 findings are mechanical
 
 Next
-  npx uptide@next fix --only zod      migrate on a new branch, verify, no push
-  npx uptide@next check --only zod    the summary, one line per change
+  npx uptide@next fix zod      migrate on a new branch, verify, no push
+  npx uptide@next check zod    the summary, one line per change
 "
 `;

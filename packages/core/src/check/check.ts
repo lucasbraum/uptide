@@ -1,5 +1,4 @@
 import { readFileSync, realpathSync } from 'node:fs';
-import { totalmem } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { typescriptAdapter } from '../adapters/typescript/index.js';
 import { createFsSurfaceCache } from '../cache/fs-surface-cache.js';
@@ -39,6 +38,12 @@ import { arbitrateUnchecked } from './file-kind.js';
 import { groupName, releaseGroups } from './groups.js';
 import { importedByText, importFileCounts } from './importers.js';
 import { match } from './match.js';
+import {
+  estimateDeclarationHeapMb,
+  estimateWorkspaceMb,
+  freeMemoryBytes,
+  memoryPolicy,
+} from './memory.js';
 import { mergeSignals } from './merge.js';
 import {
   hasTopLevelAwait,
@@ -50,6 +55,7 @@ import {
 } from './module-format.js';
 import { mapWithLimit } from './pool.js';
 import { isBehind, rankCandidates } from './rank.js';
+import { groupRootCauses } from './root-cause.js';
 import { runtimeChangeFindings } from './runtime-changes.js';
 import { confirmGeneric, evidenceOf, tierOf } from './tier.js';
 import { unattributedFindings } from './unattributed.js';
@@ -83,11 +89,13 @@ export interface CheckOptions {
    */
   runtime?: boolean;
   /**
-   * Workspaces checked in parallel, each in a worker thread with its own program. Default
-   * 2: a parsed program is hundreds of MB, and two fit comfortably where six may not. Only
+   * Workspaces checked in parallel, each in a worker thread with its own program. The
+   * default is selected from free memory and CPU count. Only
    * with the default adapter, fetcher and cache; injected ones stay in this thread.
    */
   workspaceConcurrency?: number;
+  /** Internal memory reservation per worker. */
+  workerHeapMb?: number;
   /** Attach the migration plan (`PackageReport.plan`). Default true; `fix` plans by doing. */
   plan?: boolean;
   /**
@@ -142,10 +150,14 @@ export async function check(opts: CheckOptions): Promise<CheckResult> {
   const ctx: Ctx = { adapter, fetcher: memoizingFetcher(fetcher), cache, findUsages, opts };
   const installedByWorkspace: Record<string, Record<string, string>> = {};
   const catalogByWorkspace: Record<string, string[]> = {};
+  const declaredByWorkspace: Record<string, string[]> = {};
   for (const workspace of workspaces) {
     const repo = { dir: resolve(opts.cwd, workspace) };
     installedByWorkspace[workspace] = Object.fromEntries(await adapter.installedDependencies(repo));
     const specifiers = (await adapter.declaredSpecifiers?.(repo)) ?? new Map<string, string>();
+    declaredByWorkspace[workspace] = [
+      ...new Set([...specifiers.keys(), ...Object.keys(installedByWorkspace[workspace] ?? {})]),
+    ];
     catalogByWorkspace[workspace] = [...specifiers]
       .filter(([, spec]) => spec.startsWith('catalog:'))
       .map(([name]) => name);
@@ -187,6 +199,14 @@ export async function check(opts: CheckOptions): Promise<CheckResult> {
   const { adapter: _a, fetcher: _f, cache: _c, onProgress: _p, ...givenOpts } = opts;
   const plainOpts: WorkspaceJob['opts'] = {
     ...givenOpts,
+    // Compiler overlays share a workspace program; serialize them within its memory slot.
+    concurrency: 1,
+    targets: {
+      ...Object.fromEntries(
+        ranked.filter((c) => c.latest !== undefined).map((c) => [c.name, c.latest as string]),
+      ),
+      ...opts.targets,
+    },
     order: ranked.map((c) => c.name),
     // A registry that did not answer is not "up to date": the package is still attempted.
     behind: ranked.filter((c) => c.latest === undefined || isBehind(c)).map((c) => c.name),
@@ -219,37 +239,99 @@ export async function check(opts: CheckOptions): Promise<CheckResult> {
     }));
   const injected =
     opts.adapter !== undefined || opts.fetcher !== undefined || opts.cache !== undefined;
-  const workers = injected ? 1 : Math.max(1, opts.workspaceConcurrency ?? 2);
+  const workspaceName = new Map(
+    workspaces.map((w) => [readManifest(resolve(opts.cwd, w))?.name, w]),
+  );
+  const reachableWorkspaces = (workspace: string): string[] => {
+    const found = new Set([workspace]);
+    for (const current of found)
+      for (const dependency of declaredByWorkspace[current] ?? []) {
+        const local = workspaceName.get(dependency);
+        if (local && local !== '.') found.add(local);
+      }
+    return [...found];
+  };
+  const declarationsMb = injected ? 0 : estimateDeclarationHeapMb(opts.cwd);
+  const estimates = new Map(
+    jobs.map((job) => [
+      job.workspace,
+      injected
+        ? 0
+        : 512 +
+          reachableWorkspaces(job.workspace).reduce(
+            (sum, w) =>
+              sum +
+              estimateWorkspaceMb(
+                resolve(job.cwd, w),
+                Object.keys(installedByWorkspace[w] ?? {}).length,
+              ) -
+              512,
+            0,
+          ),
+    ]),
+  );
+  if (!injected)
+    for (const [workspace, estimate] of estimates)
+      estimates.set(workspace, Math.max(estimate, declarationsMb));
+  const policy = memoryPolicy(
+    undefined,
+    undefined,
+    opts.workspaceConcurrency,
+    Math.max(1024, ...estimates.values()),
+  );
+  const workers = injected ? 1 : policy.workers;
+  plainOpts.workerHeapMb = policy.heapMb;
+  plainOpts.workspaceConcurrency = workers;
   // A workspace whose analysis dies (out of memory, a crash in a worker) costs that
   // workspace's answers, never the others': its dependencies are reported as failed.
   const guarded = (run: (job: WorkspaceJob) => Promise<PackageReport[]>) => (job: WorkspaceJob) =>
-    run(job).catch((err: unknown): PackageReport[] => {
+    (async () => {
+      const estimate = estimates.get(job.workspace) ?? 0;
+      const available = Math.min(policy.heapMb, memoryPolicy(undefined, 1, 1).heapMb);
+      const active = (importedByWorkspace[job.workspace] ?? []).some((name) =>
+        behindNames.has(name),
+      );
+      if (!injected && (active || opts.allDeps) && estimate > available)
+        throw new UptideError(
+          'MEMORY_BUDGET',
+          `workspace ${job.workspace} needs approximately ${estimate} MB of heap; ${available} MB fits the 60% available-memory budget. Close other applications or check a smaller workspace.`,
+        );
+      return run(job);
+    })().catch((err: unknown): PackageReport[] => {
       const declared = installedByWorkspace[job.workspace] ?? {};
       return (plainOpts.behind ?? [])
-        .filter((name) => declared[name] !== undefined && !linked(declared[name]))
+        .filter(
+          (name) =>
+            (declared[name] !== undefined || importedByWorkspace[job.workspace]?.includes(name)) &&
+            !linked(declared[name]),
+        )
         .map((name) => ({
-          ...notImported(job.workspace, name, declared[name] as string),
+          ...notImported(job.workspace, name, (declared[name] ?? versionOf(name) ?? '?') as string),
+          target: plainOpts.targets?.[name] ?? declared[name] ?? '?',
+          latest: plainOpts.targets?.[name] ?? declared[name] ?? '?',
+          ...(declared[name] === undefined ? { undeclared: {} } : {}),
           status: 'skipped' as const,
           skipReason: errorCode(err),
           notes: [
-            /memory/i.test(String((err as Error).message))
-              ? `analysis failed: out of memory in ${job.workspace} (check it alone with --only ${name}, or raise UPTIDE_WORKER_HEAP_MB)`
-              : `analysis failed: ${(err as Error).message ?? String(err)}`,
+            errorCode(err) === 'MEMORY_BUDGET'
+              ? (err as Error).message
+              : /memory/i.test(String((err as Error).message))
+                ? `analysis failed: out of memory in ${job.workspace} (try uptide check ${name} in a smaller workspace or free more memory)`
+                : `analysis failed: ${(err as Error).message ?? String(err)}`,
           ],
         }));
     });
-  const results =
-    workers > 1 && workspaces.length > 1
-      ? await mapWithLimit(
-          jobs,
-          workers,
-          guarded((job) => runInWorker(job, opts.onProgress)),
-        )
-      : await mapWithLimit(
-          jobs,
-          1,
-          guarded((job) => checkWorkspace(ctx, job)),
-        );
+  const results = !injected
+    ? await mapWithLimit(
+        jobs,
+        workers,
+        guarded((job) => runInWorker(job, opts.onProgress)),
+      )
+    : await mapWithLimit(
+        jobs,
+        1,
+        guarded((job) => checkWorkspace(ctx, job)),
+      );
   // Pack rules preview their actual edit; check and fix must promise the same work.
   if (adapter.id === 'typescript')
     for (const report of results.flat()) {
@@ -275,6 +357,7 @@ export async function check(opts: CheckOptions): Promise<CheckResult> {
     catalogByWorkspace,
   );
   for (const p of packages) p.tier ??= tierOf(PACKS, p.name, p.installed, p.target);
+  for (const p of packages) groupRootCauses(p);
   if (adapter.id === 'typescript' && opts.plan !== false) planPackages(packages, opts);
   else for (const p of packages) delete p.planContext;
   await ctx.fetcher.dispose();
@@ -517,14 +600,20 @@ export function mergeAcrossWorkspaces(
 
 /**
  * What one workspace worker may use: a type-checked program of a large workspace takes
- * gigabytes, and the analysis holds two (installed and target). 4 GB at least; more when the
- * machine has it to spare for every worker at once, up to 8 GB. `UPTIDE_WORKER_HEAP_MB` sets it.
+ * gigabytes, and the analysis holds two (installed and target). At most 60% of available
+ * memory across workers including overhead, capped at 8 GB each. Overrides can lower it.
  */
-export function workerHeapMb(workers: number, totalBytes = totalmem(), env = process.env): number {
+export function workerHeapMb(
+  workers: number,
+  freeBytes = freeMemoryBytes(),
+  env = process.env,
+): number {
+  const budget = Math.floor(((freeBytes / 1024 / 1024) * 0.6) / Math.max(1, workers) / 1.4);
   const asked = Number(env.UPTIDE_WORKER_HEAP_MB);
-  if (Number.isFinite(asked) && asked >= 512) return Math.floor(asked);
-  const share = Math.floor(totalBytes / 1024 / 1024 / (Math.max(1, workers) + 1));
-  return Math.min(8192, Math.max(4096, share));
+  return Math.max(
+    0,
+    Math.min(8192, budget, Number.isFinite(asked) && asked >= 128 ? Math.floor(asked) : 8192),
+  );
 }
 
 /** A worker thread checks one workspace with the default adapter, fetcher and cache. */
@@ -541,16 +630,24 @@ async function runInWorker(
     const worker = new Worker(url, {
       workerData: job,
       execArgv: fromSource ? ['--import', 'tsx'] : [],
-      resourceLimits: { maxOldGenerationSizeMb: workerHeapMb(job.opts.workspaceConcurrency ?? 2) },
+      resourceLimits: {
+        maxOldGenerationSizeMb: Math.max(16, job.opts.workerHeapMb ?? workerHeapMb(1)),
+      },
     });
+    let settled = false;
     worker.on('message', (message) => {
-      if (message.type === 'error') reject(new UptideError(message.code, message.message));
-      else if (message.type === 'progress') onProgress?.(message.event);
-      else if (message.type === 'result') resolvePromise(message.reports);
+      if (message.type === 'error') {
+        settled = true;
+        void worker.terminate().then(() => reject(new UptideError(message.code, message.message)));
+      } else if (message.type === 'progress') onProgress?.(message.event);
+      else if (message.type === 'result') {
+        settled = true;
+        void worker.terminate().then(() => resolvePromise(message.reports));
+      }
     });
     worker.once('error', reject);
     worker.once('exit', (code) => {
-      if (code !== 0) reject(new Error(`workspace ${job.workspace}: worker exited with ${code}`));
+      if (!settled) reject(new Error(`workspace ${job.workspace}: worker exited with ${code}`));
     });
   });
 }
@@ -585,6 +682,18 @@ async function checkWorkspace(ctx: Ctx, job: WorkspaceJob): Promise<PackageRepor
   const opts: CheckOptions = { ...ctx.opts, ...job.opts };
   const { workspace, workspaces, installedByWorkspace, importedByWorkspace } = job;
   const packages: PackageReport[] = [];
+  if (
+    !opts.adapter &&
+    opts.only &&
+    !opts.allDeps &&
+    (importedByWorkspace[workspace] ?? []).length === 0
+  ) {
+    return progress(opts.onProgress, { phase: 'resolve', workspace }, () =>
+      Object.entries(installedByWorkspace[workspace] ?? {})
+        .filter(([name]) => opts.only?.includes(name))
+        .map(([name, version]) => notImported(workspace, name, version)),
+    );
+  }
   // Out of time before this workspace started: loading its program alone can take longer than
   // the budget. What it imports and is behind is reported as left out, from the manifests
   // and a text scan, without loading anything.
@@ -734,11 +843,17 @@ async function checkWorkspace(ctx: Ctx, job: WorkspaceJob): Promise<PackageRepor
           return members.map((m) => ({
             ...notImported(workspace, m, installed.get(m) as string),
             status: 'skipped' as const,
-            skipReason: errorCode(err),
+            target: opts.targets?.[m] ?? installed.get(m) ?? '?',
+            latest: opts.targets?.[m] ?? installed.get(m) ?? '?',
+            skipReason: /Maximum call stack size exceeded/.test(String(err))
+              ? 'ANALYSIS_STACK_OVERFLOW'
+              : errorCode(err),
             notes: [
-              late
-                ? 'time budget reached during its analysis'
-                : `analysis failed: ${(err as Error).message ?? String(err)}`,
+              /Maximum call stack size exceeded/.test(String(err))
+                ? `${m}: analysis exceeded its recursion limit while inspecting declarations (Maximum call stack size exceeded). No safety verdict; other named packages continue.`
+                : late
+                  ? 'time budget reached during its analysis'
+                  : `analysis failed: ${(err as Error).message ?? String(err)}`,
             ],
           }));
         }

@@ -126,10 +126,16 @@ export { type ReverifyOptions, reverify } from './fix/reverify.js';
 export { type FixOptions, fix } from './fix/run.js';
 export { detectStyle } from './fix/style.js';
 export type { Fixer, FixReport, FixRequest, FixResponse } from './fix/types.js';
+export {
+  type ListedDependency,
+  type ListOptions,
+  type ListReport,
+  listDependencies,
+} from './list/list.js';
 export { sdkApiVersion, stripeConcerns, stripePack } from './packs/stripe/index.js';
 export type { MigrationPack, MigrationRule } from './packs/types.js';
 export { zodPack } from './packs/zod/index.js';
-export { type PlanServices, upgradePlan } from './plan/gather.js';
+export { type PlanOptions, type PlanServices, upgradePlan } from './plan/gather.js';
 export {
   type Effort,
   effortOf,

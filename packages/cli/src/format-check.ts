@@ -285,14 +285,12 @@ function notAnalyzed(report: CheckReport, opts: FormatCheckOptions, colors: Colo
         .map((p) => p.name)
         .join(', ')}${late.length > 6 ? `, and ${late.length - 6} more` : ''}`,
       colors.dim(
-        `    ${uptide} check --only ${late
+        `    ${uptide} check ${late
           .slice(0, 3)
           .map((p) => p.name)
-          .join(',')}    by name, no time limit`,
+          .join(' ')}    by name, no time limit`,
       ),
-      colors.dim(
-        `    ${uptide} check --max-time ${Math.max(300, (opts.maxTime ?? 60) * 5)}    a longer budget (0: no limit)`,
-      ),
+      colors.dim(`    ${uptide} list    discover upgrades, then check named packages`),
     );
   }
   // One line per cause: twenty dependencies lost to the same failure are one fact.
@@ -333,23 +331,27 @@ export function nextCommands(rows: Row[], opts: FormatCheckOptions): [string, st
     const pinned = target ? ` --target ${quote(target)}` : '';
     if (row.plan.some((g) => g.severity !== 'deprecated'))
       commands.push([
-        `${uptide} fix --only ${name}${pinned}${cwd}`,
+        `${uptide} fix ${name}${pinned}${cwd}`,
         row.p.tier === 'generic'
           ? 'migrate with the agent on a new branch, verify, no push'
           : 'migrate on a new branch, verify, no push',
       ]);
     else if (row.p.tier !== 'generic' && row.plan.some((g) => g.by.rule > 0))
       commands.push([
-        `${uptide} fix --only ${name}${pinned} --include-deprecated${cwd}`,
+        `${uptide} fix ${name}${pinned} --include-deprecated${cwd}`,
         'migrate the deprecated calls on a new branch, no push',
       ]);
   }
-  const only = opts.repeat?.only ? ` --only ${quote(opts.repeat.only)}` : '';
+  const names = opts.repeat?.only?.split(',') ?? [
+    ...new Set(rows.flatMap((r) => (r.p.members ?? [r.p]).map((p) => p.name))),
+  ];
+  const only = names.length ? ` ${names.map(quote).join(' ')}` : ' <package>';
+  const planOnly = opts.repeat?.only ? ` --only ${quote(opts.repeat.only)}` : '';
   const targets = Object.entries(opts.repeat?.targets ?? {})
     .map(([name, version]) => ` --target ${quote(`${name}@${version}`)}`)
     .join('');
   if (rows.filter((r) => r.plan.length > 0).length > 1)
-    commands.push([`${uptide} plan${only}${cwd}`, 'the order to upgrade in, with the effort']);
+    commands.push([`${uptide} plan${planOnly}${cwd}`, 'the order to upgrade in, with the effort']);
   commands.push(
     opts.details
       ? [`${uptide} check${only}${targets}${cwd}`, 'the summary, one line per change']

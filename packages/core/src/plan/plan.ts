@@ -1,4 +1,5 @@
 import { isFailure } from '../check/check.js';
+import { compareVersions } from '../check/version.js';
 import type { CheckReport, PackageReport, PlanGroup, Tier } from '../domain/report.js';
 import { satisfies } from '../fetch/range.js';
 
@@ -8,7 +9,7 @@ export interface Effort {
    * `none`: nothing in the code is affected. `small`: rules do it, or a handful of sites
    * for the agent. `medium`: up to 25 sites that need the agent or a person. `large`: more.
    */
-  level: 'none' | 'small' | 'medium' | 'large';
+  level: 'unknown' | 'none' | 'small' | 'medium' | 'large';
   /** Breaking sites, by who migrates them. */
   byRule: number;
   byAgent: number;
@@ -57,6 +58,7 @@ export interface UpgradeStep {
 }
 
 export interface UpgradePlan {
+  notes?: string[];
   steps: UpgradeStep[];
   /** Behind and not in the plan: not analyzed, with the reason. */
   notPlanned: { name: string; installed: string; reason: string }[];
@@ -76,7 +78,9 @@ const sitesOf = (groups: PlanGroup[], pick: (g: PlanGroup) => number): number =>
   groups.reduce((n, g) => n + pick(g), 0);
 
 /** The effort a package's findings imply. Deprecations cost nothing now and are not counted. */
-export function effortOf(p: Pick<PackageReport, 'plan'>): Effort {
+export function effortOf(
+  p: Pick<PackageReport, 'plan'> & Partial<Pick<PackageReport, 'status' | 'importers'>>,
+): Effort {
   const breaking = (p.plan ?? []).filter((g) => g.severity === 'breaking');
   const unverified = (p.plan ?? []).filter((g) => g.severity === 'unverified');
   const byRule = sitesOf(breaking, (g) => g.by.rule);
@@ -85,17 +89,25 @@ export function effortOf(p: Pick<PackageReport, 'plan'>): Effort {
   const unconfirmed = sitesOf(unverified, (g) => g.sites);
   const hands = byAgent + manual;
   const level: Effort['level'] =
-    hands > 25
-      ? 'large'
-      : hands > 5
-        ? 'medium'
-        : hands > 0 || byRule > 0 || unconfirmed > 0
-          ? 'small'
-          : 'none';
+    p.status === 'unknown' || p.status === 'partial' || p.importers?.some((i) => !i.analyzed)
+      ? 'unknown'
+      : hands > 25
+        ? 'large'
+        : hands > 5
+          ? 'medium'
+          : hands > 0 || byRule > 0 || unconfirmed > 0
+            ? 'small'
+            : 'none';
   return { level, byRule, byAgent, manual, unconfirmed };
 }
 
-const RANK: Record<Effort['level'], number> = { none: 0, small: 1, medium: 2, large: 3 };
+const RANK: Record<Effort['level'], number> = {
+  none: 0,
+  small: 1,
+  medium: 2,
+  large: 3,
+  unknown: 4,
+};
 
 /** Whether `version` is inside `range`; a range npm cannot parse constrains nothing. */
 function within(version: string, range: string): boolean {
@@ -136,14 +148,20 @@ export function planUpgrades(report: CheckReport, peers: PeerLookup): UpgradePla
   const planned = new Map<string, PlannedPackage>();
   for (const p of analyzed) {
     const effort = effortOf(p);
-    for (const m of p.members ?? [p])
+    for (const m of p.members ?? [p]) {
+      const previous = planned.get(m.name);
       planned.set(m.name, {
         name: m.name,
-        installed: m.installed,
+        installed:
+          previous && compareVersions(previous.installed, m.installed) < 0
+            ? previous.installed
+            : m.installed,
         target: m.target,
         tier: p.tier ?? 'generic',
-        effort,
+        effort:
+          previous && RANK[previous.effort.level] > RANK[effort.level] ? previous.effort : effort,
       });
+    }
   }
   const constraints: PeerConstraint[] = [];
   const before = new Map<string, Set<string>>(); // name -> names that must come first

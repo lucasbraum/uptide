@@ -183,7 +183,7 @@ export function requireFixable(repo: Repo, only: string): void {
   if (!['pnpm', 'npm', 'yarn'].includes(repo.manager))
     throw new CliError(`fix does not support ${repo.manager} repositories yet`, {
       why: 'It updates the lockfile and verifies the result, which is implemented for npm, pnpm and Yarn. `check` works here and lists every site to migrate.',
-      next: `uptide check --only ${only} --details`,
+      next: `uptide check ${only} --details`,
     });
   const top = git(repo.root, 'rev-parse', '--show-toplevel');
   if (top === undefined)
@@ -220,7 +220,7 @@ export function noAgentForGeneric(only: string, disabled: boolean): CliError {
     {
       why: 'Without a pack there are no rules to apply. Nothing was changed: no clone, no branch, no install.',
       next: disabled
-        ? `uptide check --only ${only} --details   (every site, to migrate by hand)`
+        ? `uptide check ${only} --details   (every site, to migrate by hand)`
         : `export ANTHROPIC_API_KEY=<your key> && uptide fix --only ${only}`,
     },
   );

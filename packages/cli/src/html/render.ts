@@ -112,7 +112,7 @@ export function renderHtml(report: CheckReport, opts: HtmlOptions): string {
       const rest = g.locations.length - Math.min(siteLimit, g.locations.length);
       if (rest > 0)
         body += compact
-          ? `<p class="more">and ${rest} more sites — use uptide check --details for every location.</p>`
+          ? `<p class="more">and ${rest} more sites — use uptide check &lt;package&gt; --details for every location.</p>`
           : `<details><summary>and ${rest} more sites (excerpts omitted)</summary>${overflow}</details>`;
       if (!g.locations.length)
         body += '<p class="more">No site locations supplied by the engine.</p>';
@@ -144,7 +144,7 @@ export function renderHtml(report: CheckReport, opts: HtmlOptions): string {
       late.length + failed.length > 0
         ? `<section class="package" id="not-analyzed"><header><h2>Not analyzed</h2></header>${
             late.length
-              ? `<p class="more unverified">${late.length} behind, out of time${opts.maxTime ? ` (--max-time ${e(opts.maxTime)})` : ''}: ${e(late.map((p) => p.name).join(', '))}. Run check with --only for these, or with a larger --max-time.</p>`
+              ? `<p class="more unverified">${late.length} behind, out of time${opts.maxTime ? ` (--max-time ${e(opts.maxTime)})` : ''}: ${e(late.map((p) => p.name).join(', '))}. Run check with explicit package names.</p>`
               : ''
           }${failed.map((p) => `<p class="more breaking">${e(p.name)} ${e(p.installed)}: ${e((p.notes[0] ?? 'analysis failed').split('\n')[0])}</p>`).join('')}</section>`
         : '';
@@ -157,7 +157,7 @@ export function renderHtml(report: CheckReport, opts: HtmlOptions): string {
 <body><main><header><div class="brand">UPTIDE / CHECK</div><h1>${e(opts.header?.repo ?? report.repo)}</h1><div class="meta"><span>${e(opts.header?.manager ?? 'Package manager unavailable')}</span><span>${report.workspaces.length} ${report.workspaces.length === 1 ? 'workspace' : 'workspaces'} analyzed</span><time datetime="${e(opts.date)}">${e(new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short', timeZone: opts.timeZone }).format(new Date(opts.date)))}</time><span>Uptide CLI ${e(opts.version)}</span><span>${elapsed(opts.header?.ms ?? 0)}</span></div><p class="muted">${e(verdict(rows))}</p>${legend}</header>
 <div class="filters" hidden role="search" aria-label="Filter findings">${['All', 'Breaking', 'Deprecated', 'Unverified'].map((s) => `<button type="button" data-filter="${s.toLowerCase()}" aria-pressed="${s === 'All'}">${s}</button>`).join('')}<input id="search" type="search" aria-label="Search file paths and change rules" placeholder="Search files or rules…"></div>
 <section aria-label="Dependency summary" class="summary">${summary || '<p class="more safe">✓ Nothing to upgrade. No findings in the analyzed scope.</p>'}</section><p id="empty-filter" class="notice" hidden>No findings match these filters.</p>
-${compact ? '<p class="notice">Compact report: excerpts and additional sites omitted to stay under 300 KB. Use uptide check --details for the full report.</p>' : ''}${dependencies}${missing}
+${compact ? '<p class="notice">Compact report: excerpts and additional sites omitted to stay under 300 KB. Use uptide check &lt;package&gt; --details for the full report.</p>' : ''}${dependencies}${missing}
 <details class="notes"><summary>Analysis notes · ${notes.length} notes</summary><ul>${
       notes
         .slice(0, compact ? 30 : 300)
@@ -171,7 +171,7 @@ ${compact ? '<p class="notice">Compact report: excerpts and additional sites omi
   if (Buffer.byteLength(html) >= MAX_HTML_BYTES) html = render(0, 10, 80, true);
   if (Buffer.byteLength(html) >= MAX_HTML_BYTES)
     throw new Error(
-      'HTML report exceeds 300 KB even without excerpts; narrow the scope with --only.',
+      'HTML report exceeds 300 KB even without excerpts; check fewer named packages.',
     );
   return html;
 }

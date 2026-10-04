@@ -8,6 +8,8 @@ export type Fixability = 'mechanical' | 'assisted' | 'manual' | 'unknown' | 'non
 
 /** A compile error downstream of a root-cause anchor; `file` is repository-relative. */
 export interface DownstreamSite {
+  column?: number;
+  snippet?: string;
   file: string;
   line: number;
   code: number;

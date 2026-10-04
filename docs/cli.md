@@ -3,32 +3,43 @@
 `uptide --help` and `uptide <command> --help` are the authority; this page adds what help
 cannot show.
 
-## `uptide check`
+## `uptide list`
+
+Fast discovery with no compile, install, tarball downloads or execution of repository code.
+Requires a lockfile (exact manifest versions also work once the repository is detected).
+Shows every outdated direct dependency, its current and latest version, major/minor/patch,
+verified/generic tier, import-file count, direct call/new/JSX count, top symbols and workspaces.
+Majors first, then importing files and call sites, with name/version tie breakers.
+
+- `--all`: expand minor/patch rows, collapsed by default.
+- `--json`: every row and per-package discovery failure, in deterministic order.
+- `--cwd <dir>`, `--ci`, `--no-color`: shared options.
+
+Unused means no static source import was found. Script tools, config plugins and type
+packages may still be needed. Syntax scanning includes imports, re-exports, require,
+import-equals, literal dynamic imports and JS/TS/JSX/TSX; it does not resolve indirect aliases
+or reflection. Counts are repository-wide when several workspaces lock different versions.
+Internal workspace dependencies and local/git/URL specifiers are excluded from registry queries.
+
+## `uptide check <package...>`
+
+Examples: `uptide check zod`, `uptide check zod stripe`. No names prints a short pointer to
+`uptide list` and exits 2, before reading or analyzing a repository. There is no automatic
+whole-repository budgeted mode or `--max-time` flag.
 
 | Flag | Meaning |
 | --- | --- |
-| `--only zod,stripe` | dependencies to check, with no time limit; default: every direct dependency that is behind |
-| `--max-time 300` | seconds after which no new dependency is started; `0` for no limit; default 60 (none with `--only`) |
-| `--target zod@4.6.5` | exact target, repeatable; default is `latest` |
+| `--only zod,stripe` | compatibility alias for positional package names; `all` is rejected |
+| `--target zod@4.6.5` | exact target, repeatable; bare version with one selected package |
 | `--details` | every site, reason, compiler message and analysis note |
 | `--verbose` | one progress line per analysis phase, with timings |
+| `--workspaces <n>` | maximum parallel workspaces, capped by memory and CPUs |
 | `--cwd <dir>` | repository to work on |
 | `--json` | the full report as JSON on stdout |
 | `--ci` | plain log output: no color, no spinner (`NO_COLOR` is respected too) |
 
-Exit codes, for scripts and CI: **0** nothing breaking, **1** breaking changes found,
-**2** uptide could not answer (bad arguments, unsupported repository, no network). When
-it cannot answer, it says why and prints the exact command to run next.
-
-### What is checked, and in what order
-
-With no `--only`, every direct dependency that is behind its latest version is a candidate.
-They are analyzed in order of likely impact: major upgrades first, then the dependencies
-imported in the most files. After `--max-time` no new dependency is started; one that is
-still being analyzed gets half the budget again to finish. In a workspace repository the
-workspaces that import the most of what is behind go first, and a workspace the budget
-does not reach is not loaded at all. Whatever was left out is listed under "Not analyzed"
-with the two commands that include it (`--only <names>`, a larger `--max-time`).
+Exit codes: **0** no breaking changes, **1** breaking changes found, **2** bad arguments
+or incomplete analysis. A failing package/workspace does not erase successful results.
 
 ### Tiers
 
@@ -48,8 +59,15 @@ counted on the first screen only as "N unconfirmed".
 
 A dependency whose analysis fails (the registry refuses, a tarball cannot be fetched, a
 workspace runs out of memory) is listed under "Not analyzed" with the reason, and the
-others are reported as usual. Large workspaces need memory: each analysis thread may use
-4 GB, more when the machine has it, and `UPTIDE_WORKER_HEAP_MB` sets the limit.
+others are reported as usual. CPU count and available memory choose concurrency. About
+60% of available physical memory (including OS-reported reclaimable memory) is reserved for
+worker heaps plus native overhead. Source size, dependency count and installed declaration volume estimate workspace cost;
+a workspace that does not fit is skipped with a clear reason. `UPTIDE_WORKER_HEAP_MB` can
+lower the limit, but cannot override the memory budget. Unexpected allocation failures
+remain isolated to the workspace. Recursion failures name the package and give no safety verdict.
+
+Common causes are grouped into one finding with a site count; `--details` expands sites.
+For example, TypeScript 7 missing compiler API members form one cause rather than dozens.
 
 While it runs, a terminal shows one live line with the current phase, which disappears
 when the work ends; `--verbose` keeps one line per phase with timings. In a pipe or with
@@ -57,24 +75,22 @@ when the work ends; `--verbose` keeps one line per phase with timings. In a pipe
 
 ## `uptide plan`
 
-`check`, then the order to act on it. Takes `--only`, `--max-time`, `--json`, `--html`.
+Discovery plus optional saved check results: `uptide plan --results check.json`. Takes
+`--only`, `--json`, `--html`; never implicitly checks packages or fetches tarballs.
 
-1. Dependencies whose upgrade touches nothing in your code share the first step.
-2. The rest follow from the least work to the most.
-3. Peer ranges override both: a package goes after the peer its target needs, two packages
-   whose targets need each other share a step, and a range nothing in the plan satisfies is
-   printed as blocked.
-
-Effort is read off the findings: `none` (nothing affected), `small` (rules do it, or up to
-5 sites for the agent or a person), `medium` (up to 25), `large` (more). It is an estimate.
+Unchecked or partially checked packages have unknown effort and suggest `uptide check <pkg>`.
+Matching complete check results supply estimates: none, small, medium or large. Saved
+results must match the repository, versions and workspaces; rerun after source changes.
+Peer ranges from registry metadata and installed manifests constrain order; unavailable
+metadata is disclosed. Without node_modules installed-peer constraints cannot be read.
 
 ### A shareable HTML report
 
 ```sh
-uptide check --html                 # terminal output + <OS temp>/uptide/<repo>-<timestamp>.html
-uptide check --html review.html     # explicit output path, relative to your current directory
-uptide check --html --open          # open the default browser in an interactive terminal
-uptide check --json --html --ci     # stdout stays JSON; the HTML path is printed on stderr
+uptide check zod --html                 # terminal output + <OS temp>/uptide/<repo>-<timestamp>.html
+uptide check zod --html review.html     # explicit output path, relative to your current directory
+uptide check zod --html --open          # open the default browser in an interactive terminal
+uptide check zod --json --html --ci     # stdout stays JSON; the HTML path is printed on stderr
 ```
 
 The report uses the terminal's migration plan: dependency summary first, then expandable
@@ -89,9 +105,9 @@ Long lines/excerpts and very large reports are trimmed with a notice to keep the
 below 300 KB. Review excerpts before sharing. `--open` never opens a browser in CI or
 when output is redirected; `--open` requires `--html`.
 
-## `uptide fix` for a generic dependency
+## `uptide fix <package>` for a generic dependency
 
-`uptide fix --only <any dependency>` works without a pack: there are no rules, so every
+`uptide fix <any dependency>` works without a pack: there are no rules, so every
 site with evidence goes to the agent, one at a time, and an edit is kept only if that
 site's compiler error disappears and no new one appears. The verification and the publish
 gate are the same as for a verified dependency.
@@ -104,7 +120,7 @@ gate are the same as for a verified dependency.
 - The pull request opens with a note that no migration pack covers the package, and its
   risk is never Low.
 
-## `uptide fix`, step by step
+## `uptide fix <package>`, step by step
 
 Everything happens in a temporary clone of your repository, never in your checkout.
 

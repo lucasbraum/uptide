@@ -242,3 +242,29 @@ describe('removePackageDir', () => {
     );
   });
 });
+
+it('reads and caches peer metadata without tarballs, including caches from older builds', async () => {
+  const cacheDir = mkdtempSync(join(tmpdir(), 'uptide-peers-'));
+  const fetchFn = vi.fn(
+    async () =>
+      new Response(
+        JSON.stringify({
+          name: 'demo',
+          version: '1.0.0',
+          peerDependencies: { react: '^19' },
+          dist: { tarball: 'https://reg.test/demo.tgz' },
+        }),
+      ),
+  );
+  const fetcher = createNpmFetcher({ cacheDir, config, fetch: fetchFn as typeof fetch });
+  await fetcher.resolve('demo', '1.0.0');
+  const oldPath = join(cacheDir, 'registry/demo/resolve-1.0.0.json');
+  const oldEntry = JSON.parse(readFileSync(oldPath, 'utf8'));
+  delete oldEntry.value.peerDependencies;
+  writeFileSync(oldPath, JSON.stringify(oldEntry));
+  expect(await fetcher.metadata?.('demo', '1.0.0')).toEqual({ peerDependencies: { react: '^19' } });
+  const calls = fetchFn.mock.calls.length;
+  expect(await fetcher.metadata?.('demo', '1.0.0')).toEqual({ peerDependencies: { react: '^19' } });
+  expect(fetchFn.mock.calls).toHaveLength(calls);
+  expect(existsSync(tarballCachePath(cacheDir, 'demo', '1.0.0'))).toBe(false);
+});

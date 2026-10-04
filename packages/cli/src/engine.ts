@@ -6,6 +6,9 @@ import {
   diffPackage,
   type ErrorCode,
   type FixReport,
+  type ListOptions,
+  type ListReport,
+  listDependencies,
   openPr,
   type PrOptions,
   type ProgressEvent,
@@ -36,8 +39,9 @@ export type UpdatePrBody = (opts: {
 
 /** The engine as the CLI uses it. Tests substitute an in-memory one. */
 export interface Engine {
+  list?(request: ListOptions): Promise<ListReport>;
   check(request: CheckRequest, onProgress?: ProgressListener): Promise<CheckResult>;
-  /** `check`, then the order to upgrade in with peer constraints and effort. */
+  /** Discovery plus optional saved check evidence, with peer constraints and effort. */
   plan?(request: CheckRequest, onProgress?: ProgressListener): Promise<PlanResult>;
   fix(request: FixRequest, onProgress?: ProgressListener): Promise<FixReport>;
   /** Remove kept temporary clones older than `days`; lists what was removed and what remains. */
@@ -100,6 +104,7 @@ async function offThread<T>(job: Job, onProgress?: ProgressListener): Promise<T>
 
 export function defaultEngine(): Engine {
   return {
+    list: listDependencies,
     check: (request, onProgress) => offThread<CheckResult>({ kind: 'check', request }, onProgress),
     plan: (request, onProgress) => offThread<PlanResult>({ kind: 'plan', request }, onProgress),
     fix: (request, onProgress) => offThread<FixReport>({ kind: 'fix', request }, onProgress),

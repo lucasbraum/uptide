@@ -18,6 +18,7 @@ const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n =
 
 /** `small · 28 sites: 24 by rule, 4 by agent · 2 unconfirmed`, or what "none" means. */
 export function effortLine(e: Effort): string {
+  if (e.level === 'unknown') return 'not checked completely · effort unknown';
   if (e.level === 'none') return 'no code changes expected';
   const sites = e.byRule + e.byAgent + e.manual;
   const by = [
@@ -63,6 +64,8 @@ export function formatPlan(plan: UpgradePlan, opts: FormatPlanOptions = {}): str
   }
   if (plan.steps.length === 0)
     lines.push(colors.dim('Nothing to plan: every analyzed dependency is up to date.'), '');
+  for (const note of plan.notes ?? []) lines.push(note);
+  if (plan.notes?.length) lines.push('');
   const width = String(plan.steps.length).length;
   const indent = ' '.repeat(width + 2);
   for (const step of plan.steps) {
@@ -82,7 +85,11 @@ export function formatPlan(plan: UpgradePlan, opts: FormatPlanOptions = {}): str
       );
     if (opts.fixable && step.effort !== 'none')
       for (const p of step.packages)
-        lines.push(colors.dim(`${indent}${uptide} fix --only ${p.name}${cwd}`));
+        lines.push(
+          colors.dim(
+            `${indent}${uptide} ${p.effort.level === 'unknown' ? 'check' : 'fix'} ${p.name}${cwd}`,
+          ),
+        );
     lines.push('');
   }
   if (plan.notPlanned.length > 0) {
@@ -91,10 +98,7 @@ export function formatPlan(plan: UpgradePlan, opts: FormatPlanOptions = {}): str
       lines.push(`  ${p.name} ${p.installed}: ${p.reason}`);
     if (plan.notPlanned.length > 12)
       lines.push(colors.dim(`  and ${plan.notPlanned.length - 12} more`));
-    lines.push(
-      colors.dim(`  ${uptide} plan --max-time 300${cwd}    a longer budget (0: no limit)`),
-      '',
-    );
+    lines.push(colors.dim(`  ${uptide} list${cwd}    refresh discovery`), '');
   }
   if (plan.steps.some((s) => s.packages.some((p) => p.tier === 'generic')))
     lines.push(colors.dim(TIER_LEGEND));
