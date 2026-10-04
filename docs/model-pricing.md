@@ -61,26 +61,28 @@ custom endpoints may charge different prices. The CLI cannot enforce an external
 service's invoice or API contract. If returned usage exceeds the reserved token bounds,
 it reports actual usage and stops all further calls instead of hiding the discrepancy.
 
-## Live evaluation status
+## Live evaluation
 
-Live `fix zod` and `fix stripe` storefront evaluations for all three defaults are
-**deferred by request until API keys are available**. Verification pass/fail, agent
-sites fixed, cost and time are not yet measured. No synthetic response is presented as
-a live result. Adapter tests replay synthetic wire fixtures offline.
+The [storefront results](provider-evaluation.md) include verified zod/stripe runs for
+all three providers, the Sonnet 4.6 versus 5.5 effort comparison, exact API-echoed model
+IDs, and spend versus reservations. Sonnet 5.5 with `medium` effort is the Anthropic
+default. Its $2 input / $10 output per MTok rates were checked against the
+[Sonnet 5.5 overview](https://platform.claude.com/docs/en/models/sonnet-5-5/overview)
+on 2026-10-04. The small fixture comparison does not establish a general quality ranking.
 
-Anthropic remains on Sonnet 4.6. Although the current documentation lists Sonnet 5.5,
-switching that default requires running both on storefront first. Each future run
-must start from the same clean storefront fixture, with only its provider's key
-in the environment; save the JSON report's verification, agent-site count, `llm.costUsd`
-and `timingMs`. Include Sonnet 4.6 and 5.5 in that comparison before changing the default.
-
-The evaluation helper accepts the same provider/model choices without overwriting
-another model's results:
+Offline CI replays wire fixtures, including a captured no-tool response. Live calls
+are opt-in, with environment keys only. Build core first, then use the evaluation
+helper against a clean, installed storefront checkout outside this repository:
 
 ```sh
-pnpm eval:fix /path/to/clean-storefront --with-key --only=zod --provider=openai
-pnpm eval:fix /path/to/clean-storefront --with-key --only=stripe --provider=gemini
-pnpm eval:fix /path/to/clean-storefront --with-key --only=zod --provider=anthropic --model=claude-sonnet-5-5
+pnpm --filter @uptide/core build
+pnpm exec tsx scripts/eval-providers.ts --smoke --provider=anthropic
+pnpm exec tsx scripts/eval-providers.ts --repo=/scratch/storefront --only=zod --provider=openai
+pnpm exec tsx scripts/eval-providers.ts --repo=/scratch/storefront --only=stripe --provider=gemini
+pnpm exec tsx scripts/eval-providers.ts --repo=/scratch/storefront --only=zod --provider=anthropic --model=claude-sonnet-5-5 --effort=high
 ```
 
-Repeat both packages for each default; keep the generated reports outside Git.
+Repeat both packages for each model/effort. `--effort=high` explicitly reproduces the
+Sonnet 5.5 API default; omission uses Uptide's selected `medium` effort. Each run gets
+an isolated clone. Only aggregate metrics are emitted by this helper; keep any full
+local fix reports outside Git.

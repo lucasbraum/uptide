@@ -16,6 +16,7 @@ export interface Usage {
   cacheWriteHourTokens: number;
 }
 export interface LlmResponse {
+  model?: string;
   calls: ToolCall[];
   usage?: Usage;
   failure?: string;
@@ -26,7 +27,13 @@ export interface Call {
   maxTokens: number;
 }
 export interface Adapter {
-  prepare(model: string, messages: LlmMessage[], maxTokens: number, baseUrl?: string): Call;
+  prepare(
+    model: string,
+    messages: LlmMessage[],
+    maxTokens: number,
+    baseUrl?: string,
+    options?: { effort?: 'low' | 'medium' | 'high' },
+  ): Call;
   headers(key: string): Record<string, string>;
   parse(body: unknown): LlmResponse;
 }

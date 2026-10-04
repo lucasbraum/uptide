@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterAll, expect, it, vi } from 'vitest';
 import type { FixRequest } from '../fix/types.js';
 import { adapters } from './adapters.js';
+import { modelCapabilities } from './capabilities.js';
 import { KEY_ENV, openaiBaseUrl, selectLlm } from './config.js';
 import { CostLimitError, estimateInputTokens, providerFixer } from './fixer.js';
 import { DEFAULT_MODELS, priceFor, reserveCost, usageCost } from './pricing.js';
@@ -59,7 +60,11 @@ for (const provider of PROVIDERS) {
         mode: 'ANY',
         allowedFunctionNames: ['submit_patch'],
       });
-    } else expect(body.tool_choice).toEqual({ type: 'tool', name: 'submit_patch' });
+    } else {
+      expect(body.tool_choice).toEqual({ type: 'auto' });
+      expect(body.output_config).toEqual({ effort: 'medium' });
+      expect(body.tools[0].strict).toBe(true);
+    }
     expect(providerFixer({ provider, model, available: false }, { env: {} })).toBeUndefined();
   });
   it(`${provider}: rejects text-only, malformed and multiple tools as paid failed attempts`, async () => {
@@ -228,10 +233,10 @@ it('rejects stored keys, unknown fields, nested credentials and malformed config
     }
   }
 });
-it('supports Responses-compatible HTTPS endpoints and local HTTP, never URL credentials or redirects', () => {
+it('supports Chat Completions-compatible HTTPS endpoints and local HTTP, never URL credentials or redirects', () => {
   expect(openaiBaseUrl('http://localhost:1234/v1/')).toBe('http://localhost:1234/v1');
   expect(adapters.openai.prepare('custom', [], 8192, 'https://example.test/v1').url).toBe(
-    'https://example.test/v1/responses',
+    'https://example.test/v1/chat/completions',
   );
   for (const url of [
     'http://example.test',
@@ -271,4 +276,93 @@ it('rejects credentials hidden in duplicate JSON fields before parsing can disca
       'key-like setting',
     );
   }
+});
+
+it('chooses forced tool support per model and leaves Sonnet 5.5 thinking at its API default', () => {
+  expect(modelCapabilities('anthropic', 'claude-sonnet-4-6').supportsForcedTool).toBe(true);
+  expect(modelCapabilities('anthropic', 'claude-sonnet-5-5').supportsForcedTool).toBe(false);
+  const old = adapters.anthropic.prepare('claude-sonnet-4-6', [], 8192).body;
+  const latest = adapters.anthropic.prepare('claude-sonnet-5-5', [], 8192).body;
+  expect(old.tool_choice).toEqual({ type: 'tool', name: 'submit_patch' });
+  expect(latest.tool_choice).toEqual({ type: 'auto' });
+  expect(latest.tools).toMatchObject([{ name: 'submit_patch', strict: true }]);
+  expect(latest.system).toContain('only valid response is exactly one submit_patch tool call');
+  expect(latest.thinking).toBeUndefined();
+  expect(latest.output_config).toEqual({ effort: 'medium' });
+  expect(
+    adapters.anthropic.prepare('claude-sonnet-5-5', [], 8192, undefined, { effort: 'high' }).body
+      .output_config,
+  ).toEqual({ effort: 'high' });
+  expect(modelCapabilities('openai', DEFAULT_MODELS.openai).supportsForcedTool).toBe(true);
+  expect(modelCapabilities('gemini', DEFAULT_MODELS.gemini).supportsForcedTool).toBe(true);
+});
+
+it('replays a captured Sonnet 5.5 no-tool response as a paid failed attempt with explicit feedback', async () => {
+  const fixer = required(
+    providerFixer(
+      { provider: 'anthropic', model: 'claude-sonnet-5-5', available: true },
+      {
+        env: { ANTHROPIC_API_KEY: 'test' },
+        fetch: async () => new Response(JSON.stringify(recorded('anthropic-no-tool'))),
+      },
+    ),
+  );
+  const reply = await fixer.fix(request);
+  expect(reply.failureKind).toBe('no-tool-call');
+  expect(reply.failure).toContain('respond only by calling submit_patch');
+  expect(reply.costUsd).toBeGreaterThan(0);
+  expect(reply.reservationUsd).toBeGreaterThan(reply.costUsd ?? 0);
+  expect(reply.responseModel).toBe('claude-sonnet-5-5');
+  expect(reply.diff).toBe('');
+});
+
+it('uses Chat Completions only for an explicit base URL and accounts for returned usage', async () => {
+  const wire = recorded('openai-chat');
+  const fetcher = vi.fn(async () => new Response(JSON.stringify(wire)));
+  const fixer = required(
+    providerFixer(
+      {
+        provider: 'openai',
+        model: DEFAULT_MODELS.openai,
+        available: true,
+        baseUrl: 'https://example.test/v1',
+      },
+      { env: { OPENAI_API_KEY: 'test' }, fetch: fetcher },
+    ),
+  );
+  const reply = await fixer.fix(request);
+  const [url, options] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
+  const body = JSON.parse(String(options.body));
+  expect(url).toBe('https://example.test/v1/chat/completions');
+  expect(body.tool_choice).toEqual({ type: 'function', function: { name: 'submit_patch' } });
+  expect(body.tools[0].function.strict).toBe(true);
+  expect(body.max_tokens).toBe(8192);
+  expect(body.messages[0].role).toBe('system');
+  expect(body.input).toBeUndefined();
+  expect(body.instructions).toBeUndefined();
+  expect(reply.failure).toBeUndefined();
+  expect(reply.inputTokens).toBe(100);
+  expect(reply.outputTokens).toBe(20);
+  expect(reply.costUsd).toBeCloseTo((90 * 2 + 10 * 0.1 + 20 * 10) / 1e6, 8);
+  expect(reply.responseModel).toBe('gpt-6.1-sol');
+  wire.choices[0].finish_reason = 'length';
+  expect((await fixer.fix(request)).failureKind).toBe('invalid-tool-call');
+});
+
+it('classifies 429 as rate limited and preserves its reservation and retry delay', async () => {
+  const fixer = required(
+    providerFixer(
+      { provider: 'gemini', model: DEFAULT_MODELS.gemini, available: true },
+      {
+        env: { GEMINI_API_KEY: 'test' },
+        fetch: async () =>
+          new Response('private error body', { status: 429, headers: { 'retry-after': '2' } }),
+      },
+    ),
+  );
+  const reply = await fixer.fix(request);
+  expect(reply).toMatchObject({ failureKind: 'rate-limited', retryAfterMs: 2000, costUsd: 0 });
+  expect(reply.failure).toContain('rate limited');
+  expect(reply.unreportedCostUsd).toBe(required(fixer.estimate)(request));
+  expect(JSON.stringify(reply)).not.toContain('private error body');
 });

@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 import { Node, Project, SyntaxKind } from 'ts-morph';
 import type { ProgressListener } from '../domain/progress.js';
 import { ACCEPTED_KEYS } from '../llm/config.js';
@@ -118,6 +119,8 @@ export async function assist(
   };
   const limit = limits.maxCostUsd ?? DEFAULT_MAX_COST_USD;
   let halted = false;
+  // A rate limit applies across sites, including when the final attempt at a site failed.
+  let retryAfterMs = 0;
   const stopForBudget = (site: FixSite, reason: string) => {
     llm.costLimit ??= { limitUsd: limit, notAttempted: 0 };
     llm.costLimit.notAttempted++;
@@ -206,6 +209,20 @@ export async function assist(
         );
         break;
       }
+      if (retryAfterMs > 0) {
+        onProgress?.({
+          phase: 'assist',
+          package: pack.name,
+          detail: `rate limited; waiting ${Math.ceil(retryAfterMs / 1000)}s before retry`,
+          state: 'start',
+        });
+        // Do not retry early, and allow cancellation/event processing during long waits.
+        while (retryAfterMs > 0) {
+          const wait = Math.min(60_000, retryAfterMs);
+          await delay(wait);
+          retryAfterMs -= wait;
+        }
+      }
       const where = `${site.finding.usage.file}:${site.finding.usage.line}${attempt ? ` (attempt ${attempt + 1})` : ''}`;
       const started = performance.now();
       onProgress?.({ phase: 'assist', package: pack.name, detail: where, state: 'start' });
@@ -223,6 +240,11 @@ export async function assist(
       site.attempts.push(log);
       try {
         const response = await fixer.fix(request, remaining);
+        log.responseModel = response.responseModel;
+        log.reservationUsd = response.reservationUsd ?? reservation;
+        log.unreportedCostUsd = response.unreportedCostUsd;
+        log.failureKind = response.failureKind;
+        retryAfterMs = response.retryAfterMs ?? 0;
         log.inputTokens = response.inputTokens;
         log.outputTokens = response.outputTokens;
         log.costUsd = response.costUsd ?? 0;
@@ -279,6 +301,7 @@ export async function assist(
         }
         retry = e instanceof Error ? e.message : String(e);
       } finally {
+        log.durationMs = performance.now() - started;
         if (site.outcome !== 'agent') {
           writeFileSync(file, original);
           log.explanation = [log.explanation, retry].filter(Boolean).join('; ');

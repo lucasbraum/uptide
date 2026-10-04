@@ -27,7 +27,19 @@ export interface FixSite {
   resolvedBy?: string;
   attempts?: AssistedAttempt[];
 }
+export type LlmFailureKind =
+  | 'no-tool-call'
+  | 'invalid-tool-call'
+  | 'rate-limited'
+  | 'api-error'
+  | 'usage-unavailable'
+  | 'token-bounds';
 export interface AssistedAttempt {
+  responseModel?: string;
+  reservationUsd?: number;
+  unreportedCostUsd?: number;
+  failureKind?: LlmFailureKind;
+  durationMs?: number;
   attempt: number;
   outcome: 'accepted' | 'reverted';
   before: FixDiagnostic[];
@@ -87,6 +99,10 @@ export interface FixRequest {
   retry?: string;
 }
 export interface FixResponse {
+  responseModel?: string;
+  reservationUsd?: number;
+  failureKind?: LlmFailureKind;
+  retryAfterMs?: number;
   failure?: string;
   halt?: boolean;
   /** Budget retained for a call whose API did not report usage. */

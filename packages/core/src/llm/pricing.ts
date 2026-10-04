@@ -7,6 +7,8 @@ export const PRICE_SOURCES = {
   gemini: 'https://ai.google.dev/gemini-api/docs/pricing',
 } as const;
 export interface Price {
+  source?: string;
+  checkedAt?: string;
   input: number;
   output: number;
   cached: number;
@@ -19,7 +21,15 @@ export interface Price {
 export const PRICES: Record<Provider, Record<string, Price>> = {
   anthropic: {
     'claude-sonnet-4-6': { input: 3, output: 15, cached: 0.3, write: 3.75, writeHour: 6 },
-    'claude-sonnet-5-5': { input: 2, output: 10, cached: 0.2, write: 2.5, writeHour: 4 },
+    'claude-sonnet-5-5': {
+      input: 2,
+      output: 10,
+      cached: 0.2,
+      write: 2.5,
+      writeHour: 4,
+      source: 'https://platform.claude.com/docs/en/models/sonnet-5-5/overview',
+      checkedAt: PRICE_DATE,
+    },
     'claude-opus-5-5': { input: 4, output: 20, cached: 0.2, write: 5, writeHour: 8 },
     'claude-fable-5-1': { input: 10, output: 50, cached: 0.25, write: 12.5, writeHour: 20 },
     'claude-haiku-4-5-20251001': { input: 1, output: 5, cached: 0.1, write: 1.25, writeHour: 2 },
@@ -71,8 +81,8 @@ export const PRICES: Record<Provider, Record<string, Price>> = {
   },
 };
 export const DEFAULT_MODELS: Record<Provider, string> = {
-  // Retained until a live storefront comparison with Sonnet 5.5 is available.
-  anthropic: 'claude-sonnet-4-6',
+  // Storefront comparison: docs/provider-evaluation.md (Sonnet 5.5, medium effort).
+  anthropic: 'claude-sonnet-5-5',
   openai: 'gpt-6.1-sol',
   gemini: 'gemini-3.8-flash',
 };

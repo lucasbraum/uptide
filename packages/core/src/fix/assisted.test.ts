@@ -176,7 +176,7 @@ it('Anthropic sends only scoped context, reports usage/cost, and is absent witho
   });
   expect(sent).not.toContain('unrelated private source');
   expect(sent).toContain('checked-in guide');
-  expect(response?.costUsd).toBeCloseTo(0.0006);
+  expect(response?.costUsd).toBeCloseTo(0.0004);
 });
 
 it('never chooses an unrelated diagnostic elsewhere in the file', async () => {
@@ -412,3 +412,56 @@ for (const provider of PROVIDERS) {
     expect(llm.costUsd).toBeLessThan(1);
   }, 15000);
 }
+
+it('charges a recorded no-tool response, feeds back the required tool call, then verifies the retry', async () => {
+  const f = fixture();
+  const missing = readFileSync(
+    new URL('../llm/fixtures/anthropic-no-tool.json', import.meta.url),
+    'utf8',
+  );
+  const valid = readFileSync(new URL('../llm/fixtures/anthropic.json', import.meta.url), 'utf8');
+  const sent: string[] = [];
+  const fixer = providerFixer(
+    { provider: 'anthropic', model: 'claude-sonnet-5-5', available: true },
+    {
+      env: { ANTHROPIC_API_KEY: 'test' },
+      fetch: async (_url, options) => {
+        sent.push(String(options?.body));
+        return new Response(sent.length === 1 ? missing : valid);
+      },
+    },
+  );
+  const llm = await assist(f.root, f.sites, zodPack, fixer, f.verify);
+  expect(sent).toHaveLength(2);
+  expect(sent[1]).toContain('respond only by calling submit_patch');
+  expect(f.sites[0]?.attempts?.map((a) => a.outcome)).toEqual(['reverted', 'accepted']);
+  expect(f.sites[0]?.attempts?.[0]?.failureKind).toBe('no-tool-call');
+  expect(f.sites[0]?.attempts?.every((a) => (a.reservationUsd ?? 0) >= a.costUsd)).toBe(true);
+  expect(llm.costUsd).toBeCloseTo(0.002074, 8);
+  expect(f.verify()).toEqual([]);
+}, 15000);
+
+it('waits on rate limits and rechecks the budget before the next HTTP request', async () => {
+  const f = fixture();
+  const valid = readFileSync(new URL('../llm/fixtures/anthropic.json', import.meta.url), 'utf8');
+  const called: number[] = [];
+  const fixer = providerFixer(
+    { provider: 'anthropic', model: 'claude-sonnet-5-5', available: true },
+    {
+      env: { ANTHROPIC_API_KEY: 'test' },
+      fetch: async () => {
+        called.push(performance.now());
+        return called.length === 1
+          ? new Response('', { status: 429, headers: { 'retry-after': '0.02' } })
+          : new Response(valid);
+      },
+    },
+  );
+  const llm = await assist(f.root, f.sites, zodPack, fixer, f.verify);
+  expect(called).toHaveLength(2);
+  expect((called[1] ?? 0) - (called[0] ?? 0)).toBeGreaterThanOrEqual(19);
+  expect(f.sites[0]?.attempts?.[0]?.failureKind).toBe('rate-limited');
+  expect(llm.unreportedCostUsd).toBeGreaterThan(0);
+  expect((llm.unreportedCostUsd ?? 0) + llm.costUsd).toBeLessThan(1);
+  expect(f.sites[0]?.outcome).toBe('agent');
+}, 15000);

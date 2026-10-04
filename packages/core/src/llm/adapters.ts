@@ -1,4 +1,5 @@
-import { openaiBaseUrl } from './config.js';
+import { modelCapabilities } from './capabilities.js';
+import { openaiBaseUrl, validModel } from './config.js';
 import { PATCH_TOOL, SYSTEM } from './prompt.js';
 import type { Adapter, Provider, ToolCall, Usage } from './types.js';
 
@@ -43,12 +44,19 @@ function call(name: unknown, args: unknown): ToolCall {
 }
 export const adapters: Record<Provider, Adapter> = {
   anthropic: {
-    prepare: (model, messages, maxTokens) => ({
+    prepare: (model, messages, maxTokens, _baseUrl, options) => ({
       url: 'https://api.anthropic.com/v1/messages',
       maxTokens,
       body: {
         model,
         max_tokens: maxTokens,
+        ...((options?.effort ?? modelCapabilities('anthropic', model).defaultEffort)
+          ? {
+              output_config: {
+                effort: options?.effort ?? modelCapabilities('anthropic', model).defaultEffort,
+              },
+            }
+          : {}),
         service_tier: 'standard_only',
         system: SYSTEM,
         messages,
@@ -57,9 +65,12 @@ export const adapters: Record<Provider, Adapter> = {
             name: PATCH_TOOL.name,
             description: PATCH_TOOL.description,
             input_schema: PATCH_TOOL.parameters,
+            strict: true,
           },
         ],
-        tool_choice: { type: 'tool', name: PATCH_TOOL.name },
+        tool_choice: modelCapabilities('anthropic', model).supportsForcedTool
+          ? { type: 'tool', name: PATCH_TOOL.name }
+          : { type: 'auto' },
       },
     }),
     headers: (key) => ({ 'x-api-key': key, 'anthropic-version': '2023-06-01' }),
@@ -71,6 +82,7 @@ export const adapters: Record<Provider, Adapter> = {
       const created = count(u.cache_creation_input_tokens, true);
       const hour = count(creation.ephemeral_1h_input_tokens, true);
       return {
+        ...(validModel(b.model) ? { model: b.model } : {}),
         calls: array(b.content)
           .map(object)
           .filter((c) => c.type === 'tool_use')
@@ -83,28 +95,70 @@ export const adapters: Record<Provider, Adapter> = {
     },
   },
   openai: {
-    prepare: (model, messages, maxTokens, baseUrl) => ({
-      url: `${openaiBaseUrl(baseUrl ?? 'https://api.openai.com/v1')}/responses`,
-      maxTokens,
-      body: {
-        model,
-        instructions: SYSTEM,
-        input: messages,
-        max_output_tokens: maxTokens,
-        store: false,
-        service_tier: 'default',
-        parallel_tool_calls: false,
-        tools: [{ type: 'function', ...PATCH_TOOL, strict: true }],
-        tool_choice: { type: 'function', name: PATCH_TOOL.name },
-      },
-    }),
+    prepare: (model, messages, maxTokens, baseUrl) =>
+      baseUrl
+        ? {
+            url: `${openaiBaseUrl(baseUrl)}/chat/completions`,
+            maxTokens,
+            body: {
+              model,
+              messages: [{ role: 'system', content: SYSTEM }, ...messages],
+              max_tokens: maxTokens,
+              stream: false,
+              parallel_tool_calls: false,
+              tools: [{ type: 'function', function: { ...PATCH_TOOL, strict: true } }],
+              tool_choice: modelCapabilities('openai', model).supportsForcedTool
+                ? { type: 'function', function: { name: PATCH_TOOL.name } }
+                : 'auto',
+            },
+          }
+        : {
+            url: `${openaiBaseUrl(baseUrl ?? 'https://api.openai.com/v1')}/responses`,
+            maxTokens,
+            body: {
+              model,
+              instructions: SYSTEM,
+              input: messages,
+              max_output_tokens: maxTokens,
+              store: false,
+              service_tier: 'default',
+              parallel_tool_calls: false,
+              tools: [{ type: 'function', ...PATCH_TOOL, strict: true }],
+              tool_choice: modelCapabilities('openai', model).supportsForcedTool
+                ? { type: 'function', name: PATCH_TOOL.name }
+                : 'auto',
+            },
+          },
     headers: (key) => ({ authorization: `Bearer ${key}` }),
     parse: (value) => {
       const b = object(value),
         u = object(b.usage),
         details = object(u.input_tokens_details);
+      if (Array.isArray(b.choices)) {
+        const choices = b.choices.map(object);
+        return {
+          ...(validModel(b.model) ? { model: b.model } : {}),
+          calls: choices
+            .flatMap((c) => array(object(c.message).tool_calls))
+            .map(object)
+            .filter((c) => c.type === 'function')
+            .map((c) => {
+              const f = object(c.function);
+              return call(f.name, f.arguments);
+            }),
+          usage: usage(
+            u.prompt_tokens,
+            u.completion_tokens,
+            object(u.prompt_tokens_details).cached_tokens,
+          ),
+          ...(choices.length !== 1 || choices[0]?.finish_reason !== 'tool_calls'
+            ? { failure: 'Response did not complete submit_patch.' }
+            : {}),
+        };
+      }
       const written = count(details.cache_write_tokens, true);
       return {
+        ...(validModel(b.model) ? { model: b.model } : {}),
         calls: array(b.output)
           .map(object)
           .filter((c) => c.type === 'function_call')
@@ -148,7 +202,9 @@ export const adapters: Record<Provider, Adapter> = {
           },
         ],
         toolConfig: {
-          functionCallingConfig: { mode: 'ANY', allowedFunctionNames: [PATCH_TOOL.name] },
+          functionCallingConfig: modelCapabilities('gemini', model).supportsForcedTool
+            ? { mode: 'ANY', allowedFunctionNames: [PATCH_TOOL.name] }
+            : { mode: 'AUTO' },
         },
       },
     }),
@@ -159,6 +215,7 @@ export const adapters: Record<Provider, Adapter> = {
         candidates = array(b.candidates).map(object);
       const c = candidates[0] ?? {};
       return {
+        ...(validModel(b.modelVersion) ? { model: b.modelVersion } : {}),
         calls: candidates
           .flatMap((c) => array(object(c.content).parts))
           .map(object)

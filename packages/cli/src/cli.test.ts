@@ -618,7 +618,7 @@ describe('--help', () => {
 
 it('selects each provider from its key, passes model and the universal budget, and prints spend', async () => {
   for (const [provider, key, model] of [
-    ['anthropic', 'ANTHROPIC_API_KEY', 'claude-sonnet-4-6'],
+    ['anthropic', 'ANTHROPIC_API_KEY', 'claude-sonnet-5-5'],
     ['openai', 'OPENAI_API_KEY', 'gpt-6.1-sol'],
     ['gemini', 'GEMINI_API_KEY', 'gemini-3.8-flash'],
   ] as const) {
