@@ -75,6 +75,7 @@ export async function assist(
   context?: PackContext,
   disabled = false,
   onProgress?: ProgressListener,
+  limits: { maxCostUsd?: number | undefined } = {},
 ): Promise<FixReport['llm']> {
   const llm: FixReport['llm'] = {
     available: !!fixer,
@@ -90,6 +91,14 @@ export async function assist(
       a.finding.usage.line - b.finding.usage.line,
   )) {
     if (site.outcome !== 'manual') continue;
+    // The budget is checked before a site starts: what a site costs is only known afterwards,
+    // so the last one may overshoot, and nothing is abandoned half-way.
+    if (fixer && limits.maxCostUsd !== undefined && llm.costUsd >= limits.maxCostUsd) {
+      llm.costLimit ??= { limitUsd: limits.maxCostUsd, notAttempted: 0 };
+      llm.costLimit.notAttempted++;
+      site.reason += `; not attempted: the cost limit of $${limits.maxCostUsd.toFixed(2)} was reached (--max-cost)`;
+      continue;
+    }
     if (!fixer) {
       site.reason += disabled
         ? '; assisted fixes disabled (--no-llm), left manual'

@@ -1,5 +1,6 @@
 import { basename } from 'node:path';
 import type { Finding } from '../domain/report.js';
+import { GENERIC_NOTE } from '../packs/generic.js';
 import { UPTIDE_COMMAND } from '../version.js';
 import type { BehaviorResult } from './behavior.js';
 import { fitPieces, must, type Piece } from './budget.js';
@@ -309,6 +310,12 @@ export function migrationRisk(report: FixReport): {
       : []),
   ];
   if (high.length) return { level: 'High', reason: high.join('; ') };
+  // No pack: nothing but the compiler vouches for the agent's edits. Never Low.
+  if (report.tier === 'generic')
+    return {
+      level: 'Medium',
+      reason: `no migration pack for ${report.package}: agent edits verified by the compiler only`,
+    };
   // The changelog between the two API versions touches nothing this code uses and breaks
   // nothing: what is left is that this is billing code, which is why it is not Low.
   if (additiveBumpOnly(report))
@@ -589,6 +596,7 @@ export function renderMigration(
       '',
     );
   }
+  if (report.tier === 'generic') lines.push(`> ${GENERIC_NOTE(report.package)}`, '');
   if (report.llm.disabled) lines.push('Assisted fixes disabled (--no-llm).', '');
   lines.push(...summaryRows(report), '', '### What changed', '');
   groups(report).forEach((g, i) => {
@@ -671,7 +679,7 @@ export function renderMigration(
     report.verification.tests.some((t) => t.status === 'missing')
   )
     review.push(
-      `- ${report.verification.tests.every((t) => t.status === 'missing') ? 'No tests ran.' : 'Some workspaces have no tests.'} ${report.package === 'zod' ? `Smoke-test the routes ${scopeList(report) ? `behind ${scopeList(report)}` : 'that use the changed schemas'} before merging.` : 'Add coverage for the changed billing and webhook flows before merging.'}`,
+      `- ${report.verification.tests.every((t) => t.status === 'missing') ? 'No tests ran.' : 'Some workspaces have no tests.'} ${report.package === 'zod' ? `Smoke-test the routes ${scopeList(report) ? `behind ${scopeList(report)}` : 'that use the changed schemas'} before merging.` : report.package === 'stripe' ? 'Add coverage for the changed billing and webhook flows before merging.' : 'Exercise the changed code by hand before merging.'}`,
     );
   for (const t of report.verification.tests.filter((t) => ['failed', 'timeout'].includes(t.status)))
     review.push(
@@ -686,6 +694,10 @@ export function renderMigration(
   for (const l of (report.verification.lint ?? []).filter((l) => l.status === 'failed'))
     review.push(
       `- The repository's lint (${l.tool}) fails on the edited files; fix it before merging (see verification details).`,
+    );
+  if (report.llm.costLimit)
+    review.push(
+      `- The agent stopped at the cost limit of $${report.llm.costLimit.limitUsd.toFixed(2)} (\`--max-cost\`): ${count(report.llm.costLimit.notAttempted, 'site')} not attempted. Run again with a higher limit to continue.`,
     );
   for (const s of report.sites.filter((s) => s.outcome === 'manual'))
     review.push(

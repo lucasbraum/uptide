@@ -24,7 +24,9 @@ export async function resolveTarget(
   }
   try {
     return { version: await resolve(pack.name, 'latest'), source: 'latest on npm' };
-  } catch {
+  } catch (err) {
+    // Without a pack there is no tested target to fall back on: the registry has to answer.
+    if (!pack.defaultTarget) throw err;
     return { version: pack.defaultTarget, source: "the pack's tested target" };
   }
 }
