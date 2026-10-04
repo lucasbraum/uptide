@@ -37,6 +37,23 @@ describe('release pipeline', () => {
     expect(workflow).not.toContain('pnpm changeset version');
   });
 
+  it('allows next only from main before checkout or publishing', () => {
+    const guard = workflow.slice(workflow.indexOf('steps:'), workflow.indexOf('actions/checkout'));
+    expect(guard).toContain("github.ref != 'refs/heads/main'");
+    expect(guard).toContain('exit 1');
+  });
+
+  it('uses GitHub PR links when generating the changelog', () => {
+    const config = JSON.parse(read('.changeset/config.json'));
+    expect(config.changelog).toEqual([
+      '@changesets/changelog-github',
+      { repo: 'uptide-dev/uptide' },
+    ]);
+    expect(JSON.parse(read('package.json')).devDependencies).toHaveProperty(
+      '@changesets/changelog-github',
+    );
+  });
+
   it('tests the tarball before publishing it', () => {
     expect(workflow.indexOf('pnpm smoke')).toBeGreaterThan(0);
     expect(workflow.indexOf('pnpm smoke')).toBeLessThan(workflow.indexOf('publish --tag next'));
@@ -49,7 +66,9 @@ describe('release pipeline', () => {
     const cli = JSON.parse(read('packages/cli/package.json'));
     // Provenance is the workflows' flag: a manifest setting would override it either way.
     expect(cli.publishConfig).toEqual({ access: 'public' });
-    expect(cli.repository.url).toBe('git+https://github.com/lucasbraum/uptide.git');
+    expect(cli.repository.url).toBe('git+https://github.com/uptide-dev/uptide.git');
+    expect(cli.homepage).toBe('https://github.com/uptide-dev/uptide#readme');
+    expect(cli.bugs).toBe('https://github.com/uptide-dev/uptide/issues');
     // Nothing publishes from a laptop: the root script only points at the workflow.
     expect(JSON.parse(read('package.json')).scripts.release).not.toMatch(
       /\b(changeset|npm|pnpm)\b.*\bpublish\b/,
@@ -62,7 +81,9 @@ describe('release pipeline', () => {
       expect(triggers).toContain('workflow_dispatch:');
       expect(triggers).not.toMatch(/\n {2}(push|pull_request|schedule|release):/);
       expect(triggers).toMatch(/version:[\s\S]*?required: true/);
-      expect(triggers).not.toContain('default: 0.3.0');
+      expect(
+        triggers.slice(triggers.indexOf('version:'), triggers.indexOf('dry_run:')),
+      ).not.toContain('default:');
       expect(triggers).toMatch(/dry_run:[\s\S]*?default: true/);
     });
 
@@ -97,6 +118,26 @@ for (const [channel, text] of [
   ['latest', latest],
   ['next', workflow],
 ] as const) {
+  it(`${channel} creates a release at the published SHA only after a successful real publish`, () => {
+    const jobs = text.split('  github-release:');
+    expect(jobs).toHaveLength(2);
+    const publish = jobs[0];
+    const release = jobs[1];
+    expect(publish).toContain('permissions: {}');
+    expect(publish).toMatch(/permissions:\n {6}contents: read\n[\s\S]*?id-token: write/);
+    expect(publish).not.toContain('contents: write');
+    expect(release).toContain(`needs: publish-${channel}`);
+    expect(release).toMatch(/if: \$\{\{ !inputs\.dry_run \}\}/);
+    expect(release).toContain('permissions:\n      contents: write');
+    expect(release).not.toContain('id-token:');
+    expect(release).toMatch(/RELEASE_COMMIT: \$\{\{ github\.sha \}\}/);
+    expect(release).toContain('gh release create "v$VERSION"');
+    expect(release).toContain('--target "$RELEASE_COMMIT"');
+    expect(release).toContain('--generate-notes');
+    if (channel === 'next') expect(release).toContain('--prerelease --latest=false');
+    else expect(release).not.toContain('--prerelease');
+  });
+
   it(`${channel} checks the committed version before install or build, without rewriting it`, () => {
     const guard = text.indexOf('run: node scripts/check-release-version.mjs');
     expect(guard).toBeGreaterThan(text.indexOf('uses: actions/checkout@v4'));

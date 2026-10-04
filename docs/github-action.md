@@ -1,6 +1,6 @@
 # GitHub Action: Renovate and Dependabot pull requests
 
-Use [the example workflow](../examples/uptide-workflow.yml), pinning a reviewed commit of `lucasbraum/uptide`. It checks same-repository bot PRs on `pull_request`
+Use [the example workflow](../examples/uptide-workflow.yml), pinning a reviewed commit of `uptide-dev/uptide`. It checks same-repository bot PRs on `pull_request`
 `opened`/`synchronize`, detects zod/stripe upgrades from manifests, catalogs and lockfile
 importers, and maintains one sticky findings comment. `only` selects dependencies;
 `paths` selects repository-relative source directories/globs.

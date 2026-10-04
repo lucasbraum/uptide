@@ -9,7 +9,8 @@ are not acceptable anywhere in the project's spaces (issues, pull requests, disc
 
 ## Reporting
 
-Report unacceptable behavior privately to the maintainer,
-[@lucasbraum](https://github.com/lucasbraum), rather than in a public thread. Reports are
-kept confidential, reviewed promptly, and handled following the Covenant's enforcement
+Report unacceptable behavior privately to the maintainers through
+[private reports](https://github.com/uptide-dev/uptide/security/advisories/new), rather
+than in a public thread. Reports are kept confidential, reviewed promptly, and handled
+following the Covenant's enforcement
 guidelines: correction, warning, temporary ban, permanent ban.

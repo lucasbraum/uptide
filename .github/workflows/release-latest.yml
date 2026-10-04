@@ -19,8 +19,7 @@ concurrency:
   group: release
   cancel-in-progress: false
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   publish-latest:
@@ -82,3 +81,23 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: 'true'
+
+  github-release:
+    needs: publish-latest
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      VERSION: ${{ inputs.version }}
+      RELEASE_COMMIT: ${{ github.sha }}
+    steps:
+      # gh creates the missing tag at the published SHA, never the moving main tip.
+      - name: Tag the published commit and create its GitHub Release
+        run: >-
+          gh release create "v$VERSION"
+          --target "$RELEASE_COMMIT"
+          --title "v$VERSION"
+          --generate-notes

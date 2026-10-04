@@ -19,8 +19,7 @@ concurrency:
   group: release
   cancel-in-progress: false
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   publish-next:
@@ -37,6 +36,11 @@ jobs:
       # The one flag for provenance: 'true' only when the repository is public.
       UPTIDE_PROVENANCE: ${{ github.event.repository.visibility == 'public' }}
     steps:
+      - name: A next release comes from main
+        if: ${{ github.ref != 'refs/heads/main' }}
+        run: |
+          echo "::error::next is published only from main."
+          exit 1
       - uses: actions/checkout@v4
       - name: The version matches the committed CLI manifest
         run: node scripts/check-release-version.mjs
@@ -67,3 +71,23 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: ${{ env.UPTIDE_PROVENANCE }}
+
+  github-release:
+    needs: publish-next
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      VERSION: ${{ inputs.version }}
+      RELEASE_COMMIT: ${{ github.sha }}
+    steps:
+      # gh creates the missing tag at the published SHA, never the moving main tip.
+      - name: Tag the published commit and create its GitHub Release
+        run: >-
+          gh release create "v$VERSION"
+          --target "$RELEASE_COMMIT"
+          --title "v$VERSION"
+          --generate-notes --prerelease --latest=false

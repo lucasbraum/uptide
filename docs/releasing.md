@@ -13,17 +13,21 @@ pnpm changeset        # pick `uptide`, patch/minor/major, one-line summary
 
 ## Publishing
 
-1. Open a version PR running `pnpm changeset version` to update package versions and the changelog. For `next`, prepare the prerelease version in this PR (for example, `pnpm changeset version --snapshot next`).
+1. Open a version PR with `pnpm changeset version` to update package versions and the changelog. Set `GITHUB_TOKEN` so changelog entries link their GitHub PRs.
 2. Merge the version PR.
 3. Run **Release (latest)** or **Release (next)** at that merged ref with the same `version` as `packages/cli/package.json`. Use `dry_run` to validate without publishing.
-4. Tag the released commit `vX.Y.Z` (use the full prerelease version for `next`) and push the tag.
+4. After publishing, the workflow creates `vX.Y.Z` at the published commit and a GitHub Release with generated notes (`next` is marked as a prerelease). Dry runs skip both.
+
+For `next`, prepare the prerelease version in the version PR with
+`pnpm changeset version --snapshot next`.
 
 Both workflows reject a version mismatch before installing dependencies and never
 rewrite versions. `latest` requires the public repository's `main` branch and a stable,
-unpublished version; `next` only moves the `next` dist-tag. Configure the `NPM_TOKEN`
-repository secret for publishing. npm provenance is required for `latest` and enabled
+unpublished version; `next` also requires `main` and only moves the `next` dist-tag.
+Configure the `NPM_TOKEN` repository secret for publishing. npm provenance is required for `latest` and enabled
 for `next` when the repository is public; the CLI's `repository.url` must match the
-publishing repository.
+publishing repository. Only the post-publish tagging job has `contents: write`; the
+publish job has `contents: read` and `id-token: write` for provenance.
 
 ## Optional telemetry capture
 

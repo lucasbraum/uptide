@@ -22,8 +22,8 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           persist-credentials: false
-      # Pin lucasbraum/uptide to a reviewed full commit SHA before enabling.
-      - uses: lucasbraum/uptide@REVIEWED_COMMIT_SHA
+      # Pin uptide-dev/uptide to a reviewed full commit SHA before enabling.
+      - uses: uptide-dev/uptide@REVIEWED_COMMIT_SHA
         with:
           only: zod,stripe
           paths: |

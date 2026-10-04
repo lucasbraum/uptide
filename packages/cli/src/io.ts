@@ -44,7 +44,7 @@ export function processIo(): Io {
         rl.on('SIGINT', () => done(false));
         rl.on('close', () => done(false));
         rl.question(
-          'Share anonymous CLI usage with Uptide (PostHog EU, 90-day retention)?\nRandom IDs, public package versions and aggregate counts only; no IP, code, paths or repo names.\nDetails: https://github.com/lucasbraum/uptide/blob/main/docs/telemetry.md\nEnable telemetry? [y/N] ',
+          'Share anonymous CLI usage with Uptide (PostHog EU, 90-day retention)?\nRandom IDs, public package versions and aggregate counts only; no IP, code, paths or repo names.\nDetails: https://github.com/uptide-dev/uptide/blob/main/docs/telemetry.md\nEnable telemetry? [y/N] ',
           (answer) => done(/^y(?:es)?$/i.test(answer.trim())),
         );
       }),
