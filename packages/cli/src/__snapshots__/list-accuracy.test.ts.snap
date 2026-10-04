@@ -14,3 +14,25 @@ Generic analysis is the default; verified means a migration pack is available.
 Next  uptide check babel-plugin-example
 "
 `;
+
+exports[`retains unknown counts and collapses repeated network failures (TTY=false) 1`] = `
+"uptide list
+
+0 outdated   6 not checked (network)   0 major   0 minor   0 groups   0 tooling
+
+? 6 packages on registry.npmjs.org: timed out, skipped
+Usage is a syntax scan, no type analysis.
+Generic analysis is the default; verified means a migration pack is available.
+"
+`;
+
+exports[`retains unknown counts and collapses repeated network failures (TTY=true) 1`] = `
+"[1muptide list[22m
+
+[1m0[22m outdated   [1m6[22m not checked (network)   [1m0[22m major   [1m0[22m minor   [1m0[22m groups   [1m0[22m tooling
+
+? 6 packages on registry.npmjs.org: timed out, skipped
+[2mUsage is a syntax scan, no type analysis.[22m
+[2mGeneric analysis is the default; verified means a migration pack is available.[22m
+"
+`;

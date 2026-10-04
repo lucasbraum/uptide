@@ -23,7 +23,31 @@ in #8; its fixture protects that behavior.
 
 With two private packages returning 401, failed registry requests fall from 4 to 2 and
 failure rows from 4 to 2. With valid fixture credentials, both packages resolve and no
-failure remains. A deterministic clock test stalls both private responses and verifies
-that discovery stops at the shared 800 ms deadline while retaining a fast public package.
+failure remains. The scoped registry + `${ENV}` token fixture also runs through the packaged CLI.
 
-Re-run: `pnpm --filter @uptide/core exec vitest run src/list/accuracy.test.ts`.
+`large-registry` declares 80 invented packages. A local HTTP server delays every abbreviated
+metadata response by 220 ms: all 80 resolve, with exactly 80 requests and at most 16 in flight.
+This intentionally exceeds the former shared 800 ms deadline. Deterministic tests give each
+attempt 10 seconds including stalled bodies, retry timeout/5xx once, keep failures as unknown,
+and stop further requests to a host only after 401/403/405. A current/target metadata failure
+also cannot hide an already-known outdated package.
+
+Re-run: `pnpm --filter @uptide/core exec vitest run src/list/accuracy.test.ts src/list/registry.test.ts`.
+
+## Public registry runs
+
+Measured on 2026-10-04, Node 22, with the packaged CLI (`list --all --json --ci --cwd <checkout>`),
+no dependency installation and the repositories' committed Yarn lockfiles. Times include the
+local syntax scan; npm metadata was fetched live without an Uptide registry cache.
+
+| Public checkout | Declared dependencies | Outdated | Unknown latest | Network failures | Discovery time |
+| --- | --- | --- | --- | --- | --- |
+| webpack `62f7a27c7e09b91ecf43bcaf1730288b33cbd77f`, before this fix | 121 | 5 | not exposed | 63 timeouts | 4.497 s |
+| Same webpack checkout, after | 121 | 14 | 0 | 0 | 5.456 s |
+| webpack v5.50.0 (`400a0f94ab45ca20b10f219c8311e87d3d3f108c`), after | 93 | 73 (47 major / 20 minor / 6 patch) | 0 | 0 | 2.482 s |
+
+Both after-runs still exit 2 for one separate, pre-existing metadata limitation: npm alias
+`prettier-2` on current webpack, and the GitHub shorthand `tooling: webpack/tooling#v1.19.0`
+on v5.50.0. These are not network timeouts. The current checkout's reported 14 upgrades
+include the alias row, whose target is not reliable until alias resolution is supported.
+Neither alias nor GitHub shorthand resolution is changed by this timeout fix.

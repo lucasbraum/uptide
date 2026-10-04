@@ -86,6 +86,29 @@ export function listBlocks(
       .map((p) => ({ members: [p] })),
   ];
 }
+/** Group only identical registry failures; HTML keeps a named row for every package. */
+export function listFailureLines(report: ListReport, details = false): string[] {
+  const failures = [...new Map(report.failures.map((f) => [f.name, f])).values()];
+  const buckets = new Map<string, typeof failures>();
+  for (const failure of failures) {
+    const key =
+      failure.host && failure.summary
+        ? JSON.stringify([failure.host, failure.status, failure.summary])
+        : failure.name;
+    buckets.set(key, [...(buckets.get(key) ?? []), failure]);
+  }
+  return [...buckets.values()].flatMap((members) => {
+    const first = members[0];
+    if (!first) return [];
+    const denied = [401, 403, 405].includes(first.status ?? 0);
+    if (first.host && first.summary && members.length > (denied ? 1 : 5))
+      return [
+        `? ${members.length} packages on ${first.host}: ${first.summary}, skipped`,
+        ...(details ? members.map((f) => `    ${f.name}`) : []),
+      ];
+    return members.map((f) => `? ${f.name}: ${f.reason}`);
+  });
+}
 export function formatList(report: ListReport, opts: FormatListOptions = {}): string {
   const color = opts.color ?? false;
   const c = pc.createColors(color);
@@ -99,6 +122,7 @@ export function formatList(report: ListReport, opts: FormatListOptions = {}): st
   lines.push(
     [
       stat(report.packages.length, 'outdated'),
+      ...(report.unknown?.length ? [stat(report.unknown.length, 'not checked (network)')] : []),
       stat(report.packages.filter((p) => p.change === 'major').length, 'major'),
       stat(report.packages.filter((p) => p.change === 'minor').length, 'minor'),
       ...(report.packages.some((p) => p.change === 'patch')
@@ -183,10 +207,9 @@ export function formatList(report: ListReport, opts: FormatListOptions = {}): st
       }
     lines.push('');
   }
-  if (!report.packages.length && !report.failures.length)
+  if (!report.packages.length && !report.failures.length && !report.unknown?.length)
     lines.push('Every direct dependency is up to date.', '');
-  for (const f of new Map(report.failures.map((f) => [f.name, f])).values())
-    lines.push(`? ${f.name}: ${f.reason}`);
+  lines.push(...listFailureLines(report, opts.details));
   lines.push(
     c.dim('Usage is a syntax scan, no type analysis.'),
     c.dim('Generic analysis is the default; verified means a migration pack is available.'),

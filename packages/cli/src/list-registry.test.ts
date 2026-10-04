@@ -27,9 +27,11 @@ it.skipIf(!existsSync(bin)).each([true, false])(
         res.end(JSON.stringify({ error: `rejected https://${secret}@registry.invalid` }));
         return;
       }
-      const version = req.url?.endsWith('/latest') ? '2.0.0' : '1.0.0';
       res.end(
-        JSON.stringify({ version, dist: { tarball: 'https://registry.invalid/unused.tgz' } }),
+        JSON.stringify({
+          'dist-tags': { latest: '2.0.0' },
+          versions: { '1.0.0': {}, '2.0.0': {} },
+        }),
       );
     });
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -63,10 +65,11 @@ it.skipIf(!existsSync(bin)).each([true, false])(
         (error: { stdout: string; stderr: string; code: number }) => error,
       );
       expect(result.code).toBe(accepted ? 0 : 2);
-      expect(seen).toHaveLength(accepted ? 4 : 2);
+      expect(seen).toHaveLength(2);
       expect(seen.every((value) => value === `Bearer ${secret}`)).toBe(true);
       const report = JSON.parse(result.stdout);
       expect(report.failures).toHaveLength(accepted ? 0 : 2);
+      expect(report.unknown).toHaveLength(accepted ? 0 : 2);
       const html = readFileSync(join(cwd, 'report.html'), 'utf8');
       expect(html.match(/class="incomplete-row"/g)?.length ?? 0).toBe(accepted ? 0 : 2);
       expect(result.stdout + result.stderr + html).not.toContain(secret);

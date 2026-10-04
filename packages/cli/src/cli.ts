@@ -359,7 +359,7 @@ ${PRIVACY}`,
               }
             }
           }
-          return report.failures.length ? EXIT.error : EXIT.ok;
+          return report.failures.length || report.unknown?.length ? EXIT.error : EXIT.ok;
         }),
     );
 

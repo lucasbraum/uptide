@@ -72,15 +72,15 @@ it.each([
     );
 });
 
-const manifest = (url: string) => {
-  const name = decodeURIComponent(url.split('/').at(-2) ?? 'demo');
-  const version = url.endsWith('/latest') ? '2.0.0' : '1.0.0';
-  return Response.json({
-    name,
-    version,
-    dist: { tarball: `https://npm.pkg.github.com/${name}.tgz` },
+const manifest = (_url: string) =>
+  Response.json({
+    'dist-tags': { latest: '2.0.0' },
+    versions: {
+      '1.0.0': { version: '1.0.0' },
+      '1.1.0': { version: '1.1.0' },
+      '2.0.0': { version: '2.0.0' },
+    },
   });
-};
 
 it('uses layered registry auth without persisting credentials or rerequesting target metadata', async () => {
   const cwd = fixture('private-registry');
@@ -106,7 +106,7 @@ it('uses layered registry auth without persisting credentials or rerequesting ta
   });
   expect(result.failures).toEqual([]);
   expect(result.packages).toHaveLength(2);
-  expect(transport).toHaveBeenCalledTimes(4); // latest + current, no separate target request
+  expect(transport).toHaveBeenCalledTimes(2); // one packument per package, shared by latest/current/target
   expect(JSON.stringify(result)).not.toMatch(/fixture-project-secret|fixture-user-secret|\.tgz/);
   expect(readFileSync(join(cwd, '.npmrc'), 'utf8')).toBe(before);
   expect(existsSync(join(cwd, 'discovery-cache'))).toBe(false);
@@ -136,15 +136,22 @@ it.each([401, 403])(
       ['@example/one', '@example/two'].map((name) => ({
         name,
         kind: 'registry',
-        reason: 'private registry needs auth (npm.pkg.github.com), skipped',
+        host: 'npm.pkg.github.com',
+        status,
+        summary: status === 401 ? 'auth required (401)' : 'access denied (403)',
+        reason:
+          status === 401
+            ? 'auth required (401) for npm.pkg.github.com: check your .npmrc token. Skipped.'
+            : "access denied (403) on npm.pkg.github.com, your token can't read this package. Skipped.",
       })),
     );
     expect(transport).toHaveBeenCalledTimes(2);
+    expect(result.unknown?.map((p) => p.name)).toEqual(['@example/one', '@example/two']);
     expect(JSON.stringify(result)).not.toMatch(/https:|secret|%2F|HTTP/);
   },
 );
 
-it('bounds all discovery requests together, aborts stalled bodies, and keeps fast public results', async () => {
+it('gives each attempt 10 seconds including stalled bodies, retries once, and retains unknown packages', async () => {
   const cwd = fixture('private-registry');
   const pkg = JSON.parse(readFileSync(join(cwd, 'package.json'), 'utf8'));
   pkg.dependencies.public = '1.0.0';
@@ -171,18 +178,18 @@ it('bounds all discovery requests together, aborts stalled bodies, and keeps fas
     cwd,
     fetcher: createDiscoveryFetcher({ cwd, config, fetch: transport }),
   });
-  await vi.advanceTimersByTimeAsync(800);
+  await vi.advanceTimersByTimeAsync(20_000);
   const report = await pending;
   expect(report.packages.map((p) => p.name)).toEqual(['public']);
   expect(report.failures).toHaveLength(2);
   expect(
-    report.failures.every(
-      (f) => f.reason === 'registry request timed out (npm.pkg.github.com), skipped',
-    ),
+    report.failures.every((f) => f.reason === 'timed out on npm.pkg.github.com, skipped'),
   ).toBe(true);
   expect(signals.every((signal) => signal.aborted)).toBe(true);
-  expect(transport).toHaveBeenCalledTimes(4);
-  expect(report.timing.totalMs).toBeLessThanOrEqual(800);
+  expect(transport).toHaveBeenCalledTimes(5); // public once; two stalled packages twice each
+  expect(signals).toHaveLength(4);
+  expect(report.unknown?.map((p) => p.name)).toEqual(['@example/one', '@example/two']);
+  expect(report.timing.totalMs).toBe(20_000);
 });
 
 it('does not retry or cache responses for auth, throttling and connection errors', async () => {
@@ -192,17 +199,21 @@ it('does not retry or cache responses for auth, throttling and connection errors
     scoped: {},
     tokens: { 'registry.example/': 'synthetic-secret' },
   };
-  for (const respond of [
-    async () => new Response('synthetic-secret', { status: 429 }),
-    async () => {
-      throw new Error('https://synthetic-secret@registry.example');
-    },
-  ]) {
+  for (const [respond, reason] of [
+    [
+      async () => new Response('synthetic-secret', { status: 429 }),
+      'registry request failed (429) on registry.example, skipped',
+    ],
+    [
+      async () => {
+        throw new Error('https://synthetic-secret@registry.example');
+      },
+      'network request failed on registry.example, skipped',
+    ],
+  ] as const) {
     const transport = vi.fn(respond);
     const fetcher = createDiscoveryFetcher({ cwd, config, fetch: transport });
-    await expect(fetcher.resolve('@example/one', 'latest')).rejects.toThrow(
-      'registry request failed (registry.example), skipped',
-    );
+    await expect(fetcher.resolve('@example/one', 'latest')).rejects.toThrow(reason);
     expect(transport).toHaveBeenCalledTimes(1);
   }
 });

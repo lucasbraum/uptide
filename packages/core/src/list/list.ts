@@ -53,7 +53,17 @@ export interface ListReport {
   workspaces: string[];
   packages: ListedDependency[];
   groups: ListGroup[];
-  failures: { name: string; workspace?: string; reason: string; kind?: 'registry' }[];
+  /** Packages whose latest version could not be checked; never counted as up to date. */
+  unknown?: { name: string; currentVersions: string[]; workspaces: string[]; reason: string }[];
+  failures: {
+    name: string;
+    workspace?: string;
+    reason: string;
+    kind?: 'registry';
+    host?: string;
+    summary?: string;
+    status?: number;
+  }[];
   timing: { totalMs: number };
 }
 export interface ListOptions {
@@ -93,6 +103,13 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
     failures.push({
       name,
       ...(registry ? { kind: 'registry' as const } : {}),
+      ...(error instanceof DiscoveryRegistryError
+        ? {
+            host: error.host,
+            summary: error.summary,
+            ...(error.status ? { status: error.status } : {}),
+          }
+        : {}),
       reason: registry
         ? registryFailure(error, registryHost(registryFor(name, config)))
         : `${context}${error instanceof Error ? error.message : String(error)}`,
@@ -142,7 +159,7 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
   const metadata = new Map<string, Manifest[]>();
   const targets = new Map<string, Manifest>();
   const latestVersions = new Map<string, string>();
-  await mapWithLimit(names, 12, async (name) => {
+  await mapWithLimit(names, 16, async (name) => {
     const items: Manifest[] = [];
     const missing: string[] = [];
     for (const [version, locations] of declared.get(name) ?? []) {
@@ -153,8 +170,7 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
       else missing.push(version);
     }
     metadata.set(name, items);
-    // Complete each package independently: a slow private host cannot hold public results
-    // behind a metadata barrier until the shared network budget expires.
+    // Resolve each package independently within the bounded request pool.
     if (!opts.only || opts.only.includes(name)) {
       try {
         const latest = await fetcher.resolve(name, 'latest');
@@ -173,6 +189,7 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
         }
       } catch (error) {
         fail(name, error);
+        blocked.add(name);
       }
     }
     for (const version of missing) {
@@ -218,7 +235,7 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
     .filter((name) => !opts.only || opts.only.includes(name))
     .flatMap((name): ListedDependency[] => {
       const latest = latestVersions.get(name);
-      if (!latest || blocked.has(name)) return [];
+      if (!latest) return [];
       return [...(declared.get(name) ?? [])]
         .filter(([current]) => compareVersions(latest, current) > 0)
         .map(([current, declaredWorkspaces]) => {
@@ -279,6 +296,15 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
     workspaces,
     packages,
     groups,
+    unknown: names
+      .filter((name) => (!opts.only || opts.only.includes(name)) && !latestVersions.has(name))
+      .map((name) => ({
+        name,
+        currentVersions: [...(declared.get(name)?.keys() ?? [])],
+        workspaces: [...new Set([...(declared.get(name)?.values() ?? [])].flat())],
+        reason:
+          failures.find((failure) => failure.name === name)?.reason ?? 'latest version unavailable',
+      })),
     failures: [...new Map(failures.map((failure) => [failure.name, failure])).values()],
     timing: { totalMs: Date.now() - start },
   };

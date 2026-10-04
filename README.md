@@ -69,10 +69,15 @@ imports and HTML assets under node_modules. Expanded rows explain the evidence; 
 unused” means no usage was found by Uptide's scan, so verify before removing.
 
 Registry settings use environment overrides, project and user `.npmrc` files, scoped
-registries and host/path-scoped credentials. Discovery has an 800 ms total network budget,
-no retries and no registry cache writes; local scanning adds its own runtime. Auth failures
-produce one host-only message per package and one Incomplete HTML row. Successful packages
-remain visible; incomplete discovery exits 2. Analysis commands retain their normal retry policy.
+registries and host/path-scoped credentials. Discovery uses abbreviated metadata with up to
+16 concurrent requests, a 10-second timeout per attempt (including response bodies), and one
+retry for timeouts or HTTP 5xx. Only a host that returns 401, 403 or 405 is blocked for the
+rest of that run. Credentials and registry responses are never written to the discovery cache.
+Unresolved packages stay in JSON's `unknown` list, the summary reports “N not checked (network)”,
+and HTML keeps one named row per incomplete package. Repeated failures are grouped by host and
+reason (more than five network errors, or multiple access failures); `--details` lists names.
+Successful packages remain visible; incomplete discovery exits 2. Analysis commands retain
+their normal retry policy.
 `--json` gives every row. `--html [--open]` creates a report styled like check, with copyable
 commands and no source code or file paths by default; `--details` adds file lists.
 Usage is syntactic: indirect aliases and reflection are not followed. With different locked

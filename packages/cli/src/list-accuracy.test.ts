@@ -91,3 +91,89 @@ it('renders one incomplete row per package with host-only auth diagnostics', () 
     '@example/one: private registry needs auth (npm.pkg.github.com), skipped',
   );
 });
+
+const networkReport = (count: number, status?: number): ListReport => {
+  const host = status ? 'npm.pkg.github.com' : 'registry.npmjs.org';
+  const summary = status === 403 ? 'access denied (403)' : 'timed out';
+  const reason =
+    status === 403
+      ? `${summary} on ${host}, your token can't read this package. Skipped.`
+      : `${summary} on ${host}, skipped`;
+  const failures = Array.from({ length: count }, (_, i) => ({
+    name: `@example/package-${i}`,
+    kind: 'registry' as const,
+    host,
+    summary,
+    reason,
+    ...(status ? { status } : {}),
+  }));
+  return {
+    repo: '/private/repo',
+    workspaces: ['.'],
+    packages: [],
+    groups: [],
+    failures,
+    unknown: failures.map((f) => ({
+      name: f.name,
+      currentVersions: ['1.0.0'],
+      workspaces: ['.'],
+      reason,
+    })),
+    timing: { totalMs: 1 },
+  };
+};
+it.each([false, true])(
+  'retains unknown counts and collapses repeated network failures (TTY=%s)',
+  (color) => {
+    const report = networkReport(6);
+    const first = report.failures[0];
+    if (!first) throw new Error('missing fixture');
+    report.failures.push({ ...first, workspace: 'child' });
+    const text = formatList(report, { color });
+    expect(text).toMatchSnapshot();
+    expect(text).toContain('not checked (network)');
+    expect(text).toContain('6 packages on registry.npmjs.org: timed out, skipped');
+    expect(text).not.toContain('@example/package-');
+    expect(text).not.toContain('up to date');
+    const details = formatList(report, { details: true });
+    for (const unknown of report.unknown ?? []) expect(details.split(unknown.name)).toHaveLength(2);
+    const html = renderListHtml(report, opts);
+    expect(html).toContain('<strong>6</strong><span class="label">Unknown</span>');
+    expect(html).toContain('6 not checked (network)');
+    expect(html.match(/class="incomplete-row"/g)).toHaveLength(6);
+    for (const unknown of report.unknown ?? [])
+      expect(html.split(`<strong>${unknown.name}</strong>`)).toHaveLength(2);
+  },
+);
+it('prints up to five network failures individually, with specific reasons', () => {
+  const text = formatList(networkReport(5));
+  expect(text.match(/^\? /gm)).toHaveLength(5);
+  expect(text).toContain('@example/package-0: timed out on registry.npmjs.org, skipped');
+});
+it('collapses several access denials, with names only in details and HTML', () => {
+  const report = networkReport(3, 403);
+  const text = formatList(report);
+  expect(text).toContain('3 packages on npm.pkg.github.com: access denied (403), skipped');
+  expect(text).not.toContain('@example/package-');
+  expect(formatList(report, { details: true })).toContain('@example/package-2');
+  const single = networkReport(1, 403);
+  const failure = single.failures[0];
+  if (!failure) throw new Error('missing fixture');
+  failure.name = '@example/svg';
+  expect(formatList(single)).toContain(
+    "@example/svg: access denied (403) on npm.pkg.github.com, your token can't read this package. Skipped.",
+  );
+});
+it('does not collapse failures from different hosts or with different reasons', () => {
+  const report = networkReport(3, 403);
+  report.failures.push(
+    ...networkReport(6).failures.map((f) => ({ ...f, name: f.name.replace('package', 'public') })),
+  );
+  const lines = formatList(report)
+    .split('\n')
+    .filter((line) => line.startsWith('? '));
+  expect(lines).toEqual([
+    '? 3 packages on npm.pkg.github.com: access denied (403), skipped',
+    '? 6 packages on registry.npmjs.org: timed out, skipped',
+  ]);
+});

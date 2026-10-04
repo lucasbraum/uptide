@@ -144,7 +144,7 @@ for (const fixture of ['npm', 'npm-workspaces', 'pnpm', 'yarn', 'yarn-berry']) {
   has(`${manager} check`, check.err, 'done in ');
   expect(`${manager} check: no per-phase progress lines`, !check.err.includes('✔'), check.err);
   // The first screen: a row per dependency, a line per rule with who migrates it, the next commands.
-  has(`${manager} check`, check.out, `uptide check · smoke-${fixture} (${manager}`);
+  has(`${manager} check`, check.out, `uptide check · smoke-${fixture} · ${manager} ·`);
   matches(
     `${manager} check`,
     check.out,
@@ -154,7 +154,7 @@ for (const fixture of ['npm', 'npm-workspaces', 'pnpm', 'yarn', 'yarn-berry']) {
   matches(
     `${manager} check`,
     check.out,
-    /stripe(?: \([^)]+\))?\s+14\.25\.0 → 22\.6\.2\s+major · (?:--target|latest on npm)\s+verified\s+✗ \d+ breaking/,
+    /stripe(?: \([^)]+\))?\s+14\.25\.0 → 22\.6\.2\s+major ×8 · (?:--target|latest on npm)\s+verified\s+✗ \d+ breaking/,
   );
   has(`${manager} check`, check.out, 'New error API (required_error → error)');
   has(`${manager} check`, check.out, 'by rule');
