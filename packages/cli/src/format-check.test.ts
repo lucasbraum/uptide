@@ -73,6 +73,8 @@ const report = (packages: PackageReport[], workspaces = ['.']): CheckReport => (
     notImported: 0,
     partiallyAnalyzed: 0,
     autoFixable: 0,
+    skippedForTime: 0,
+    failed: 0,
   },
 });
 

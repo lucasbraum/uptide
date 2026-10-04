@@ -82,6 +82,8 @@ describe('scoreAgainstTruth', () => {
         notImported: 0,
         partiallyAnalyzed: 0,
         autoFixable: 0,
+        skippedForTime: 0,
+        failed: 0,
       },
     };
     const [score] = scoreAgainstTruth(report, [
@@ -157,6 +159,8 @@ describe('scoreAgainstTruth', () => {
         notImported: 0,
         partiallyAnalyzed: 0,
         autoFixable: 0,
+        skippedForTime: 0,
+        failed: 0,
       },
     };
     const scores = scoreAgainstTruth(report, [

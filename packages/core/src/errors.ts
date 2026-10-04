@@ -97,6 +97,7 @@ export type ErrorCode =
   | 'UNSUPPORTED_LOCKFILE'
   | 'UNSUPPORTED_VERSION_RANGE'
   | 'ANALYSIS_FAILED'
+  | 'TIME_BUDGET'
   | 'RUN_STALE';
 /** Stable across rendering and worker serialization. Human wording is not an API. */
 export class UptideError extends Error {

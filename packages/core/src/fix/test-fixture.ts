@@ -87,6 +87,8 @@ export function zodFixture(scratch: string) {
       notImported: 0,
       partiallyAnalyzed: 0,
       autoFixable: 1,
+      skippedForTime: 0,
+      failed: 0,
     },
     packages: [
       {

@@ -14,6 +14,9 @@ export interface DownstreamSite {
   message: string;
 }
 
+/** `verified`: a migration pack covers the upgrade. `generic`: analysis only, no pack. */
+export type Tier = 'verified' | 'generic';
+
 /** A change joined to one usage of the changed symbol, with severity resolved for that usage. */
 export interface Finding {
   change: Change;
@@ -36,6 +39,8 @@ export interface Finding {
   rule?: string;
   /** Lines the reader needs under the reason: changelog entries with the code they touch. */
   details?: string[];
+  /** What confirms a breaking finding beyond the declaration diff; see `check/tier.ts`. */
+  evidence?: 'compiler' | 'runtime' | 'module-format' | 'removed-export' | 'pack';
 }
 
 /**
@@ -87,6 +92,8 @@ export interface PlanGroup {
 
 export interface PackageReport {
   skipReason?: ErrorCode;
+  /** Set on every report `check` returns. */
+  tier?: Tier;
   /** The migration plan for the findings worth acting on; see `PlanGroup`. */
   plan?: PlanGroup[];
   /**
@@ -198,5 +205,9 @@ export interface CheckReport {
     /** Packages with no finding whose sites were not all analyzed (`partial` and `unknown`). */
     partiallyAnalyzed: number;
     autoFixable: number;
+    /** Dependencies behind that the time budget did not reach (`--max-time`). */
+    skippedForTime: number;
+    /** Dependencies whose analysis failed (registry error, install or analysis failure). */
+    failed: number;
   };
 }

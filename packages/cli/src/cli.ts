@@ -354,6 +354,8 @@ ${EXIT_CODES('no breaking change reaches your code', 'breaking changes found at 
                     notImported: 0,
                     partiallyAnalyzed: 0,
                     autoFixable: 0,
+                    skippedForTime: 0,
+                    failed: 0,
                   },
                 });
                 return EXIT.ok;

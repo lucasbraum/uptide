@@ -17,7 +17,8 @@ const VISIBLE_CONFIDENCE = 0.5;
  * What `fix` would do with a package's findings, without touching a file: the same site list
  * (`selectedFindings`), the pack's own transform as a dry run, the same rule ids as the PR
  * body. A site the transform takes is "by rule"; any other site of a supported upgrade goes
- * to the assisted fixer; without a pack nothing is automated and the site is manual.
+ * to the assisted fixer; without a pack the confirmed breaking sites go to the agent and
+ * everything else is manual.
  */
 export function planPackage(
   p: PackageReport,
@@ -49,7 +50,14 @@ export function planPackage(
         : undefined;
     // A pack's own finding marked manual is a decision, not a site anyone migrates unasked.
     const decision = finding.change.source === 'pack' && finding.fixability === 'manual';
-    const outcome: Outcome = dry?.applied ? 'mechanical' : usable && !decision ? 'agent' : 'manual';
+    // Without a pack, `fix` hands the sites that have evidence to the agent; the rest is a
+    // person's call.
+    const generic = !usable && finding.severity === 'breaking';
+    const outcome: Outcome = dry?.applied
+      ? 'mechanical'
+      : (usable && !decision) || generic
+        ? 'agent'
+        : 'manual';
     const rule =
       finding.rule ??
       dry?.rule ??
@@ -122,6 +130,8 @@ const emptySummary = {
   notImported: 0,
   partiallyAnalyzed: 0,
   autoFixable: 0,
+  skippedForTime: 0,
+  failed: 0,
 };
 
 /** `ZodString#email` as the consumer writes it: `.email`. A top-level name stays as it is. */

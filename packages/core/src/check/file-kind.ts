@@ -22,7 +22,9 @@ export function arbitrateUnchecked(
     if (f.change.path.startsWith('runtime:')) return f;
     if (f.severity !== 'breaking' && f.severity !== 'unverified') return f;
     const hit =
-      runtime && !runtime.inconclusive ? confirms(f.usage, runtime.changes, loadRoot) : undefined;
+      runtime && !runtime.inconclusive
+        ? runtimeConfirms(f.usage, runtime.changes, loadRoot)
+        : undefined;
     if (hit) {
       return {
         ...f,
@@ -64,7 +66,7 @@ export function arbitrateUnchecked(
 }
 
 /** The runtime change this site would hit, if any. */
-function confirms(
+export function runtimeConfirms(
   usage: Usage,
   changes: RuntimeChange[],
   loadRoot: string | undefined,

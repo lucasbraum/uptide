@@ -66,3 +66,51 @@ export function importedByText(
   walk(dir);
   return [...found].sort();
 }
+
+/**
+ * In how many of the repository's own source files each of `names` is imported: the cheap
+ * stand-in for call sites that ranks dependencies before any of them is analyzed.
+ */
+export function importFileCounts(root: string, names: readonly string[]): Map<string, number> {
+  const counts = new Map<string, number>(names.map((n) => [n, 0]));
+  if (names.length === 0) return counts;
+  const escaped = names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+  const pattern = new RegExp(
+    `(?:\\bfrom\\s*|\\bimport\\s*\\(?\\s*|\\brequire\\s*\\(\\s*|\\bimport\\s+)["'](${escaped})(?:\\/[^"']*)?["']`,
+    'g',
+  );
+  const walk = (at: string): void => {
+    let entries: string[];
+    try {
+      entries = readdirSync(at);
+    } catch {
+      return;
+    }
+    for (const name of entries) {
+      if (SKIPPED.has(name)) continue;
+      const path = join(at, name);
+      let directory = false;
+      try {
+        directory = statSync(path).isDirectory();
+      } catch {
+        continue;
+      }
+      if (directory) {
+        walk(path);
+        continue;
+      }
+      if (!SOURCE.test(name) || /\.d\.[cm]?ts$/.test(name)) continue;
+      let text: string;
+      try {
+        text = readFileSync(path, 'utf8');
+      } catch {
+        continue;
+      }
+      const inFile = new Set<string>();
+      for (const match of text.matchAll(pattern)) if (match[1]) inFile.add(match[1]);
+      for (const name of inFile) counts.set(name, (counts.get(name) ?? 0) + 1);
+    }
+  };
+  walk(resolve(root));
+  return counts;
+}
