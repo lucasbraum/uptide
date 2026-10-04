@@ -29,10 +29,13 @@ tests. Everything below is real output from it.
 
 ```console
 $ npx uptide check
-uptide check · storefront (pnpm, 2 packages) · 8.3s
+uptide check · storefront (pnpm, 2 packages) · 10s
 
-zod                    3.25.76 → 4.6.5    major · latest on npm   ✗ 28 breaking in 7 files    24 by rule · 4 by agent
-stripe (packages/api)  14.25.0 → 23.0.0   major · latest on npm   ✗ 4 breaking in 3 files     1 by rule · 3 by agent
+zod                    3.25.76 → 4.6.5    major · latest on npm   verified   ✗ 28 breaking in 7 files    24 by rule · 4 by agent
+stripe (packages/api)  14.25.0 → 23.0.0   major · latest on npm   verified   ✗ 4 breaking in 3 files     1 by rule · 3 by agent
+vitest                 3.2.4 → 5.0.3      major · latest on npm   generic    ✓ no impact (9 call sites)
+
+verified: migration pack · generic: no pack, breaking only if the compiler or the runtime probe confirms it
 
 zod
   ✗ New error API (required_error → error)   24 sites          by rule
@@ -49,7 +52,31 @@ stripe
 Next
   npx uptide fix --only zod       migrate on a new branch, verify, no push
   npx uptide fix --only stripe    migrate on a new branch, verify, no push
+  npx uptide plan                 the order to upgrade in, with the effort
   npx uptide check --details      every site and reason
+```
+
+`check` looks at every direct dependency that is behind, the ones most likely to hurt
+first, for a minute (`--max-time`); what it did not reach is listed with the command that
+includes it. `uptide plan` turns the same analysis into an order to upgrade in:
+
+```console
+$ npx uptide plan
+uptide plan · storefront (pnpm, 2 packages) · 10s
+
+1  vitest 3.2.4 → 5.0.3   generic
+   no code changes expected
+
+2  stripe 14.25.0 → 23.0.0   verified
+   small · 4 sites: 1 by rule, 3 by agent
+   npx uptide fix --only stripe
+
+3  zod 3.25.76 → 4.6.5   verified
+   small · 28 sites: 24 by rule, 4 by agent
+   npx uptide fix --only zod
+
+verified: migration pack · generic: no pack, breaking only if the compiler or the runtime probe confirms it
+Effort is an estimate from the findings: none (nothing affected), small (rules, or up to 5 sites by hand or agent), medium (up to 25), large (more).
 ```
 
 **After: `fix`**, one dependency at a time, each on its own verified branch:
@@ -102,16 +129,18 @@ repository already had are subtracted, never blamed on the upgrade.
 
 ## What is supported
 
+Every dependency is checked. What differs is how much Uptide knows about it:
+
 | Tier | Dependencies | What you get |
 | --- | --- | --- |
-| **Verified** | zod 3 → 4, stripe 14 and newer | `check` with a migration plan per change, `fix` with rules written for that dependency, behavior checks (zod schemas compared on generated inputs; Stripe changelog filtered to what you call), a reviewed pull request body |
-| **Generic** | any other dependency, with `--only <package>` | `check` only: the API diff between the two versions, your usages of what changed, and the compiler's errors against the target. No migrations. |
+| **Verified** | zod 3 → 4, stripe 14 and newer | A migration pack: rules written for that dependency, a guide for the agent, behavior checks (zod schemas compared on generated inputs; Stripe changelog filtered to what you call), and ground truth the pack is scored against. `fix` migrates by rule first, by agent for the rest. |
+| **Generic** | any other dependency | The same analysis without a pack. A finding is called breaking only when your compiler or the runtime probe confirms it, or when it is a `require()` of an ESM-only package or an import of a removed export; everything else is in `--details`. `fix` migrates with the agent alone, under the same verification, and says so in the pull request. |
 
-Verified means a migration pack exists: rules, a guide for the assisted fixer, and ground
-truth from a real upgrade that the pack is scored against. Generic is the same analysis
-without that knowledge; it is frozen while the packs mature
-([decision](docs/decisions/0010-check-freeze.md)), and generic *migrations* are planned,
-not shipped.
+The tier is on every row of `check`, in the HTML report and in the pull request. A generic
+`fix` needs `ANTHROPIC_API_KEY` (there are no rules to fall back on; without a key it says
+so and changes nothing), stops at `--max-cost` (default $1) and reports what it did not
+attempt. Its pull request opens with a note that no pack covers the package: every edit
+was kept on the compiler's word and deserves a careful review.
 
 - **Languages:** TypeScript, and JavaScript the compiler can see (`allowJs`).
 - **Package managers:** `check` on npm, pnpm (workspaces and catalogs), Yarn classic and
@@ -129,7 +158,8 @@ and, there:
    produces the lockfile, with lifecycle scripts disabled; a lockfile change outside the
    upgraded dependency's subtree is rejected.
 3. **Rule-based fixes.** Deterministic rewrites, only at the sites `check` reported.
-4. **Assisted fixes (optional).** Sites no rule covers go to the LLM one at a time. A patch
+4. **Assisted fixes (optional; all there is for a generic package).** Sites no rule covers
+   go to the LLM one at a time. A patch
    is kept only if it removes its compiler error, introduces none, and passes the pack's
    own validator; otherwise it is reverted and the site is left for you.
 5. **Verifies.** Type-checks with *your* TypeScript and subtracts the baseline; runs the
@@ -172,6 +202,14 @@ Without a key, or with `--no-llm`, those sites are listed for you instead. The f
 For scripts and CI: **0** nothing breaking, **1** breaking changes found,
 **2** uptide could not answer (bad arguments, unsupported repository, no network). When
 it cannot answer, it says why and prints the exact command to run next.
+
+One dependency failing (a registry error, an analysis that ran out of memory) does not
+empty the report: the others are shown and the failed one is named with its reason. The
+exit code is then 1 if anything breaking was found, else 2, because the question was not
+fully answered. Dependencies left out by `--max-time` are listed and do not change the
+exit code; use `--max-time 0` or `--only` when a script needs every answer. `fix` and
+`verify` exit 0 when the migration verifies and 1 when it does not; `plan` exits 0 with a
+plan.
 
 ## Documentation
 

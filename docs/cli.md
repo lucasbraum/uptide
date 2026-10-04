@@ -7,7 +7,8 @@ cannot show.
 
 | Flag | Meaning |
 | --- | --- |
-| `--only zod,stripe` | dependencies to check (the default); `--only all` checks every dependency |
+| `--only zod,stripe` | dependencies to check, with no time limit; default: every direct dependency that is behind |
+| `--max-time 300` | seconds after which no new dependency is started; `0` for no limit; default 60 (none with `--only`) |
 | `--target zod@4.6.5` | exact target, repeatable; default is `latest` |
 | `--details` | every site, reason, compiler message and analysis note |
 | `--verbose` | one progress line per analysis phase, with timings |
@@ -19,9 +20,53 @@ Exit codes, for scripts and CI: **0** nothing breaking, **1** breaking changes f
 **2** uptide could not answer (bad arguments, unsupported repository, no network). When
 it cannot answer, it says why and prints the exact command to run next.
 
+### What is checked, and in what order
+
+With no `--only`, every direct dependency that is behind its latest version is a candidate.
+They are analyzed in order of likely impact: major upgrades first, then the dependencies
+imported in the most files. After `--max-time` no new dependency is started; one that is
+still being analyzed gets half the budget again to finish. In a workspace repository the
+workspaces that import the most of what is behind go first, and a workspace the budget
+does not reach is not loaded at all. Whatever was left out is listed under "Not analyzed"
+with the two commands that include it (`--only <names>`, a larger `--max-time`).
+
+### Tiers
+
+Every row says `verified` or `generic`. Verified: a migration pack covers the upgrade.
+Generic: no pack; a finding is breaking only with evidence, which `--details` names under
+each site:
+
+- your code does not compile against the target at that site;
+- the runtime probe loaded the target and the export is gone or changed;
+- a `require()` of a package whose target is ESM-only;
+- the import of a name the target no longer exports.
+
+Everything else the declaration diff suggests is listed as unverified in `--details` and
+counted on the first screen only as "N unconfirmed".
+
+### Partial results
+
+A dependency whose analysis fails (the registry refuses, a tarball cannot be fetched, a
+workspace runs out of memory) is listed under "Not analyzed" with the reason, and the
+others are reported as usual. Large workspaces need memory: each analysis thread may use
+4 GB, more when the machine has it, and `UPTIDE_WORKER_HEAP_MB` sets the limit.
+
 While it runs, a terminal shows one live line with the current phase, which disappears
 when the work ends; `--verbose` keeps one line per phase with timings. In a pipe or with
 `--ci`, stderr gets a start line and the final timing. The report is on stdout.
+
+## `uptide plan`
+
+`check`, then the order to act on it. Takes `--only`, `--max-time`, `--json`, `--html`.
+
+1. Dependencies whose upgrade touches nothing in your code share the first step.
+2. The rest follow from the least work to the most.
+3. Peer ranges override both: a package goes after the peer its target needs, two packages
+   whose targets need each other share a step, and a range nothing in the plan satisfies is
+   printed as blocked.
+
+Effort is read off the findings: `none` (nothing affected), `small` (rules do it, or up to
+5 sites for the agent or a person), `medium` (up to 25), `large` (more). It is an estimate.
 
 ### A shareable HTML report
 
@@ -43,6 +88,21 @@ with VS Code file links. Missing or out-of-repository files are disclosed instea
 Long lines/excerpts and very large reports are trimmed with a notice to keep the file
 below 300 KB. Review excerpts before sharing. `--open` never opens a browser in CI or
 when output is redirected; `--open` requires `--html`.
+
+## `uptide fix` for a generic dependency
+
+`uptide fix --only <any dependency>` works without a pack: there are no rules, so every
+site with evidence goes to the agent, one at a time, and an edit is kept only if that
+site's compiler error disappears and no new one appears. The verification and the publish
+gate are the same as for a verified dependency.
+
+- It needs `ANTHROPIC_API_KEY`. Without one, or with `--no-llm`, it says what it cannot do
+  and exits before creating a clone, a branch or an install.
+- `--max-cost <usd>` (default 1) stops the agent once its calls have cost that much. Sites
+  not attempted stay manual, the summary and the pull request say how many, and a run with
+  sites left does not verify, so it cannot be published.
+- The pull request opens with a note that no migration pack covers the package, and its
+  risk is never Low.
 
 ## `uptide fix`, step by step
 

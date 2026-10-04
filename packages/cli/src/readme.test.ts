@@ -58,7 +58,7 @@ describe('README', () => {
 
   it('documents only flags the CLI accepts', async () => {
     const help: string[] = [];
-    for (const command of ['check', 'fix', 'pr', 'verify', 'clean']) {
+    for (const command of ['check', 'plan', 'fix', 'pr', 'verify', 'clean']) {
       const io = memoryIo();
       await run([command, '--help'], io, fakeEngine());
       help.push(io.stdout());
