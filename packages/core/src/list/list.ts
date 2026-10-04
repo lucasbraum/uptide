@@ -7,13 +7,18 @@ import { compareVersions, parseVersion } from '../check/version.js';
 import type { LanguageAdapter } from '../domain/adapter.js';
 import type { PackageFetcher } from '../domain/io.js';
 import type { Tier } from '../domain/report.js';
-import { createNpmFetcher } from '../fetch/npm-fetcher.js';
-import { loadRegistryConfig } from '../fetch/npmrc.js';
+import { errorCode } from '../errors.js';
+import { loadRegistryConfig, registryFor } from '../fetch/npmrc.js';
 import { stripePack } from '../packs/stripe/index.js';
 import { zodPack } from '../packs/zod/index.js';
-
-import { installedManifest, type Manifest, toolingReasons } from './evidence.js';
+import { installedManifest, type Manifest, toolingReasons, UNUSED_REASON } from './evidence.js';
 import { dependencyGroups } from './groups.js';
+import {
+  createDiscoveryFetcher,
+  DiscoveryRegistryError,
+  registryFailure,
+  registryHost,
+} from './registry.js';
 import { scanImports } from './scan.js';
 
 const compareText = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
@@ -48,7 +53,7 @@ export interface ListReport {
   workspaces: string[];
   packages: ListedDependency[];
   groups: ListGroup[];
-  failures: { name: string; workspace?: string; reason: string }[];
+  failures: { name: string; workspace?: string; reason: string; kind?: 'registry' }[];
   timing: { totalMs: number };
 }
 export interface ListOptions {
@@ -63,8 +68,8 @@ export interface ListOptions {
 export async function listDependencies(opts: ListOptions): Promise<ListReport> {
   const start = Date.now();
   const adapter = opts.adapter ?? typescriptAdapter;
-  const fetcher =
-    opts.fetcher ?? createNpmFetcher({ config: loadRegistryConfig({ cwd: opts.cwd }) });
+  const config = loadRegistryConfig({ cwd: opts.cwd });
+  const fetcher = opts.fetcher ?? createDiscoveryFetcher({ cwd: opts.cwd, config });
   const workspaces = ((await adapter.workspacePackages?.({ dir: opts.cwd })) ?? ['.']).sort();
   const workspaceNames = new Set(
     workspaces
@@ -76,6 +81,23 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
       .filter(Boolean),
   );
   const failures: ListReport['failures'] = [];
+  const blocked = new Set<string>();
+  const fail = (name: string, error: unknown, context = ''): void => {
+    const code = errorCode(error);
+    const registry =
+      error instanceof DiscoveryRegistryError ||
+      code.startsWith('REGISTRY_') ||
+      code === 'PACKAGE_NOT_FOUND' ||
+      code === 'VERSION_NOT_FOUND';
+    if (code === 'REGISTRY_AUTH' || code === 'REGISTRY_UNREACHABLE') blocked.add(name);
+    failures.push({
+      name,
+      ...(registry ? { kind: 'registry' as const } : {}),
+      reason: registry
+        ? registryFailure(error, registryHost(registryFor(name, config)))
+        : `${context}${error instanceof Error ? error.message : String(error)}`,
+    });
+  };
   const manifests: Manifest[] = [];
   const declared = new Map<string, Map<string, string[]>>();
   for (const workspace of workspaces) {
@@ -113,44 +135,63 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
     }
   }
   const names = [...declared.keys()].sort();
-  const configs: string[] = manifests.map((m) =>
-    JSON.stringify({
-      ...m,
-      scripts: undefined,
-      dependencies: undefined,
-      devDependencies: undefined,
-      optionalDependencies: undefined,
-      peerDependencies: undefined,
-    }),
-  );
-  const usage = scanImports(opts.cwd, names, workspaces, configs);
+  const configs: string[] = [];
+  const fileEvidence = new Map<string, string[]>();
+  const usage = scanImports(opts.cwd, names, workspaces, configs, fileEvidence);
   const scripts = manifests.flatMap((m) => Object.values(m.scripts ?? {})).join('\n');
   const metadata = new Map<string, Manifest[]>();
+  const targets = new Map<string, Manifest>();
+  const latestVersions = new Map<string, string>();
   await mapWithLimit(names, 12, async (name) => {
     const items: Manifest[] = [];
+    const missing: string[] = [];
     for (const [version, locations] of declared.get(name) ?? []) {
       const local = locations
         .map((w) => installedManifest(opts.cwd, w, name))
         .filter((m): m is Manifest => !!m && (!m.version || m.version === version));
       if (local.length) items.push(...local);
-      else if (fetcher.metadata) {
-        try {
-          items.push(await fetcher.metadata(name, version));
-        } catch (error) {
-          failures.push({
-            name,
-            reason: `tooling/peer metadata unavailable: ${error instanceof Error ? error.message : String(error)}`,
-          });
-        }
-      }
+      else missing.push(version);
     }
     metadata.set(name, items);
+    // Complete each package independently: a slow private host cannot hold public results
+    // behind a metadata barrier until the shared network budget expires.
+    if (!opts.only || opts.only.includes(name)) {
+      try {
+        const latest = await fetcher.resolve(name, 'latest');
+        latestVersions.set(name, latest);
+        if (
+          fetcher.metadata &&
+          [...(declared.get(name)?.keys() ?? [])].some(
+            (current) => compareVersions(latest, current) > 0,
+          )
+        ) {
+          try {
+            targets.set(name, await fetcher.metadata(name, latest));
+          } catch (error) {
+            fail(name, error, 'target peer metadata unavailable: ');
+          }
+        }
+      } catch (error) {
+        fail(name, error);
+      }
+    }
+    for (const version of missing) {
+      if (!fetcher.metadata || blocked.has(name)) break;
+      try {
+        items.push(await fetcher.metadata(name, version));
+      } catch (error) {
+        fail(name, error, 'tooling/peer metadata unavailable: ');
+      }
+    }
   });
   const configText = configs.join('\n');
   const reasons = new Map(
     names.map((name) => [
       name,
-      toolingReasons(name, metadata.get(name) ?? [], scripts, configText),
+      [
+        ...toolingReasons(name, metadata.get(name) ?? [], scripts, configText, manifests),
+        ...(fileEvidence.get(name) ?? []),
+      ],
     ]),
   );
   // Peers of used packages (including up-to-date ones) are required without source imports.
@@ -173,70 +214,54 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
     if (runtime === 'node' || needed.has(runtime))
       (reasons.get(name) as string[]).push(`types for ${runtime}`);
   }
-  const targets = new Map<string, Manifest>();
-  const packages = (
-    await mapWithLimit(
-      names.filter((name) => !opts.only || opts.only.includes(name)),
-      12,
-      async (name): Promise<ListedDependency[]> => {
-        try {
-          const latest = await fetcher.resolve(name, 'latest');
-          if (
-            fetcher.metadata &&
-            [...(declared.get(name)?.keys() ?? [])].some(
-              (current) => compareVersions(latest, current) > 0,
-            )
-          ) {
-            try {
-              targets.set(name, await fetcher.metadata(name, latest));
-            } catch (error) {
-              failures.push({
-                name,
-                reason: `target peer metadata unavailable: ${error instanceof Error ? error.message : String(error)}`,
-              });
-            }
-          }
-          return [...(declared.get(name) ?? [])]
-            .filter(([current]) => compareVersions(latest, current) > 0)
-            .map(([current, declaredWorkspaces]) => {
-              const from = parseVersion(current) ?? { major: 0, minor: 0, patch: 0 };
-              const to = parseVersion(latest) ?? { major: 0, minor: 0, patch: 0 };
-              const scanned = usage.get(name);
-              return {
-                name,
-                current,
-                latest,
-                change: to.major > from.major ? 'major' : to.minor > from.minor ? 'minor' : 'patch',
-                majorGap: Math.max(0, to.major - from.major),
-                classification: scanned?.files.length
-                  ? 'used'
-                  : reasons.get(name)?.length
-                    ? 'tooling'
-                    : 'possibly-unused',
-                reasons: reasons.get(name) ?? [],
-                tier: tierOf([zodPack, stripePack], name, current, latest),
-                workspaces: declaredWorkspaces,
-                usage: {
-                  files: scanned?.files.length ?? 0,
-                  callSites: scanned?.callSites ?? 0,
-                  references: scanned?.references ?? 0,
-                  ...(opts.details ? { fileList: scanned?.files ?? [] } : {}),
-                  workspaces: scanned?.workspaces.sort() ?? [],
-                  topSymbols: Object.entries(scanned?.symbols ?? {})
-                    .filter(([, count]) => count > 0)
-                    .sort(([a, ac], [b, bc]) => bc - ac || compareText(a, b))
-                    .slice(0, 5)
-                    .map(([name, count]) => ({ name, count })),
-                },
-              };
-            });
-        } catch (error) {
-          failures.push({ name, reason: error instanceof Error ? error.message : String(error) });
-          return [];
-        }
-      },
-    )
-  ).flat();
+  const packages = names
+    .filter((name) => !opts.only || opts.only.includes(name))
+    .flatMap((name): ListedDependency[] => {
+      const latest = latestVersions.get(name);
+      if (!latest || blocked.has(name)) return [];
+      return [...(declared.get(name) ?? [])]
+        .filter(([current]) => compareVersions(latest, current) > 0)
+        .map(([current, declaredWorkspaces]) => {
+          const from = parseVersion(current) ?? { major: 0, minor: 0, patch: 0 };
+          const to = parseVersion(latest) ?? { major: 0, minor: 0, patch: 0 };
+          const scanned = usage.get(name);
+          return {
+            name,
+            current,
+            latest,
+            change: to.major > from.major ? 'major' : to.minor > from.minor ? 'minor' : 'patch',
+            majorGap: Math.max(0, to.major - from.major),
+            classification: scanned?.files.length
+              ? 'used'
+              : reasons.get(name)?.length
+                ? 'tooling'
+                : 'possibly-unused',
+            reasons:
+              !scanned?.files.length && !reasons.get(name)?.length
+                ? [
+                    UNUSED_REASON,
+                    ...(failures.some((f) => f.name === name)
+                      ? ['tooling/peer metadata incomplete; install dependencies and scan again']
+                      : []),
+                  ]
+                : (reasons.get(name) ?? []),
+            tier: tierOf([zodPack, stripePack], name, current, latest),
+            workspaces: declaredWorkspaces,
+            usage: {
+              files: scanned?.files.length ?? 0,
+              callSites: scanned?.callSites ?? 0,
+              references: scanned?.references ?? 0,
+              ...(opts.details ? { fileList: scanned?.files ?? [] } : {}),
+              workspaces: scanned?.workspaces.sort() ?? [],
+              topSymbols: Object.entries(scanned?.symbols ?? {})
+                .filter(([, count]) => count > 0)
+                .sort(([a, ac], [b, bc]) => bc - ac || compareText(a, b))
+                .slice(0, 5)
+                .map(([name, count]) => ({ name, count })),
+            },
+          };
+        });
+    });
   packages.sort(
     (a, b) =>
       Number(b.change === 'major') - Number(a.change === 'major') ||
@@ -254,7 +279,7 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
     workspaces,
     packages,
     groups,
-    failures,
+    failures: [...new Map(failures.map((failure) => [failure.name, failure])).values()],
     timing: { totalMs: Date.now() - start },
   };
 }

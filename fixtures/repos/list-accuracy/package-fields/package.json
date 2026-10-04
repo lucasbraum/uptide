@@ -1,0 +1,40 @@
+{
+  "name": "synthetic-package-fields",
+  "private": true,
+  "dependencies": {
+    "husky": "1.0.0",
+    "lint-staged": "1.0.0",
+    "commitizen": "1.0.0",
+    "cz-example": "1.0.0",
+    "prettier": "1.0.0",
+    "eslint": "1.0.0",
+    "@babel/core": "1.0.0",
+    "jest": "1.0.0",
+    "browserslist": "1.0.0",
+    "stylelint": "1.0.0",
+    "orphan": "1.0.0"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged"
+    }
+  },
+  "lint-staged": {
+    "*.js": [
+      "prettier --write"
+    ]
+  },
+  "config": {
+    "commitizen": {
+      "path": "./node_modules/cz-example"
+    }
+  },
+  "prettier": {},
+  "eslintConfig": {},
+  "babel": {},
+  "jest": {},
+  "browserslist": [
+    "last 2 versions"
+  ],
+  "stylelint": {}
+}

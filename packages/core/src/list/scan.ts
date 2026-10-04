@@ -28,6 +28,7 @@ export function scanImports(
   names: string[],
   workspaces: string[],
   configs?: string[],
+  evidence?: Map<string, string[]>,
 ): Map<string, ImportUsage> {
   const result = new Map<string, ImportUsage>();
   const wanted = new Set(names);
@@ -47,12 +48,70 @@ export function scanImports(
         walk(path);
         continue;
       }
-      if (isConfig(entry.name)) {
-        configs?.push(readFileSync(path, 'utf8'));
+      const file = relative(root, path).replaceAll('\\', '/');
+      if (isConfig(file)) {
+        const text = readFileSync(path, 'utf8');
+        if (/(?:^|\/)\.husky\//.test(file)) configs?.push(text.replace(/^\s*#.*$/gm, ''));
+        else {
+          // Read literals without executing configs or counting comments as evidence.
+          const scanner = ts.createScanner(
+            ts.ScriptTarget.Latest,
+            true,
+            ts.LanguageVariant.Standard,
+            text,
+          );
+          const literals: string[] = [];
+          for (
+            let token = scanner.scan();
+            token !== ts.SyntaxKind.EndOfFileToken;
+            token = scanner.scan()
+          )
+            if (
+              token === ts.SyntaxKind.StringLiteral ||
+              token === ts.SyntaxKind.NoSubstitutionTemplateLiteral
+            )
+              literals.push(scanner.getTokenValue());
+          configs?.push(literals.join('\n'));
+        }
+        continue;
+      }
+      if (/\.(?:scss|sass|less|css|html?)$/i.test(entry.name)) {
+        const text = readFileSync(path, 'utf8');
+        const add = (specifier: string, reason: string): void => {
+          const clean = specifier.replace(/^~/, '').replace(/^(?:\.\.?\/|\/)*node_modules\//, '');
+          const name = packageOf(clean);
+          if (name) {
+            const reasons = evidence?.get(name) ?? [];
+            if (!reasons.includes(reason)) reasons.push(reason);
+            evidence?.set(name, reasons);
+          }
+        };
+        if (/\.html?$/i.test(entry.name)) {
+          const html = text.replace(/<!--[\s\S]*?-->/g, '');
+          for (const tag of html.matchAll(/<(script|link)\b[^>]*>/gi)) {
+            const attr = tag[1]?.toLowerCase() === 'script' ? 'src' : 'href';
+            const value = tag[0].match(
+              new RegExp(`\\s${attr}\\s*=\\s*(?:"([^"<>]*)"|'([^'<>]*)'|([^\\s>]+))`, 'i'),
+            );
+            const url = value?.[1] ?? value?.[2] ?? value?.[3];
+            if (url && /^(?:\.\.?\/|\/)*node_modules\//.test(url))
+              add(url, 'referenced by HTML assets');
+          }
+        } else {
+          const styles = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+          for (const rule of styles.matchAll(/@(import|use|forward)\s+([^;\n]+)/gi)) {
+            const specifiers = (rule[2] ?? '').matchAll(
+              /(?:^|,)\s*(?:\([^)]*\)\s*)?(?:url\(\s*(?:"([^"]+)"|'([^']+)'|([^\s)"']+))\s*\)|"([^"]+)"|'([^']+)')/g,
+            );
+            for (const value of specifiers) {
+              add(value.slice(1).find(Boolean) ?? '', 'referenced by stylesheet imports');
+              if (rule[1]?.toLowerCase() !== 'import') break;
+            }
+          }
+        }
         continue;
       }
       if (!/\.[cm]?[jt]sx?$/.test(entry.name) || /\.d\.[cm]?ts$/.test(entry.name)) continue;
-      const file = relative(root, path).replaceAll('\\', '/');
       const workspace =
         [...workspaces]
           .sort((a, b) => b.length - a.length)

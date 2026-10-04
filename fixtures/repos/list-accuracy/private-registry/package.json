@@ -1,0 +1,8 @@
+{
+  "name": "synthetic-private-registry",
+  "private": true,
+  "dependencies": {
+    "@example/one": "1.0.0",
+    "@example/two": "1.0.0"
+  }
+}

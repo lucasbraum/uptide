@@ -40,6 +40,7 @@ export function groupVersions(group: ListGroup): string {
   };
   return `→ ${range()}`;
 }
+export const UNUSED_HINT = "no usage found by Uptide's scan; verify before removing";
 export const listSymbols = (p: ListedDependency): string =>
   p.usage.topSymbols
     .filter((s) => s.count > 0)
@@ -131,6 +132,8 @@ export function formatList(report: ListReport, opts: FormatListOptions = {}): st
   const rows = new Map(shown.map((p, i) => [`${p.name}@${p.current}`, formatted[i] as string]));
   const row = (p: ListedDependency): void => {
     lines.push(rows.get(`${p.name}@${p.current}`) ?? '');
+    if (p.classification === 'tooling' || p.classification === 'possibly-unused')
+      for (const reason of p.reasons) lines.push(c.dim(ellipsis(`    ${reason}`, width)));
     if (opts.details && listSymbols(p))
       lines.push(c.dim(ellipsis(`    symbols  ${listSymbols(p)}`, width)));
     if (opts.details && p.usage.fileList?.length)
@@ -167,7 +170,7 @@ export function formatList(report: ListReport, opts: FormatListOptions = {}): st
   }
   for (const [label, packages, hint] of [
     ['TOOLING', tooling, 'used by scripts and config'],
-    ['POSSIBLY UNUSED', unused, 'no source or tooling usage found'],
+    ['POSSIBLY UNUSED', unused, UNUSED_HINT],
   ] as const) {
     if (!packages.length) continue;
     lines.push(
@@ -182,7 +185,8 @@ export function formatList(report: ListReport, opts: FormatListOptions = {}): st
   }
   if (!report.packages.length && !report.failures.length)
     lines.push('Every direct dependency is up to date.', '');
-  for (const f of report.failures) lines.push(`? ${f.name}: ${f.reason}`);
+  for (const f of new Map(report.failures.map((f) => [f.name, f])).values())
+    lines.push(`? ${f.name}: ${f.reason}`);
   lines.push(
     c.dim('Usage is a syntax scan, no type analysis.'),
     c.dim('Generic analysis is the default; verified means a migration pack is available.'),

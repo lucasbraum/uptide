@@ -1,0 +1,27 @@
+{
+  "webpack-cli": {
+    "bin": {
+      "webpack": "bin/cli.js"
+    }
+  },
+  "http-server": {
+    "bin": {
+      "http-server": "bin/cli.js"
+    }
+  },
+  "lint-staged": {
+    "bin": {
+      "lint-staged": "bin/cli.js"
+    }
+  },
+  "husky": {
+    "bin": {
+      "husky": "bin/cli.js"
+    }
+  },
+  "commitizen": {
+    "bin": {
+      "cz": "bin/cli.js"
+    }
+  }
+}

@@ -28,10 +28,12 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "ini": "^5.0.0",
     "semver": "^7.8.5",
     "ts-morph": "^28.0.0"
   },
   "devDependencies": {
+    "@types/ini": "^4.1.1",
     "@types/node": "^22.0.0",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",

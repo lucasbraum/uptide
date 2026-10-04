@@ -63,7 +63,16 @@ kind and major gap, verified/generic tier, importing files, calls, references an
 Workspace columns appear only in workspaces. Top symbols require `--details`; terminal
 columns fit the available width, and only verified packages carry a tier tag. Minor/patch upgrades, tooling and possibly
 unused packages are collapsed; `--all` expands them. Tools used by scripts/configs, runtime
-types and required peers are classified separately from possibly unused packages.
+types and required peers are classified separately from possibly unused packages. This includes
+package.json tool settings, installed bin names, gulp/Karma and hook configs, stylesheet
+imports and HTML assets under node_modules. Expanded rows explain the evidence; “possibly
+unused” means no usage was found by Uptide's scan, so verify before removing.
+
+Registry settings use environment overrides, project and user `.npmrc` files, scoped
+registries and host/path-scoped credentials. Discovery has an 800 ms total network budget,
+no retries and no registry cache writes; local scanning adds its own runtime. Auth failures
+produce one host-only message per package and one Incomplete HTML row. Successful packages
+remain visible; incomplete discovery exits 2. Analysis commands retain their normal retry policy.
 `--json` gives every row. `--html [--open]` creates a report styled like check, with copyable
 commands and no source code or file paths by default; `--details` adds file lists.
 Usage is syntactic: indirect aliases and reflection are not followed. With different locked

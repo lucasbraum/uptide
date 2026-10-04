@@ -1,0 +1,16 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`collapses possibly unused with cautious wording and explains rows on expansion 1`] = `
+"uptide list
+
+12 outdated   12 major   0 minor   0 groups   11 tooling
+
+TOOLING  11 packages, used by scripts and config · --all
+
+POSSIBLY UNUSED  1 package, no usage found by Uptide's scan; verify before removing · --all
+
+Usage is a syntax scan, no type analysis.
+Generic analysis is the default; verified means a migration pack is available.
+Next  uptide check babel-plugin-example
+"
+`;
