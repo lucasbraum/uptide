@@ -44,7 +44,21 @@ const DURATIONS = [
 ] as const;
 export const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 export const NAME_PATTERN = /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/;
+// Keep this small: the detached sender must not import the analysis engine.
+export const TELEMETRY_MODELS: Record<string, readonly string[]> = {
+  anthropic: [
+    'claude-sonnet-4-6',
+    'claude-sonnet-5-5',
+    'claude-opus-5-5',
+    'claude-fable-5-1',
+    'claude-haiku-4-5-20251001',
+  ],
+  openai: ['gpt-6.1-sol', 'gpt-6-astra', 'gpt-6-luna', 'gpt-5-pro'],
+  gemini: ['gemini-3.1-pro-preview', 'gemini-3.8-flash', 'gemini-3.7-flash'],
+};
 export interface Metrics {
+  provider?: string;
+  model?: string;
   repo?: string;
   packages?: { name: string; versions: string[] }[];
   counts?: Partial<Record<(typeof COUNTS)[number], number>>;
@@ -55,6 +69,8 @@ export interface Metrics {
 export interface Event {
   event: 'uptide_cli_run';
   properties: {
+    provider?: string;
+    model?: string;
     schema_version: 1;
     distinct_id: string;
     repo_hash: string | null;
@@ -124,6 +140,15 @@ export function sanitizeEvent(input: unknown, publicVersion: PublicVersion): Eve
   return {
     event: 'uptide_cli_run',
     properties: {
+      ...(typeof p.provider === 'string' && Object.hasOwn(TELEMETRY_MODELS, p.provider)
+        ? {
+            provider: p.provider,
+            model:
+              typeof p.model === 'string' && TELEMETRY_MODELS[p.provider]?.includes(p.model)
+                ? p.model
+                : 'custom',
+          }
+        : {}),
       schema_version: 1,
       distinct_id: p.distinct_id,
       repo_hash: typeof p.repo_hash === 'string' && HASH.test(p.repo_hash) ? p.repo_hash : null,
@@ -160,6 +185,8 @@ export function buildEvent(
   return sanitizeEvent(
     {
       properties: {
+        provider: metrics.provider,
+        model: metrics.model,
         distinct_id: settings.installId,
         repo_hash: hash,
         command,

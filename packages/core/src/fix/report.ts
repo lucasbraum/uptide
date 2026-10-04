@@ -701,9 +701,13 @@ export function renderMigration(
     review.push(
       `- The repository's lint (${l.tool}) fails on the edited files; fix it before merging (see verification details).`,
     );
+  if (report.llm.unreportedCostUsd)
+    review.push(
+      `- Unreported API usage: $${report.llm.unreportedCostUsd.toFixed(6)} reserved against the budget (actual spend unknown).`,
+    );
   if (report.llm.costLimit)
     review.push(
-      `- The agent stopped at the cost limit of $${report.llm.costLimit.limitUsd.toFixed(2)} (\`--max-cost\`): ${count(report.llm.costLimit.notAttempted, 'site')} not attempted. Run again with a higher limit to continue.`,
+      `- The agent stopped at the cost limit of $${report.llm.costLimit.limitUsd.toFixed(2)} (\`--max-cost\`): ${count(report.llm.costLimit.notAttempted, 'site')} not completed. Run again with a higher limit to continue.`,
     );
   for (const s of report.sites.filter((s) => s.outcome === 'manual'))
     review.push(

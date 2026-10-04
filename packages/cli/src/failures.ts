@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { type CheckResult, errorCode } from '@uptide/core';
+import { ACCEPTED_KEYS, type CheckResult, errorCode } from '@uptide/core';
 import type { PackageManager, Repo } from './detect.js';
 import { CliError } from './errors.js';
 import type { DependencyStatus } from './status.js';
@@ -216,30 +216,31 @@ export function requireFixable(repo: Repo, only: string): void {
 /** `fix` for a package without a pack, and no agent to do the fixing: nothing happens. */
 export function noAgentForGeneric(only: string, disabled: boolean): CliError {
   return new CliError(
-    `${only} has no migration pack, so every fix would come from the agent, and ${disabled ? 'assisted fixes are off (--no-llm)' : 'ANTHROPIC_API_KEY is not set'}`,
+    `${only} has no migration pack, so every fix would come from the agent, and ${disabled ? 'assisted fixes are off (--no-llm)' : `no selected-provider API key is set (accepted: ${ACCEPTED_KEYS})`}`,
     {
       why: 'Without a pack there are no rules to apply. Nothing was changed: no clone, no branch, no install.',
       next: disabled
         ? `uptide check ${only} --details   (every site, to migrate by hand)`
-        : `export ANTHROPIC_API_KEY=<your key> && uptide fix --only ${only}`,
+        : `uptide fix ${only}   (set ANTHROPIC_API_KEY, OPENAI_API_KEY or GEMINI_API_KEY in your environment first)`,
     },
   );
 }
 
 export function noApiKeyNote(only: string): string {
   return [
-    'note: ANTHROPIC_API_KEY is not set, so assisted fixes are off.',
+    `note: no selected-provider API key is set (${ACCEPTED_KEYS}); assisted fixes are off.`,
     '  Rule-based fixes still run; sites they cannot migrate are listed for manual work.',
-    `  Next: export ANTHROPIC_API_KEY=<your key> && uptide fix --only ${only}`,
+    `  Next: uptide fix ${only}   (set ANTHROPIC_API_KEY, OPENAI_API_KEY or GEMINI_API_KEY in your environment first)`,
     '  (or pass --no-llm to keep it that way without this note)',
     '',
   ].join('\n');
 }
 
 /** Said before any code is sent, every time it can be. */
-export const ASSISTED_NOTE = [
-  'note: assisted fixes are on. For sites the rules cannot migrate, the finding, the',
-  '  enclosing function and the compiler error are sent to Anthropic with your key.',
-  '  Pass --no-llm to keep code on this machine.',
-  '',
-].join('\n');
+export const assistedNote = (provider: string): string =>
+  [
+    'note: assisted fixes are on. For sites the rules cannot migrate, the finding, the',
+    `  enclosing function and the compiler error are sent to ${provider} with your key.`,
+    '  Pass --no-llm to keep code on this machine.',
+    '',
+  ].join('\n');

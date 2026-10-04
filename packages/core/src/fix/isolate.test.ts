@@ -447,3 +447,37 @@ describe("temporary clones are cleaned up, and only uptide's own", () => {
     expect(cleanRuns({ root: join(root, 'missing'), now })).toEqual({ removed: [], kept: [] });
   });
 });
+
+it('refuses generic no-key fixes and unsafe config before creating any clone or ref', async () => {
+  const { root, services } = zodFixture(scratch);
+  const names = [
+    'ANTHROPIC_API_KEY',
+    'OPENAI_API_KEY',
+    'GEMINI_API_KEY',
+    'UPTIDE_PROVIDER',
+    'UPTIDE_MODEL',
+  ];
+  const saved = names.map((name) => [name, process.env[name]] as const);
+  for (const name of names) delete process.env[name];
+  const before = snapshot(root);
+  const clones = existsSync(runsRoot()) ? readdirSync(runsRoot()) : [];
+  try {
+    await expect(isolatedFix({ cwd: root, only: 'react' }, services)).rejects.toMatchObject({
+      code: 'NO_FIXER',
+    });
+    expect(snapshot(root)).toEqual(before);
+    writeFileSync(
+      join(root, 'uptide.config.json'),
+      JSON.stringify({ model: 'sk-PRIVATE_CREDENTIAL' }),
+    );
+    await expect(isolatedFix({ cwd: root, only: 'zod', fixer: null }, services)).rejects.toThrow(
+      'key-like setting',
+    );
+    expect(existsSync(runsRoot()) ? readdirSync(runsRoot()) : []).toEqual(clones);
+  } finally {
+    for (const [name, value] of saved) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
+});

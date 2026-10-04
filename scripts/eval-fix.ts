@@ -1,25 +1,31 @@
-/** pnpm eval:fix <repo> [--only=zod|stripe] [--target=package@version] [--without-key|--with-key] [--include-deprecated] */
+/** pnpm eval:fix <repo> [--only=zod|stripe] [--target=package@version] [--without-key|--with-key] [--include-deprecated] [--provider=anthropic|openai|gemini] [--model=id] */
 
 import { execFileSync } from 'node:child_process';
 import { constants, cpSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
-import { fix, formatFix } from '@uptide/core';
+import { fix, formatFix, KEY_ENV, selectLlm } from '@uptide/core';
 import { workspacePackagesOf } from '../packages/core/src/adapters/typescript/repo.ts';
 
 const args = process.argv.slice(2);
 const source = resolve(args.find((a) => !a.startsWith('--')) ?? '.');
 const only = args.find((a) => a.startsWith('--only='))?.slice(7) ?? 'zod';
 if (only !== 'zod' && only !== 'stripe') throw new Error('--only must be zod or stripe');
+const selected = selectLlm(source, {
+  provider: args.find((a) => a.startsWith('--provider='))?.slice(11),
+  model: args.find((a) => a.startsWith('--model='))?.slice(8),
+});
 const withKey = args.includes('--with-key');
 const withoutKey = args.includes('--without-key');
 const mode = withoutKey ? 'without-key' : withKey ? 'with-key' : 'auto';
 const publish = args.includes('--pr');
-const out = resolve('eval-out', `${basename(source)}-${only}-${mode}`);
+const out = resolve(
+  'eval-out',
+  `${basename(source)}-${only}-${mode}-${selected.provider}-${selected.model.replaceAll('/', '_')}`,
+);
 mkdirSync(out, { recursive: true });
-if (withKey && !process.env.ANTHROPIC_API_KEY) {
-  const text =
-    'Agent eval not run: ANTHROPIC_API_KEY is not set. No API request made; no token/cost result available.\n';
+if (withKey && !selected.available) {
+  const text = `Agent eval not run: ${KEY_ENV[selected.provider]} is not set. No API request made; no token/cost result available.\n`;
   console.log(text);
   writeFileSync(join(out, 'output.txt'), text);
   process.exitCode = 2;
@@ -48,6 +54,8 @@ if (withKey && !process.env.ANTHROPIC_API_KEY) {
   try {
     const report = await fix({
       cwd: worktree,
+      provider: selected.provider,
+      model: selected.model,
       only,
       pr: publish,
       yes: args.includes('--yes'),

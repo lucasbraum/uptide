@@ -136,6 +136,7 @@ function paintFixture(sites = 1) {
   /** An agent that knows the answer and charges `costUsd` per call. */
   const fixer = (costUsd: number, seen: FixRequest[] = []) => ({
     id: 'test-model',
+    estimate: () => costUsd,
     fix: async (request: FixRequest) => {
       seen.push(request);
       const file = request.finding.usage.file;
@@ -188,11 +189,21 @@ describe('fix for a dependency without a pack', () => {
   it('refuses plainly without an agent, before anything changes', async () => {
     for (const [fixerOption, why] of [
       [null, 'assisted fixes are off (--no-llm)'],
-      [undefined, 'ANTHROPIC_API_KEY is not set'],
+      [
+        undefined,
+        'no selected-provider API key is set; accepted environment variables: ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY',
+      ],
     ] as const) {
       const { root, services } = paintFixture();
-      const key = process.env.ANTHROPIC_API_KEY;
-      delete process.env.ANTHROPIC_API_KEY;
+      const names = [
+        'ANTHROPIC_API_KEY',
+        'OPENAI_API_KEY',
+        'GEMINI_API_KEY',
+        'UPTIDE_PROVIDER',
+        'UPTIDE_MODEL',
+      ];
+      const saved = names.map((name) => [name, process.env[name]] as const);
+      for (const name of names) delete process.env[name];
       try {
         await expect(
           fix(
@@ -204,7 +215,10 @@ describe('fix for a dependency without a pack', () => {
           message: `paint has no migration pack, so every fix would come from the agent, and ${why}`,
         });
       } finally {
-        if (key !== undefined) process.env.ANTHROPIC_API_KEY = key;
+        for (const [name, value] of saved) {
+          if (value === undefined) delete process.env[name];
+          else process.env[name] = value;
+        }
       }
       expect(git(root, 'branch', '--show-current')).not.toContain('uptide/');
       expect(git(root, 'status', '--porcelain')).toBe('');
@@ -218,17 +232,17 @@ describe('fix for a dependency without a pack', () => {
       { cwd: root, only: 'paint', fixer: fixer(0.6, seen), maxCostUsd: 1 },
       services,
     );
-    // $0.60 per site: two fit under $1 (the second starts at 0.60), the third never starts.
-    expect(seen).toHaveLength(2);
-    expect(result.sites.map((s) => s.outcome).sort()).toEqual(['agent', 'agent', 'manual']);
-    expect(result.llm.costLimit).toEqual({ limitUsd: 1, notAttempted: 1 });
+    // $0.60 per site: only one call fits under the strict $1 ceiling.
+    expect(seen).toHaveLength(1);
+    expect(result.sites.map((s) => s.outcome).sort()).toEqual(['agent', 'manual', 'manual']);
+    expect(result.llm.costLimit).toEqual({ limitUsd: 1, notAttempted: 2 });
     expect(result.sites.find((s) => s.outcome === 'manual')?.reason).toContain(
-      'not attempted: the cost limit of $1.00 was reached (--max-cost)',
+      'stopped before calling: next call needs $0.600000, remaining $0.400000',
     );
     // One site still fails to compile: the run is not verified, so nothing could be published.
     expect(result.verification.passed).toBe(false);
     expect(prBody(result)).toContain(
-      '- The agent stopped at the cost limit of $1.00 (`--max-cost`): 1 site not attempted. Run again with a higher limit to continue.',
+      '- The agent stopped at the cost limit of $1.00 (`--max-cost`): 2 sites not completed. Run again with a higher limit to continue.',
     );
   }, 30000);
 

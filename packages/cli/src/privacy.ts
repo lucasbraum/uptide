@@ -3,8 +3,9 @@
  * compares them). Change it only together with what the code does.
  */
 export const PRIVACY = `Privacy:
-  Analysis runs locally. Your code is sent only to the LLM provider (Anthropic), only
-  for assisted fixes in \`uptide fix\`, and only with your own ANTHROPIC_API_KEY: for each
+  Analysis runs locally. Code snippets go to your chosen LLM provider (Anthropic, OpenAI or Gemini), only
+  for assisted fixes in \`uptide fix\`, and only with your own API key from ANTHROPIC_API_KEY,
+  OPENAI_API_KEY or GEMINI_API_KEY: for each
   site the rules cannot migrate, the finding, the enclosing function and the compiler
   error. \`uptide fix --no-llm\` turns assisted fixes off. No account.
   Anonymous telemetry is off by default and asks for consent in an interactive terminal.

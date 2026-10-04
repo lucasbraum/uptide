@@ -6,13 +6,14 @@ import { compareVersions } from '../check/version.js';
 import { type ProgressListener, progress } from '../domain/progress.js';
 import type { CheckReport, Finding } from '../domain/report.js';
 import { UptideError } from '../errors.js';
+import { ACCEPTED_KEYS, selectLlm } from '../llm/config.js';
+import { DEFAULT_MAX_COST_USD, providerFixer } from '../llm/fixer.js';
 import { genericPack } from '../packs/generic.js';
 import { stripePack } from '../packs/stripe/index.js';
 import { payloadApiVersions, stripeUsageContext } from '../packs/stripe/relevance.js';
 import type { MigrationPack, PackContext } from '../packs/types.js';
 import { zodPack } from '../packs/zod/index.js';
 import { uptideVersionInfo } from '../version.js';
-import { anthropicFixer } from './anthropic.js';
 import { assist } from './assisted.js';
 import { behaviorCheck } from './behavior.js';
 import { type Generated, generateClients } from './generate.js';
@@ -40,6 +41,8 @@ import { bumpVersions, install, packageManager } from './versions.js';
 export interface FixOptions {
   onProgress?: ProgressListener;
   cwd: string;
+  provider?: string;
+  model?: string;
   /** Any direct dependency: one with a pack (zod, stripe) or, with the agent, any other. */
   only: string;
   target?: string;
@@ -60,8 +63,8 @@ export interface FixOptions {
    */
   pinCurrentApi?: boolean;
   /**
-   * Stop asking the agent once its calls have cost this much (USD). Sites not attempted stay
-   * manual and the run says so. Default: 1 for a dependency without a pack, none otherwise.
+   * Reserve the worst-case cost before every call/retry. Sites that cannot finish stay
+   * manual and the run says so. Default: 1 USD for every package.
    */
   maxCostUsd?: number;
   /** The build doing the work; injected by tests, which run from a checkout under development. */
@@ -127,26 +130,32 @@ function originOf(root: string): string | undefined {
     return undefined;
   }
 }
-/** What a run without a pack may spend on the agent unless told otherwise. */
-export const GENERIC_MAX_COST_USD = 1;
+/** Compatibility alias: the same default now applies to all packages. */
+export const GENERIC_MAX_COST_USD = DEFAULT_MAX_COST_USD;
 export async function fix(
   options: FixOptions,
   services: FixServices = defaults,
 ): Promise<FixReport> {
   const started = Date.now();
   const root = realpathSync(resolve(options.cwd));
+  if (
+    options.maxCostUsd !== undefined &&
+    (!Number.isFinite(options.maxCostUsd) || options.maxCostUsd <= 0)
+  )
+    throw new Error('--max-cost must be a positive finite amount in USD');
+  const selection = selectLlm(root, options);
   let pack =
     options.pack ??
     [zodPack, stripePack].find((p) => p.name === options.only) ??
     genericPack(options.only);
   if (pack.name !== options.only) throw new Error(`no migration pack for ${options.only}`);
-  const fixer = options.fixer === null ? undefined : (options.fixer ?? anthropicFixer());
+  const fixer = options.fixer === null ? undefined : (options.fixer ?? providerFixer(selection));
   // Without a pack every edit is the agent's: no agent, nothing this command can do.
   const needsAgent = (candidate: MigrationPack): void => {
     if (candidate.rules.length === 0 && !fixer)
       throw new UptideError(
         'NO_FIXER',
-        `${candidate.name} has no migration pack, so every fix would come from the agent, and ${options.fixer === null ? 'assisted fixes are off (--no-llm)' : 'ANTHROPIC_API_KEY is not set'}`,
+        `${candidate.name} has no migration pack, so every fix would come from the agent, and ${options.fixer === null ? 'assisted fixes are off (--no-llm)' : `no selected-provider API key is set; accepted environment variables: ${ACCEPTED_KEYS}`}`,
       );
   };
   needsAgent(pack);
@@ -379,7 +388,7 @@ export async function fix(
       packContext,
       options.fixer === null,
       options.onProgress,
-      { maxCostUsd: options.maxCostUsd ?? (generic ? GENERIC_MAX_COST_USD : undefined) },
+      { maxCostUsd: options.maxCostUsd ?? DEFAULT_MAX_COST_USD },
     ),
   );
   const followed: Followed[] = [];

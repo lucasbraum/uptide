@@ -1,3 +1,5 @@
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { run } from './cli.js';
 import {
@@ -276,8 +278,8 @@ describe('uptide fix', () => {
       [
         ['fix', '--only', 'react'],
         {},
-        'ANTHROPIC_API_KEY is not set',
-        'Next: export ANTHROPIC_API_KEY=<your key> && uptide fix --only react',
+        'no selected-provider API key is set',
+        'Next: uptide fix react',
       ],
       [
         ['fix', '--only', 'react', '--no-llm'],
@@ -320,7 +322,7 @@ describe('uptide fix', () => {
             available: true,
             inputTokens: 1,
             outputTokens: 1,
-            costUsd: 1.02,
+            costUsd: 0.6,
             costLimit: { limitUsd: 1, notAttempted: 3 },
           },
         };
@@ -336,7 +338,7 @@ describe('uptide fix', () => {
       "  Tier      generic: no migration pack; every edit is the agent's, kept on the compiler's word. Review each one.",
     );
     expect(io.stdout()).toContain(
-      '  Agent     stopped at $1.00 (--max-cost): 3 sites not attempted',
+      '  Agent     stopped at $1.00 (--max-cost): 3 sites not completed',
     );
     // --max-cost reaches the engine; nonsense is refused.
     await run(
@@ -612,4 +614,57 @@ describe('--help', () => {
     expect(io.stderr()).toContain("unknown option '--frobnicate'");
     expect(await run(['--version'], memoryIo(), fakeEngine())).toBe(0);
   });
+});
+
+it('selects each provider from its key, passes model and the universal budget, and prints spend', async () => {
+  for (const [provider, key, model] of [
+    ['anthropic', 'ANTHROPIC_API_KEY', 'claude-sonnet-4-6'],
+    ['openai', 'OPENAI_API_KEY', 'gpt-6.1-sol'],
+    ['gemini', 'GEMINI_API_KEY', 'gemini-3.8-flash'],
+  ] as const) {
+    const engine = fakeEngine();
+    const io = memoryIo({ cwd: pnpmGitRepo(), env: { [key]: 'test-key' } });
+    expect(await run(['fix', 'zod'], io, engine)).toBe(0);
+    expect(engine.calls[0]).toMatchObject({ provider, model, maxCostUsd: 1 });
+    expect(io.stderr()).toContain(`LLM: ${provider} / ${model}`);
+    expect(io.stderr()).toContain('LLM spend: $');
+    expect(io.stderr()).not.toContain('test-key');
+  }
+});
+
+it('flags override environment and unknown models warn before the engine starts', async () => {
+  const engine = fakeEngine();
+  const io = memoryIo({
+    cwd: pnpmGitRepo(),
+    env: {
+      OPENAI_API_KEY: 'test',
+      GEMINI_API_KEY: 'test',
+      UPTIDE_PROVIDER: 'gemini',
+      UPTIDE_MODEL: 'env-model',
+    },
+  });
+  expect(
+    await run(
+      ['fix', 'zod', '--provider', 'openai', '--model', 'custom', '--max-cost', '2'],
+      io,
+      engine,
+    ),
+  ).toBe(0);
+  expect(engine.calls[0]).toMatchObject({ provider: 'openai', model: 'custom', maxCostUsd: 2 });
+  expect(io.stderr()).toContain('highest listed rates');
+});
+
+it('rejects key-like repository config before the engine, even with --no-llm', async () => {
+  const cwd = pnpmGitRepo();
+  writeFileSync(
+    join(cwd, 'uptide.config.json'),
+    JSON.stringify({ provider: 'openai', apiKey: 'PRIVATE_CREDENTIAL' }),
+  );
+  const io = memoryIo({ cwd });
+  const engine = fakeEngine();
+  expect(await run(['fix', 'zod', '--no-llm'], io, engine)).toBe(2);
+  expect(io.stderr()).toContain('key-like setting');
+  expect(io.stderr()).not.toContain('PRIVATE_CREDENTIAL');
+  expect(engine.calls).toEqual([]);
+  expect(io.stderr()).toContain('LLM spend: $0.000000');
 });

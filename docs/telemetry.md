@@ -61,6 +61,8 @@ One best-effort event is produced after a command completes. The capture envelop
 | `counts` | Applicable aggregate integer counters: `packages`, `workspaces`, `breaking`, `deprecated`, `unverified`, `failed`, `partial`, `sites`, `files`, `tests`, `new_errors`, `changes`, `steps`, `removed`, `kept` |
 | `durations_ms` | `total` and applicable `engine`, `fetch`, `diff`, `usages`, `compile`, `runtime`, `verification` durations in integer milliseconds |
 | `verification` | `passed`, `failed`, or `not_run` |
+| `provider` | For assisted fixes: `anthropic`, `openai`, or `gemini`; otherwise omitted |
+| `model` | Public model ID from the checked-in pricing table; all other IDs become `custom` to hide private deployment names |
 | `cost_usd` | Aggregate assisted-fix cost, at most six decimal places; zero when unavailable |
 | `exit_code` | `0`, `1`, or `2` |
 | `$ip` | `null` |

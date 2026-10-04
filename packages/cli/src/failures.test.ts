@@ -303,9 +303,11 @@ describe('friendly failures: each says what to run next', () => {
       {},
     );
     expect(code).toBe(0);
-    expect(stderr).toContain('note: ANTHROPIC_API_KEY is not set, so assisted fixes are off.');
+    expect(stderr).toContain(
+      'note: no selected-provider API key is set (ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY); assisted fixes are off.',
+    );
     expect(stderr).toContain('Rule-based fixes still run');
-    expect(stderr).toContain('Next: export ANTHROPIC_API_KEY=<your key> && uptide fix --only zod');
+    expect(stderr).toContain('Next: uptide fix zod');
     expect(engine.calls).toHaveLength(1);
   });
 

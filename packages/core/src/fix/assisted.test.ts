@@ -3,6 +3,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Project, ts } from 'ts-morph';
 import { afterAll, expect, it } from 'vitest';
+import { KEY_ENV } from '../llm/config.js';
+import { providerFixer } from '../llm/fixer.js';
+import { DEFAULT_MODELS } from '../llm/pricing.js';
+import { PROVIDERS } from '../llm/types.js';
 import { zodPack } from '../packs/zod/index.js';
 import { anthropicFixer } from './anthropic.js';
 import { assist, enclosingContext } from './assisted.js';
@@ -83,6 +87,7 @@ it('keeps and commits an assisted edit only when real compiler diagnostics impro
     zodPack,
     {
       id: 'mock',
+      estimate: () => 0,
       fix: async (r) => {
         requests.push(r);
         return { diff: patch('42'), inputTokens: 10, outputTokens: 5, costUsd: 0.01 };
@@ -114,6 +119,7 @@ it('reverts rejected changes, feeds back errors, and stops after two retries', a
     zodPack,
     {
       id: 'mock',
+      estimate: () => 0,
       fix: async (r) => {
         requests.push(r);
         return { diff: patch('false'), inputTokens: 1, outputTokens: 1 };
@@ -148,7 +154,13 @@ it('Anthropic sends only scoped context, reports usage/cost, and is absent witho
     sent = String(options?.body);
     return new Response(
       JSON.stringify({
-        content: [{ type: 'text', text: patch('42') }],
+        content: [
+          {
+            type: 'tool_use',
+            name: 'submit_patch',
+            input: { diff: patch('42'), explanation: 'numeric output' },
+          },
+        ],
         usage: { input_tokens: 100, output_tokens: 20 },
       }),
     );
@@ -178,6 +190,7 @@ it('never chooses an unrelated diagnostic elsewhere in the file', async () => {
     zodPack,
     {
       id: 'mock',
+      estimate: () => 0,
       fix: async () => {
         called = true;
         return { diff: patch('42'), inputTokens: 0, outputTokens: 0 };
@@ -292,3 +305,110 @@ it('shows where an import is used when the site is the import itself', () => {
   expect(shown).toContain('Lines 6-8:\nexport function Avatar(seed: string) {');
   expect(shown).not.toContain('unrelated');
 });
+
+it('preflights every retry, feeds invalid-tool feedback back, and never exceeds the budget', async () => {
+  const f = fixture();
+  const requests: FixRequest[] = [];
+  const llm = await assist(
+    f.root,
+    f.sites,
+    zodPack,
+    {
+      id: 'budgeted',
+      estimate: () => 0.6,
+      fix: async (request) => {
+        requests.push(request);
+        return {
+          diff: '',
+          inputTokens: 1,
+          outputTokens: 1,
+          costUsd: 0.3,
+          failure: 'Missing or invalid submit_patch',
+        };
+      },
+    },
+    f.verify,
+    undefined,
+    false,
+    undefined,
+    { maxCostUsd: 1 },
+  );
+  expect(requests).toHaveLength(2);
+  expect(requests[1]?.retry).toContain('Missing or invalid submit_patch');
+  expect(llm.costUsd).toBe(0.6);
+  expect(llm.costLimit).toEqual({ limitUsd: 1, notAttempted: 1 });
+  expect(f.sites[0]?.outcome).toBe('manual');
+  expect(readFileSync(join(f.root, 'src/a.ts'), 'utf8')).toBe(f.source);
+}, 15000);
+
+it('does not release a reservation when the API fails without reporting usage', async () => {
+  const f = fixture();
+  let calls = 0;
+  const llm = await assist(
+    f.root,
+    f.sites,
+    zodPack,
+    {
+      id: 'uncertain',
+      estimate: () => 0.6,
+      fix: async () => {
+        calls++;
+        return {
+          diff: '',
+          inputTokens: 0,
+          outputTokens: 0,
+          costUsd: 0,
+          unreportedCostUsd: 0.6,
+          failure: 'No usage returned',
+        };
+      },
+    },
+    f.verify,
+  );
+  expect(calls).toBe(1);
+  expect(llm).toMatchObject({
+    costUsd: 0,
+    unreportedCostUsd: 0.6,
+    costLimit: { limitUsd: 1, notAttempted: 1 },
+  });
+}, 15000);
+
+it('fails closed for custom fixers without a worst-case estimate', async () => {
+  const f = fixture();
+  let calls = 0;
+  await assist(
+    f.root,
+    f.sites,
+    zodPack,
+    {
+      id: 'unbounded',
+      fix: async () => {
+        calls++;
+        return { diff: '', inputTokens: 0, outputTokens: 0 };
+      },
+    },
+    f.verify,
+  );
+  expect(calls).toBe(0);
+  expect(f.sites[0]?.reason).toContain('no worst-case estimate');
+});
+
+for (const provider of PROVIDERS) {
+  it(`${provider} recorded protocol response passes the real compiler and patch gate`, async () => {
+    const f = fixture();
+    const fixtureJson = readFileSync(
+      new URL(`../llm/fixtures/${provider}.json`, import.meta.url),
+      'utf8',
+    );
+    const fixer = providerFixer(
+      { provider, model: DEFAULT_MODELS[provider], available: true },
+      { env: { [KEY_ENV[provider]]: 'test-only' }, fetch: async () => new Response(fixtureJson) },
+    );
+    const llm = await assist(f.root, f.sites, zodPack, fixer, f.verify);
+    expect(f.verify()).toEqual([]);
+    expect(f.sites[0]?.outcome).toBe('agent');
+    expect(llm.provider).toBe(provider);
+    expect(llm.costUsd).toBeGreaterThan(0);
+    expect(llm.costUsd).toBeLessThan(1);
+  }, 15000);
+}

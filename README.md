@@ -137,9 +137,9 @@ Every direct dependency can be discovered and selected for analysis. What differ
 | **Generic** | any other dependency | The same analysis without a pack. A finding is called breaking only when your compiler or the runtime probe confirms it, or when it is a `require()` of an ESM-only package or an import of a removed export; everything else is in `--details`. `fix` migrates with the agent alone, under the same verification, and says so in the pull request. |
 
 The tier is on every row of `check`, in the HTML report and in the pull request. A generic
-`fix` needs `ANTHROPIC_API_KEY` (there are no rules to fall back on; without a key it says
+`fix` needs a provider API key (there are no rules to fall back on; without a key it says
 so and changes nothing), stops at `--max-cost` (default $1) and reports what it did not
-attempt. Its pull request opens with a note that no pack covers the package: every edit
+complete. Its pull request opens with a note that no pack covers the package: every edit
 was kept on the compiler's word and deserves a careful review.
 
 - **Languages:** TypeScript, and JavaScript the compiler can see (`allowJs`).
@@ -147,6 +147,66 @@ was kept on the compiler's word and deserves a careful review.
   bun (text lockfile); `fix` on npm (lockfile v2/v3), pnpm, and Yarn classic/Berry with the
   node-modules linker.
 - **Not supported:** Yarn Plug'n'Play, bun's binary lockfile, Deno.
+
+## Choosing a model
+
+Assisted fixes support Anthropic, OpenAI and Gemini, with the same prompts, tool,
+verification and publish gate. Set the chosen provider's key in your environment:
+`ANTHROPIC_API_KEY`, `OPENAI_API_KEY` or `GEMINI_API_KEY`. Never put keys in repository
+config or command arguments.
+
+```sh
+uptide fix zod --provider openai --model gpt-6.1-sol
+UPTIDE_PROVIDER=gemini UPTIDE_MODEL=gemini-3.8-flash uptide fix stripe
+uptide fix zod --max-cost 1
+uptide fix zod --no-llm
+```
+
+For each setting, precedence is flag → `UPTIDE_PROVIDER` / `UPTIDE_MODEL` → nearest
+`uptide.config.json` up to the Git root. Without a provider setting, detection checks
+`ANTHROPIC_API_KEY`, then `OPENAI_API_KEY`, then `GEMINI_API_KEY`; Anthropic remains the
+overall default. An explicitly selected provider never falls back to another provider.
+The selected provider/model prints before the fix starts, and spend prints at the end.
+
+The optional config accepts **only** `provider` and `model` strings:
+
+```json
+{ "provider": "openai", "model": "gpt-6.1-sol" }
+```
+
+Unknown fields, nested settings and key-like values are rejected, including when flags
+would override them. Keys are read only from the environment. No key: a generic fix
+exits before cloning, installing or creating a branch; migration packs still apply
+rule-based fixes and leave assisted sites manual. `--no-llm` disables all model calls.
+
+Defaults checked against official documentation on 2026-10-04:
+
+| Provider | Default | Reference |
+| --- | --- | --- |
+| Anthropic | `claude-sonnet-4-6` | [Claude models](https://platform.claude.com/docs/en/models/overview); retained pending a live comparison with Sonnet 5.5 |
+| OpenAI | `gpt-6.1-sol` | [GPT-6.1 Sol](https://developers.openai.com/api/docs/models/gpt-6.1-sol), through the Responses API |
+| Gemini | `gemini-3.8-flash` | [Gemini 3.8 Flash](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash) |
+
+`--max-cost` defaults to **$1 per package**, including zod and stripe. Before every
+call and retry, Uptide reserves its worst-case input and maximum output cost. A call
+that would exceed the remaining budget is never sent. Actual returned usage replaces
+the reservation; failures without valid usage keep the full reservation, shown
+separately as unknown spend. Rejected patches still consume budget. Unfinished sites
+remain manual and cannot pass the publish gate. Unknown models use the provider's
+highest listed rates with a warning. See [model pricing](docs/model-pricing.md) for
+rates, token estimation and the scope of accounting.
+
+`OPENAI_BASE_URL` optionally selects an OpenAI **Responses-compatible, not verified**
+endpoint. Uptide appends `/responses` and uses Bearer authentication. HTTPS is required,
+except HTTP localhost for local servers. Azure, OpenRouter and local deployments must
+support this exact protocol, forced functions and the supplied model ID; Chat
+Completions-only endpoints are unsupported. No provider-specific authentication or
+billing is inferred.
+
+**Privacy:** assisted fixes send the finding, enclosing code snippet and compiler
+error to the provider you chose (or your `OPENAI_BASE_URL`). Your provider's data policy
+applies. `--no-llm` keeps assisted fixes off. Anonymous telemetry, when enabled, adds
+only the provider and a public model ID; private/custom model IDs become `custom`.
 
 ## How verification works
 
@@ -178,8 +238,9 @@ rewritten by rule.
 
 ## Privacy
 
-Analysis runs locally. Your code is sent only to the LLM provider (Anthropic), only
-for assisted fixes in `uptide fix`, and only with your own ANTHROPIC_API_KEY: for each
+Analysis runs locally. Code snippets go to your chosen LLM provider (Anthropic, OpenAI or Gemini), only
+for assisted fixes in `uptide fix`, and only with your own API key from ANTHROPIC_API_KEY,
+OPENAI_API_KEY or GEMINI_API_KEY: for each
 site the rules cannot migrate, the finding, the enclosing function and the compiler
 error. `uptide fix --no-llm` turns assisted fixes off. No account.
 Anonymous telemetry is off by default and asks for consent in an interactive terminal.
@@ -194,7 +255,7 @@ There is no Uptide server. With telemetry off (the default):
 | `list`, `plan` | locally | package names/versions requested from your npm registry; metadata only, no source code |
 | `check` | locally | nothing of yours; it downloads package tarballs from your npm registry. No LLM call, and nothing in your repository is executed. |
 | `fix`, rules and verification | locally, in a temporary clone | nothing of yours |
-| `fix`, assisted fixes | Anthropic's API, with **your** `ANTHROPIC_API_KEY` | per site no rule covers: the finding, the enclosing function or declaration, and the compiler error |
+| `fix`, assisted fixes | Your chosen provider's API, with **your** environment API key | per site no rule covers: the finding, the enclosing function or declaration, and the compiler error |
 | `pr`, `fix --pr` | GitHub, through your own `gh` | the branch and the pull request, when you say so |
 
 Without a key, or with `--no-llm`, those sites are listed for you instead. The full model, and how to report a problem, is in

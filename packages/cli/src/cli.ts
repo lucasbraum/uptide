@@ -1,13 +1,21 @@
 import { readFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 import type { CheckReport, CheckResult, FixReport } from '@uptide/core';
-import { formatFix, isFailure, TIER_LEGEND, uptideCommand } from '@uptide/core';
+import {
+  formatFix,
+  isFailure,
+  PRICE_DATE,
+  priceFor,
+  selectLlm,
+  TIER_LEGEND,
+  uptideCommand,
+} from '@uptide/core';
 import { Command, CommanderError } from 'commander';
 import { describeRepo, detectRepo, type Repo } from './detect.js';
 import { defaultEngine, type Engine } from './engine.js';
 import { CliError, EXIT, renderError } from './errors.js';
 import {
-  ASSISTED_NOTE,
+  assistedNote,
   isNetworkError,
   networkFailure,
   noAgentForGeneric,
@@ -160,6 +168,9 @@ export async function run(
   telemetry?: Telemetry,
 ): Promise<number> {
   let code: number = EXIT.ok;
+  let fixing = false,
+    fixEngineStarted = false;
+  let fixSpend: FixReport['llm'] | undefined;
 
   /** Shared shape of every action: UI from the flags, failures rendered once, exit code kept. */
   const act = async (
@@ -220,6 +231,7 @@ export async function run(
     .allowExcessArguments(true);
 
   program.hook('preAction', async (_parent, command) => {
+    fixing = command.name() === 'fix';
     await telemetry?.begin(command.name(), command.optsWithGlobals()).catch(() => {});
   });
   shared(
@@ -625,10 +637,15 @@ ${EXIT_CODES('a plan was made', 'not used', ';\n     or a dependency failed to a
         '--pin-current-api',
         "stripe only: no upgrade; write the installed SDK's default apiVersion on every client that omits it",
       )
+      .option(
+        '--provider <name>',
+        'LLM provider: anthropic, openai or gemini (also UPTIDE_PROVIDER)',
+      )
+      .option('--model <id>', 'LLM model ID (also UPTIDE_MODEL)')
       .option('--no-llm', 'rule-based fixes only: never send code to the LLM provider')
       .option(
         '--max-cost <usd>',
-        'stop asking the agent once its calls cost this much (default: 1 for a generic package, no limit otherwise)',
+        'reserve the worst-case cost before each LLM call, including retries (default: 1 USD for every package)',
       )
       .option(
         '--with-services',
@@ -653,7 +670,7 @@ What it does:
   git hooks and git config stay as they are. Install, build and test commands run with
   lifecycle scripts and git hooks disabled.
   Runs check, creates branch uptide/<package>-<version>, bumps the version and lockfile,
-  applies rule-based fixes, then (with ANTHROPIC_API_KEY, unless --no-llm) assisted fixes
+  applies rule-based fixes, then (with the selected provider's API key, unless --no-llm) assisted fixes
   for the remaining sites, and verifies with your TypeScript and your test scripts.
   Nothing is pushed without --pr --yes.
 
@@ -661,7 +678,7 @@ Tiers:
   ${TIER_LEGEND}
   A generic package has no rules: every fix comes from the agent, under the same checks (an
   edit is kept only if the site's compiler error disappears and no new one appears) and the
-  same publish gate. It needs ANTHROPIC_API_KEY, stops at --max-cost and says what it left.
+  same publish gate. It needs ANTHROPIC_API_KEY, OPENAI_API_KEY or GEMINI_API_KEY; --max-cost defaults to $1.
 
 Examples:
   $ uptide fix zod
@@ -682,6 +699,8 @@ ${PRIVACY}`,
           pinCurrentApi?: boolean;
           llm?: boolean;
           maxCost?: string;
+          provider?: string;
+          model?: string;
           withServices?: boolean;
           keep?: boolean;
           pr?: boolean;
@@ -705,7 +724,8 @@ ${PRIVACY}`,
               throw new CliError(`--only ${only}: fix upgrades one dependency at a time`, {
                 next: `uptide fix ${only.split(',')[0]}`,
               });
-            const maxCost = flags.maxCost !== undefined ? Number(flags.maxCost) : undefined;
+            const maxCost = flags.maxCost !== undefined ? Number(flags.maxCost) : 1;
+            const selection = selectLlm(cwd, flags, io.env);
             if (maxCost !== undefined && (!Number.isFinite(maxCost) || maxCost <= 0))
               throw new CliError(`--max-cost ${flags.maxCost}: expected an amount in USD`, {
                 next: `uptide fix ${only} --max-cost 2`,
@@ -713,7 +733,7 @@ ${PRIVACY}`,
             // No pack, so no rule: without the agent there is nothing this command can do,
             // and it says so before it touches anything.
             const hasPack = (PACKED as readonly string[]).includes(only);
-            if (!hasPack && (flags.llm === false || !io.env.ANTHROPIC_API_KEY))
+            if (!hasPack && (flags.llm === false || !selection.available))
               throw noAgentForGeneric(only, flags.llm === false);
             if (flags.pinCurrentApi && only !== 'stripe')
               throw new CliError('--pin-current-api applies to stripe only', {
@@ -757,11 +777,26 @@ ${PRIVACY}`,
                 'pin run: the SDK stays, apiVersion is written on each client; no code leaves this machine\n',
               );
             else if (!llm) io.err('assisted fixes off (--no-llm): no code leaves this machine\n');
-            else io.err(io.env.ANTHROPIC_API_KEY ? ASSISTED_NOTE : noApiKeyNote(only));
+            else if (selection.available) {
+              io.err(
+                `LLM: ${selection.provider} / ${selection.model} · budget $${maxCost.toFixed(2)}\n`,
+              );
+              io.err(assistedNote(selection.provider));
+              const price = priceFor(selection.provider, selection.model);
+              if (price.fallback)
+                io.err(
+                  `Unknown model pricing: using ${selection.provider}'s highest listed rates (${PRICE_DATE}) for cost and budget.\n`,
+                );
+              if (selection.baseUrl)
+                io.err(
+                  'OPENAI_BASE_URL override: compatible, not verified; endpoint pricing may differ.\n',
+                );
+            } else io.err(noApiKeyNote(only));
             if (!hasPack)
               io.err(
                 `${only} has no migration pack (generic tier): every fix comes from the agent, up to $${(maxCost ?? 1).toFixed(2)} (--max-cost)\n`,
               );
+            fixEngineStarted = true;
             const report = await progress.phase(
               flags.pinCurrentApi
                 ? 'Pin of the Stripe API version (scan, edits, verification)'
@@ -775,6 +810,8 @@ ${PRIVACY}`,
                     includeDeprecated: flags.includeDeprecated,
                     ...(flags.pinCurrentApi ? { pinCurrentApi: true } : {}),
                     llm,
+                    provider: selection.provider,
+                    model: selection.model,
                     ...(maxCost !== undefined ? { maxCostUsd: maxCost } : {}),
                     withServices: flags.withServices,
                     ...(flags.keep ? { keep: true } : {}),
@@ -786,6 +823,7 @@ ${PRIVACY}`,
               (r) => `verification ${r.verification.passed ? 'passed' : 'failed'}`,
             );
             if (quiet && !ui.interactive) io.err(`done in ${elapsed(io.now() - started)}\n`);
+            fixSpend = report.llm;
             telemetry?.record(() => fixMetrics(report, repo.root));
             // The report as a page, next to the stored run; the summary points at it.
             try {
@@ -1060,6 +1098,14 @@ ${EXIT_CODES('description rendered (and updated unless --preview)', 'not used')}
     // Help and --version are answers, not failures; anything else is a usage error.
     return err.exitCode === 0 ? EXIT.ok : EXIT.error;
   }
+  if (fixing)
+    io.err(
+      fixSpend
+        ? `LLM spend: $${fixSpend.costUsd.toFixed(6)}${fixSpend.unreportedCostUsd ? `; up to $${fixSpend.unreportedCostUsd.toFixed(6)} reserved for calls without usage` : ''}\n`
+        : fixEngineStarted
+          ? 'LLM spend: unavailable (the run ended before returning a usage report).\n'
+          : 'LLM spend: $0.000000 (no LLM calls).\n',
+    );
   telemetry?.finish(code);
   return code;
 }

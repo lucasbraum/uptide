@@ -25,6 +25,8 @@ export type CheckRequest = Pick<
 > & { checkResults?: CheckReport };
 
 export interface FixRequest {
+  provider?: string;
+  model?: string;
   cwd: string;
   only: string;
   /** `--max-cost`: where the agent stops, in USD. */

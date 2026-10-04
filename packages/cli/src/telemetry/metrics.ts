@@ -52,5 +52,7 @@ export function fixMetrics(report: FixReport, cwd: string): Metrics {
         ? 'passed'
         : 'failed',
     cost: report.llm.costUsd,
+    provider: report.llm.provider,
+    model: report.llm.model,
   };
 }
