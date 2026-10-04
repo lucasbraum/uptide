@@ -39,10 +39,14 @@ export function manifestCommands(manifest: Record<string, unknown>): TaskCommand
       text: stringValues(hooks).join('\n'),
       reason: 'hook/task command in package.json husky.hooks',
     },
-    ...['lint-staged', 'simple-git-hooks'].map((field) => ({
-      text: stringValues(manifest[field]).join('\n'),
-      reason: `hook/task command in package.json ${field}`,
-    })),
+    {
+      text: lintStaged(manifest['lint-staged']).commands.join('\n'),
+      reason: 'lint-staged command',
+    },
+    {
+      text: stringValues(manifest['simple-git-hooks']).join('\n'),
+      reason: 'hook/task command in package.json simple-git-hooks',
+    },
   ].filter((entry) => entry.text);
 }
 const KARMA_PACKAGES: Record<string, string[]> = {
@@ -146,6 +150,82 @@ function literalTokens(text: string): string {
       values.push(scanner.getTokenValue());
   return values.join('\n');
 }
+/** Current glob maps and legacy v7-v9 linters maps. Ignore globs are never commands. */
+export function lintStaged(value: unknown): { commands: string[]; ignores: string[] } {
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    return { commands: [], ignores: [] };
+  const data = value as Record<string, unknown>;
+  const linters = data.linters && typeof data.linters === 'object' ? data.linters : data;
+  return {
+    commands: Object.entries(linters)
+      .filter(([key]) => key !== 'ignore')
+      .flatMap(([, command]) =>
+        typeof command === 'string'
+          ? [command]
+          : Array.isArray(command)
+            ? command.filter((v): v is string => typeof v === 'string')
+            : [],
+      ),
+    ignores: Array.isArray(data.ignore)
+      ? data.ignore.filter((v): v is string => typeof v === 'string')
+      : [],
+  };
+}
+/** Literal exports only. Never import/execute repository JavaScript. */
+export function configValue(file: string, text: string): unknown {
+  if (!/\.[cm]?[jt]s$/.test(file)) {
+    const document = parseDocument(text, { customTags: [], logLevel: 'silent' });
+    try {
+      return document.errors.length ? undefined : document.toJS({ maxAliasCount: 50 });
+    } catch {
+      return undefined;
+    }
+  }
+  const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
+  const bindings = new Map<string, ts.Expression>();
+  let exported: ts.Expression | undefined;
+  const visit = (node: ts.Node): void => {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer)
+      bindings.set(node.name.text, node.initializer);
+    if (ts.isExportAssignment(node)) exported = node.expression;
+    if (
+      ts.isBinaryExpression(node) &&
+      node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+      node.left.getText(source) === 'module.exports'
+    )
+      exported = node.right;
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  const seen = new Set<ts.Node>();
+  const value = (node: ts.Expression | undefined): unknown => {
+    if (!node || seen.has(node)) return undefined;
+    seen.add(node);
+    try {
+      if (ts.isStringLiteralLike(node)) return node.text;
+      if (ts.isIdentifier(node)) return value(bindings.get(node.text));
+      if (
+        ts.isParenthesizedExpression(node) ||
+        ts.isAsExpression(node) ||
+        ts.isSatisfiesExpression(node)
+      )
+        return value(node.expression);
+      if (ts.isArrayLiteralExpression(node)) return node.elements.map(value);
+      if (ts.isObjectLiteralExpression(node))
+        return Object.fromEntries(
+          node.properties.flatMap((p) =>
+            ts.isPropertyAssignment(p)
+              ? [[p.name.getText(source).replace(/^['"]|['"]$/g, ''), value(p.initializer)]]
+              : [],
+          ),
+        );
+      return undefined;
+    } finally {
+      seen.delete(node);
+    }
+  };
+  return value(exported);
+}
 export function scanConfig(
   file: string,
   text: string,
@@ -163,26 +243,29 @@ export function scanConfig(
   const consumers = configConsumers(file);
   for (const name of consumers) add(name, `config file ${label}`);
   let literals: string;
-  if (/(?:^|\/)\.husky\//.test(file)) literals = text.replace(/^\s*#.*$/gm, '');
-  else if (/\.(?:ya?ml|json)$/.test(label) || /^\.[\w-]+rc$/.test(label) || label === '.standard') {
-    // JSON is a YAML subset. Unknown tags remain data; aliases have a bounded expansion.
-    const document = parseDocument(text, { customTags: [], logLevel: 'silent' });
-    try {
-      literals = document.errors.length
-        ? label.endsWith('.json')
+  if (consumers.includes('lint-staged')) {
+    const config = lintStaged(configValue(file, text));
+    literals = config.commands.join('\n');
+    tasks?.push({ text: literals, reason: 'lint-staged command' });
+  } else {
+    if (/(?:^|\/)\.husky\//.test(file)) literals = text.replace(/^\s*#.*$/gm, '');
+    else if (
+      /\.(?:ya?ml|json)$/.test(label) ||
+      /^\.[\w-]+rc$/.test(label) ||
+      label === '.standard'
+    ) {
+      const value = configValue(file, text);
+      literals =
+        value === undefined && label.endsWith('.json')
           ? literalTokens(text)
-          : ''
-        : stringValues(document.toJS({ maxAliasCount: 50 })).join('\n');
-    } catch {
-      literals = '';
-    }
-  } else literals = literalTokens(text);
-
-  if (
-    consumers.some((name) => ['husky', 'lint-staged', 'simple-git-hooks'].includes(name)) ||
-    /(?:^|\/)\.husky\//.test(file)
-  )
-    tasks?.push({ text: literals, reason: `hook/task command in ${label}` });
+          : stringValues(value).join('\n');
+    } else literals = literalTokens(text);
+    if (
+      consumers.some((name) => ['husky', 'simple-git-hooks'].includes(name)) ||
+      /(?:^|\/)\.husky\//.test(file)
+    )
+      tasks?.push({ text: literals, reason: `hook/task command in ${label}` });
+  }
   if (/(?:^|\/)karma\.conf\.[^/]+$/.test(file)) karmaEvidence(file, text, names, add);
   return literals;
 }

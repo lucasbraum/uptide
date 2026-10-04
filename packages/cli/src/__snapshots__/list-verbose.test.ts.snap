@@ -3,9 +3,11 @@
 exports[`formats all five timings and file counts deterministically 1`] = `
 "manifest read  1.3 ms · 1 package manifest · 6 installed manifests
 registry       20.0 ms
-source scan    8.3 ms · 36 source files · 5 asset files
+source scan    8.3 ms · 36 source files · 5 asset files · 7 parsed · 2 workers
 config scan    2.5 ms · 3 config files
 render         1.5 ms
-files          48 visited (excluding ignored directories and symlinks)
+files          48 visited (pruned directory contents not enumerated)
+skipped        .gitignore: 4 files · 1 directory
+skipped        no dependency text: 29 files · 0 directories
 "
 `;

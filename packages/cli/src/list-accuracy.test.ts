@@ -177,3 +177,33 @@ it('does not collapse failures from different hosts or with different reasons', 
     '? 6 packages on registry.npmjs.org: timed out, skipped',
   ]);
 });
+
+it('keeps configured peer members out of Possibly unused while locating the group by its lead', async () => {
+  const report = await listDependencies({
+    cwd: fileURLToPath(
+      new URL('../../../fixtures/repos/list-accuracy/legacy-lint-staged/', import.meta.url),
+    ),
+    fetcher: {
+      resolve: async () => '2.0.0',
+      metadata: async (name, version) =>
+        name === 'unused-plugin'
+          ? { peerDependencies: { prettier: version === '2.0.0' ? '^2' : '^1' } }
+          : {},
+    },
+  });
+  const terminal = formatList(report, { all: true, width: 160 });
+  const [beforeUnused, unused] = terminal.split('POSSIBLY UNUSED');
+  expect(beforeUnused).toContain('prettier');
+  expect(beforeUnused).toContain('lint-staged command');
+  expect(beforeUnused).toContain('config file .prettierrc');
+  expect(unused).not.toContain('config file .prettierrc');
+  expect(unused).toContain('pretty-quick');
+  expect(unused).toContain('uptide check --group unused-plugin');
+  const html = renderListHtml(report, opts);
+  const [tools, unusedHtml] = html.split('02 / Possibly unused');
+  expect(tools).toContain('config file .prettierrc');
+  expect(unusedHtml).not.toContain('config file .prettierrc');
+  expect(unusedHtml).toContain('pretty-quick');
+  expect(report.groups[0]?.members).toHaveLength(2);
+  expect(terminal).toMatchSnapshot();
+});

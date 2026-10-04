@@ -58,7 +58,9 @@ Next
 
 `list` reads manifests, lockfiles, source imports and registry metadata. Groups come first,
 with a command such as `uptide check --group nestjs` to check their members together.
-External peers are members labeled by the package that requires them. Each row gives current → latest, upgrade
+External peers are members labeled by the package that requires them. Each member keeps its own
+classification and evidence. A group header follows its lead; members with independent usage
+appear in their own section, and the group command/JSON still includes the complete member list. Each row gives current → latest, upgrade
 kind and major gap, verified/generic tier, importing files, calls, references and top symbols.
 Workspace columns appear only in workspaces. Top symbols require `--details`; terminal
 columns fit the available width, and only verified packages carry a tier tag. Minor/patch upgrades, tooling and possibly
@@ -67,7 +69,9 @@ types and required direct dependencies/peers are classified separately from poss
 package.json tool settings (including keys matching dependency names), tool rc file presence,
 installed bin names (including collisions), hook/task commands, Karma plugin mappings and auto-loading, stylesheet
 imports and HTML assets under node_modules. Expanded rows explain the evidence; “possibly
-unused” means no usage was found by Uptide's scan, so verify before removing.
+unused” means no usage was found by Uptide's scan, so verify before removing. Legacy lint-staged
+`linters` maps and current flat glob maps both supply commands; `ignore` entries supply scan
+exclusions, never usage evidence.
 
 Registry settings use environment overrides, project and user `.npmrc` files, scoped
 registries and host/path-scoped credentials. Discovery uses abbreviated metadata with up to
@@ -98,6 +102,16 @@ assets; config scan includes configuration parsing and classification. Render co
 and optional HTML writing, excluding browser launch. With `--json`, verbose phase/count data is
 also included under `timing`; default JSON stays unchanged. This helps distinguish registry
 latency from repositories with many source/config files. Configs are read statically, never executed.
+
+The scan prunes `bower_components`, `vendor`, `node_modules`, build/output/cache directories,
+`*.min.js`, `*.bundle.js` and source maps. It respects nested `.gitignore`, `.eslintignore`,
+`.prettierignore`, package.json `standard.ignore`, and lint-staged `ignore` settings. Rules are
+relative to the directory declaring them, with glob/negation handling. A fast dependency-name
+text gate and lexer select candidates for full syntax parsing; bindings, shadowing, calls and
+references still use the syntax parser. Large batches (at least 32 candidates / 8 MB) use up to
+four CPU workers; smaller batches avoid worker startup overhead. Verbose output includes parsed
+file/worker counts and skipped counts per reason. Pruned directory contents are not enumerated,
+so those counts are directories, not estimated numbers of files.
 
 `check` requires names (`uptide check zod stripe`). With no names it points to `uptide list`
 and exits 2 before doing work. It retains tiers and partial results per named package.

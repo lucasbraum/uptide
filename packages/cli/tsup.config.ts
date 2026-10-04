@@ -22,6 +22,7 @@ export default defineConfig({
     'engine-worker': 'src/engine-worker.ts',
     // The engine starts `./worker.js` next to whichever file holds its code; chunks and
     // this entry both land flat in dist/, so the relative URL keeps resolving.
+    'list-worker': fileURLToPath(import.meta.resolve('@uptide/core/list-worker')),
     worker: fileURLToPath(import.meta.resolve('@uptide/core/worker')),
   },
   format: ['esm'],

@@ -58,7 +58,20 @@ it('formats all five timings and file counts deterministically', () => {
     timing: {
       totalMs: 32,
       phases: { manifestReadMs: 1.25, registryMs: 20, sourceScanMs: 8.25, configScanMs: 2.5 },
-      files: { manifests: 1, installedManifests: 6, visited: 48, source: 36, config: 3, assets: 5 },
+      files: {
+        manifests: 1,
+        installedManifests: 6,
+        visited: 48,
+        source: 36,
+        config: 3,
+        assets: 5,
+        parsed: 7,
+        workers: 2,
+        skipped: {
+          '.gitignore': { files: 4, directories: 1 },
+          'no dependency text': { files: 29, directories: 0 },
+        },
+      },
     },
   };
   expect(formatListTimings(report, 1.5)).toMatchSnapshot();

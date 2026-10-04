@@ -59,7 +59,7 @@ it('discovers without installation, resolves metadata once per name and retains 
   expect((await listDependencies({ cwd, fetcher: { resolve } })).packages).toEqual(result.packages);
 });
 
-it('recognizes literal import forms, skips comments, generated files and symlink cycles', () => {
+it('recognizes literal import forms, skips comments, generated files and symlink cycles', async () => {
   const cwd = fixture();
   mkdirSync(join(cwd, 'node_modules'));
   writeFileSync(join(cwd, 'node_modules', 'ignored.ts'), "import x from 'tool'; x();");
@@ -72,7 +72,7 @@ const mod = await import('dynamic/subpath'); mod.run();
 export { x } from 'reexport';
 `,
   );
-  const scan = scanImports(cwd, ['zod', 'tool', 'other', 'dynamic', 'reexport'], ['.']);
+  const scan = await scanImports(cwd, ['zod', 'tool', 'other', 'dynamic', 'reexport'], ['.']);
   expect(scan.get('zod')?.callSites).toBe(2);
   expect(scan.get('tool')).toBeUndefined();
   expect(scan.get('other')?.symbols.make).toBe(1);
@@ -135,6 +135,8 @@ it('discovers a synthetic single-package pnpm Nest API, including tooling and pe
     result.packages.filter((p) => p.classification === 'possibly-unused').map((p) => p.name),
   ).toEqual(['@types/unrelated', 'orphan']);
   const tools = [
+    '@fastify/static',
+    'reflect-metadata',
     '@nestjs/cli',
     '@nestjs/schematics',
     'eslint',
@@ -189,7 +191,7 @@ it('discovers a synthetic single-package pnpm Nest API, including tooling and pe
   expect(result.groups.map((g) => g.id)).toContain('@nestjs/cli');
   expect(new Set(result.groups.map((g) => g.id)).size).toBe(result.groups.length);
   expect(result.packages.find((p) => p.name === '@fastify/static')).toMatchObject({
-    classification: 'peer',
+    classification: 'tooling',
     peerOf: ['@nestjs/platform-fastify'],
   });
   expect(result.packages.find((p) => p.name === 'nodemailer')).toMatchObject({
@@ -252,7 +254,7 @@ it('uses installed bin and peer metadata without registry metadata or executing 
   expect(metadata).not.toHaveBeenCalledWith('runtime', '1.0.0');
 });
 
-it('counts value references once, excluding declarations and member names', () => {
+it('counts value references once, excluding declarations and member names', async () => {
   const cwd = fixture();
   writeFileSync(
     join(cwd, 'index.tsx'),
@@ -262,12 +264,12 @@ app.register(plugin); const options = { plugin }; const callback = api.run;
 api.run(); const unrelated = { plugin: 1 }; unrelated.plugin;
 `,
   );
-  const scan = scanImports(cwd, ['tool', 'other'], ['.']);
+  const scan = await scanImports(cwd, ['tool', 'other'], ['.']);
   expect(scan.get('tool')).toMatchObject({ references: 2, callSites: 0, symbols: { default: 2 } });
   expect(scan.get('other')).toMatchObject({ references: 1, callSites: 1, symbols: { run: 2 } });
 });
 
-it('does not count shadowed bindings as imported calls or references', () => {
+it('does not count shadowed bindings as imported calls or references', async () => {
   const cwd = fixture();
   writeFileSync(
     join(cwd, 'index.tsx'),
@@ -279,7 +281,7 @@ app.register(plugin);
 <components.Widget></components.Widget>;
 `,
   );
-  const scan = scanImports(cwd, ['tool', 'other'], ['.']);
+  const scan = await scanImports(cwd, ['tool', 'other'], ['.']);
   expect(scan.get('tool')).toMatchObject({ references: 1, callSites: 0 });
   expect(scan.get('other')).toMatchObject({ references: 0, callSites: 1 });
 });

@@ -12,7 +12,8 @@ export interface FormatListOptions {
   invocation?: string;
   cwd?: string;
 }
-const plural = (count: number, noun: string): string => `${count} ${noun}${count === 1 ? '' : 's'}`;
+const plural = (count: number, noun: string, multiple = `${noun}s`): string =>
+  `${count} ${count === 1 ? noun : multiple}`;
 const quote = (s: string): string =>
   /^[\w./@:=+-]+$/.test(s) ? s : `'${s.replaceAll("'", "'\"'\"'")}'`;
 const dependencyKey = (p: ListedDependency): string =>
@@ -32,6 +33,10 @@ export function listUsage(p: ListedDependency): string {
     .filter(Boolean)
     .join(' · ');
 }
+export function groupCount(group: ListGroup & { totalMembers?: number }): string {
+  const total = group.totalMembers ?? group.members.length;
+  return `${plural(total, 'package')}${total === group.members.length ? '' : ` (${group.members.length} in this section)`}`;
+}
 export function groupVersions(group: ListGroup): string {
   const main = group.members.filter((p) => !p.peerOf);
   const range = (): string => {
@@ -43,6 +48,13 @@ export function groupVersions(group: ListGroup): string {
   return `→ ${range()}`;
 }
 export const UNUSED_HINT = "no usage found by Uptide's scan; verify before removing";
+export const listReasons = (p: ListedDependency): string[] =>
+  p.reasons.filter(
+    (reason) =>
+      !p.peerOf?.some(
+        (name) => reason === `required by ${name}` || reason === `peer dependency of ${name}`,
+      ),
+  );
 export const listSymbols = (p: ListedDependency): string =>
   p.usage.topSymbols
     .filter((s) => s.count > 0)
@@ -54,30 +66,49 @@ export function listSections(report: ListReport): {
   tooling: ListedDependency[];
   unused: ListedDependency[];
 } {
-  // Groups containing source usage lead the report; tooling-only groups stay collapsed.
-  const groups = report.groups.filter((g) => g.members.some((p) => p.classification === 'used'));
-  const key = dependencyKey;
-  const grouped = new Set(groups.flatMap((g) => g.members.map(key)));
-  const remaining = report.packages.filter((p) => !grouped.has(key(p)));
-  const toolingKeys = new Set(remaining.filter((p) => p.classification === 'tooling').map(key));
-  for (const group of report.groups) {
-    if (!groups.includes(group) && group.members.some((p) => toolingKeys.has(key(p))))
-      for (const p of group.members) toolingKeys.add(key(p));
-  }
+  const groups = report.groups.filter((g) => groupLead(g)?.classification === 'used');
+  const grouped = new Set(groups.flatMap((g) => g.members.map(dependencyKey)));
+  const remaining = report.packages.filter((p) => !grouped.has(dependencyKey(p)));
+  const isTooling = (p: ListedDependency): boolean =>
+    p.classification === 'tooling' ||
+    (p.classification === 'peer' &&
+      report.groups.some(
+        (g) =>
+          g.members.some((m) => dependencyKey(m) === dependencyKey(p)) &&
+          groupLead(g)?.classification === 'tooling',
+      ));
   return {
     groups,
     used: remaining.filter((p) => p.classification === 'used'),
-    tooling: remaining.filter((p) => toolingKeys.has(key(p))),
-    unused: remaining.filter((p) => !toolingKeys.has(key(p)) && p.classification !== 'used'),
+    tooling: remaining.filter(isTooling),
+    unused: remaining.filter(
+      (p) =>
+        p.classification === 'possibly-unused' || (p.classification === 'peer' && !isTooling(p)),
+    ),
   };
 }
+const groupLead = (group: ListGroup): ListedDependency | undefined =>
+  group.members.find((p) => p.name === group.lead) ??
+  group.members.find((p) => !p.peerOf) ??
+  group.members[0];
 /** Group rows inside a collapsed category too, preserving commands for the whole group. */
 export function listBlocks(
   packages: ListedDependency[],
   report: ListReport,
 ): { id?: string; name?: string; members: ListedDependency[] }[] {
   const keys = new Set(packages.map((p) => dependencyKey(p)));
-  const groups = report.groups.filter((g) => g.members.every((p) => keys.has(dependencyKey(p))));
+  // A group header belongs to its lead. Independently used members appear in their own
+  // section, rather than inheriting an unused lead's classification. JSON retains all members.
+  const groups = report.groups
+    .filter((g) => {
+      const lead = groupLead(g);
+      return lead && keys.has(dependencyKey(lead));
+    })
+    .map((g) => ({
+      ...g,
+      totalMembers: g.members.length,
+      members: g.members.filter((p) => keys.has(dependencyKey(p))),
+    }));
   const grouped = new Set(groups.flatMap((g) => g.members.map((p) => dependencyKey(p))));
   return [
     ...groups,
@@ -146,10 +177,16 @@ export function formatListTimings(report: ListReport, renderMs: number): string 
   return [
     `manifest read  ${phases.manifestReadMs.toFixed(1)} ms · ${plural(files.manifests, 'package manifest')} · ${plural(files.installedManifests, 'installed manifest')}`,
     `registry       ${phases.registryMs.toFixed(1)} ms`,
-    `source scan    ${phases.sourceScanMs.toFixed(1)} ms · ${plural(files.source, 'source file')} · ${plural(files.assets, 'asset file')}`,
+    `source scan    ${phases.sourceScanMs.toFixed(1)} ms · ${plural(files.source, 'source file')} · ${plural(files.assets, 'asset file')}${files.parsed === undefined ? '' : ` · ${files.parsed} parsed · ${files.workers || 0} workers`}`,
     `config scan    ${phases.configScanMs.toFixed(1)} ms · ${plural(files.config, 'config file')}`,
     `render         ${Math.max(0, renderMs).toFixed(1)} ms`,
-    `files          ${files.visited} visited (excluding ignored directories and symlinks)`,
+    `files          ${files.visited} visited (pruned directory contents not enumerated)`,
+    ...Object.entries(files.skipped ?? {})
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(
+        ([reason, count]) =>
+          `skipped        ${reason}: ${plural(count.files, 'file')} · ${plural(count.directories, 'directory', 'directories')}`,
+      ),
     '',
   ].join('\n');
 }
@@ -201,7 +238,7 @@ export function formatList(report: ListReport, opts: FormatListOptions = {}): st
   const row = (p: ListedDependency): void => {
     lines.push(rows.get(dependencyKey(p)) ?? '');
     if (p.classification === 'tooling' || p.classification === 'possibly-unused')
-      for (const reason of p.reasons) lines.push(c.dim(ellipsis(`    ${reason}`, width)));
+      for (const reason of listReasons(p)) lines.push(c.dim(ellipsis(`    ${reason}`, width)));
     if (opts.details && listSymbols(p))
       lines.push(c.dim(ellipsis(`    symbols  ${listSymbols(p)}`, width)));
     if (opts.details && p.usage.fileList?.length)
@@ -213,7 +250,7 @@ export function formatList(report: ListReport, opts: FormatListOptions = {}): st
         [
           [
             { text: g.name, tone: 'bold' },
-            { text: plural(g.members.length, 'package') },
+            { text: groupCount(g) },
             { text: groupVersions(g) },
             { text: groupCommand(g, opts), tone: 'dim' },
           ],

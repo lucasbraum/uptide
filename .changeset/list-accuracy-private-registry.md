@@ -22,3 +22,9 @@ Recognize tool rc files, hook/task commands, generic package configuration field
 short names and auto-loaded plugins, colliding bins and required direct dependencies.
 Show the actual shared failure reason in discovery summaries. Add opt-in list --verbose
 phase timings and file counts, and preserve pnpm default/named catalog discovery.
+
+Preserve independently used group members' classifications and reasons. Read legacy lint-staged
+linters maps alongside flat configs, keeping ignore globs separate from commands. Prune vendored,
+generated and repository-ignored sources, prefilter with text/lexical gates before full parsing,
+and distribute large syntax batches across CPU workers. Report per-reason skip counts in verbose
+output while retaining complete group membership in JSON and check commands.

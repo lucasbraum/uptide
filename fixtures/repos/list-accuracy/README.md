@@ -109,3 +109,42 @@ Manifest read: 6.8 ms; registry: 1504.4 ms; source scan: 1536.0 ms; config scan:
 92.4 ms; JSON render: below 1 ms. Visited 6,192 files: 4,796 source, 813 config,
 61 stylesheet/HTML assets; 1 package manifest, no installed manifests. Live network
 timings vary; dependency count alone does not describe source scanning work.
+
+## Legacy lint-staged and scan performance
+
+`legacy-lint-staged` mirrors the requested v7–v9 shape: `.huskyrc` invokes lint-staged;
+`.lintstagedrc` has a `linters` map invoking prettier/standard and an `ignore` array.
+An unused plugin's target peer range links it to prettier. Prettier remains Tooling with
+`lint-staged command` and `config file .prettierrc`; pretty-quick remains possibly unused.
+The terminal/HTML group follows its lead, while independently classified members remain in
+their own sections. Group commands and JSON retain both members. Tests cover legacy and flat
+formats in JSON, YAML, CommonJS, ESM, TypeScript and package.json, including ignored-glob false positives.
+
+Before/after against commit `9a6e7b7`, Node 22, same webpack checkout as above. Registry responses
+are fixed in this benchmark to isolate scanning; the table reports source-scan wall time,
+including file traversal, text/lexer gates and worker startup. Synthetic construction happens
+before timing. These are local measurements, not a run on the private AngularJS application.
+
+| Repository | Source scan before | Source scan after | Source files read before → after | Full parses after | Workers |
+| --- | --- | --- | --- | --- | --- |
+| webpack v5.50.0 | 1.081 s | 0.730 s | 4,796 → 660 | 260 | 0 |
+| Synthetic: 1,844 source + 1,293 asset files | 13.542 s | 0.779 s | 1,844 → 544 | 160 | 4 |
+
+Synthetic exclusions: 400 bower files, 400 vendor files, 300 gitignored generated files,
+200 files excluded by standard.ignore. The remaining 544 sources contain 160 real imports
+and 384 unrelated files; all 1,293 assets have no dependency references. **All 160 files and
+160 call sites survive**, with zero spurious references. The skipped output reports four pruned
+directories and 1,677 text-prefiltered files without enumerating excluded directory contents.
+Webpack skips 4,231 files / 4 directories via .eslintignore, 47 / 4 via .prettierignore,
+111 node_modules directories and one vendor directory. It then skips 411 files by text and
+46 by lexer. Config scanning after: webpack 120 ms, synthetic 4 ms.
+
+Reproduce after `pnpm build`: `node scripts/list-scan-benchmark.mjs /path/to/webpack-v5.50.0`.
+The script generates/removes a temporary synthetic tree and never contacts a registry.
+The same fixture and mock responses were used for both versions.
+
+A live packaged CLI run after the optimization reports **73 outdated, 1 intentional skip,
+0 unknown/failures, exit 0** on webpack v5.50.0: 1.763 s total; 0.808 s registry,
+0.820 s source scan and 0.127 s config scan. Network time varies independently.
+Regression tests compare parallel/sequential outputs, protect require/import/re-export/JSX and
+shadowing semantics, cover ignore negation/scoping, and run the bundled worker via a local mock registry.

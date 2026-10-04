@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
-import { configConsumers, manifestCommands, type TaskCommands } from './config.js';
+import { configConsumers, lintStaged, manifestCommands, type TaskCommands } from './config.js';
 
 export interface Manifest {
   [key: string]: unknown;
@@ -93,7 +93,8 @@ export function toolingReasons(
           ? (manifest.config as { commitizen?: unknown } | undefined)?.commitizen
           : manifest[field];
       if (value === undefined) continue;
-      const text = JSON.stringify(value);
+      const text =
+        field === 'lint-staged' ? lintStaged(value).commands.join('\n') : JSON.stringify(value);
       if (
         consumers.includes(name) ||
         referencesPackage(text, name) ||

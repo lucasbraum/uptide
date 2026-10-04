@@ -55,6 +55,7 @@ export interface ListedDependency {
 }
 export interface ListGroup {
   id: string;
+  lead?: string;
   name: string;
   members: ListedDependency[];
 }
@@ -91,6 +92,9 @@ export interface ListReport {
       source: number;
       config: number;
       assets: number;
+      parsed?: number;
+      workers?: number;
+      skipped?: ScanStats['skipped'];
     };
   };
 }
@@ -237,7 +241,7 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
     assetFiles: 0,
   };
   const tasks: TaskCommands[] = [];
-  const usage = scanImports(
+  const usage = await scanImports(
     opts.cwd,
     [...new Set(names.map(localName))],
     workspaces,
@@ -478,6 +482,9 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
               source: scanStats.sourceFiles,
               config: scanStats.configFiles,
               assets: scanStats.assetFiles,
+              parsed: scanStats.parsedFiles,
+              workers: scanStats.workers,
+              skipped: scanStats.skipped,
             },
           }
         : {}),

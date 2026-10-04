@@ -66,9 +66,7 @@ it('reads YAML task values, hook strings, and credits both colliding webpack bin
     report.packages.filter((p) => p.classification === 'possibly-unused').map((p) => p.name),
   ).toEqual(['orphan']);
   for (const name of ['pretty-quick', 'standard', 'webpack', 'webpack-cli'])
-    expect(report.packages.find((p) => p.name === name)?.reasons).toContain(
-      'hook/task command in .lintstagedrc.yaml',
-    );
+    expect(report.packages.find((p) => p.name === name)?.reasons).toContain('lint-staged command');
   expect(report.packages.find((p) => p.name === 'lint-staged')?.reasons).toContain(
     'hook/task command in .huskyrc',
   );
@@ -108,7 +106,9 @@ it.each([
   const report = await listDependencies({ cwd, fetcher });
   expect(report.packages.find((p) => p.name === 'hook-worker')).toMatchObject({
     classification: 'tooling',
-    reasons: expect.arrayContaining([`hook/task command in ${file}`]),
+    reasons: expect.arrayContaining([
+      file.includes('lint') ? 'lint-staged command' : `hook/task command in ${file}`,
+    ]),
   });
 });
 it('recognizes generic manifest configuration fields and hook/task commands by installed bins', async () => {
@@ -121,7 +121,7 @@ it('recognizes generic manifest configuration fields and hook/task commands by i
     'hook/task command in package.json husky.hooks',
   );
   expect(report.packages.find((p) => p.name === 'standard')?.reasons).toContain(
-    'hook/task command in package.json lint-staged',
+    'lint-staged command',
   );
   expect(report.packages.find((p) => p.name === 'hook-worker')?.reasons).toContain(
     'hook/task command in package.json simple-git-hooks',
@@ -218,7 +218,7 @@ it('reports timings/file counts only when requested, counting configs separately
   writeFileSync(join(cwd, 'app.scss'), '@use "theme";');
   writeFileSync(join(cwd, 'readme.txt'), 'not scanned as code');
   const report = await listDependencies({ cwd, fetcher, verbose: true });
-  expect(report.timing.files).toEqual({
+  expect(report.timing.files).toMatchObject({
     manifests: 1,
     installedManifests: 6,
     visited: 8,

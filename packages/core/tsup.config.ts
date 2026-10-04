@@ -9,7 +9,11 @@ export default defineConfig({
     __UPTIDE_BUILD_COMMIT__: JSON.stringify(metadata.uptideCommit),
     __UPTIDE_BUILD_DIRTY__: JSON.stringify(metadata.uptideDirty),
   },
-  entry: { index: 'src/index.ts', worker: 'src/check/worker.ts' },
+  entry: {
+    index: 'src/index.ts',
+    worker: 'src/check/worker.ts',
+    'list-worker': 'src/list/list-worker.ts',
+  },
   format: ['esm'],
   dts: true,
   sourcemap: true,

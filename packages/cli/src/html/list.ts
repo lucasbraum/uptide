@@ -3,10 +3,12 @@ import type { ListedDependency, ListGroup, ListReport } from '@uptide/core';
 import {
   type FormatListOptions,
   groupCommand,
+  groupCount,
   groupVersions,
   listBlocks,
   listChange,
   listCommand,
+  listReasons,
   listSections,
   listSymbols,
   listUsage,
@@ -36,9 +38,9 @@ export function renderListHtml(report: ListReport, opts: ListHtmlOptions): strin
   const nextSection = (): string => String(++section).padStart(2, '0');
   const commands = { ...opts, cwd: opts.details ? opts.cwd : undefined };
   const row = (p: ListedDependency, command?: string): string =>
-    `<article class="member-grid${command ? ' has-command' : ''}"><div class="pkg-name">${e(p.name)}${p.tier === 'verified' ? '<span class="verified">verified</span>' : ''}</div><div class="versions">${e(p.current)} → ${e(p.latest)}</div><div class="gap">${e(listChange(p))}</div><div class="usage${p.peerOf ? ' muted' : ''}">${p.peerOf ? `peer of ${e(p.peerOf.join(', '))}` : e(listUsage(p))}</div>${command ? reportCopyButton(command) : ''}${(p.classification === 'tooling' || p.classification === 'possibly-unused') && p.reasons.length ? `<div class="details-line">${p.reasons.map(e).join(' · ')}</div>` : ''}${opts.details && listSymbols(p) ? `<div class="details-line">Top symbols: ${e(listSymbols(p))}</div>` : ''}${opts.details && p.usage.fileList?.length ? `<details class="details-line"><summary>Files</summary><ul>${p.usage.fileList.map((file) => `<li>${e(file)}</li>`).join('')}</ul></details>` : ''}</article>`;
+    `<article class="member-grid${command ? ' has-command' : ''}"><div class="pkg-name">${e(p.name)}${p.tier === 'verified' ? '<span class="verified">verified</span>' : ''}</div><div class="versions">${e(p.current)} → ${e(p.latest)}</div><div class="gap">${e(listChange(p))}</div><div class="usage${p.peerOf ? ' muted' : ''}">${p.peerOf ? `peer of ${e(p.peerOf.join(', '))}` : e(listUsage(p))}</div>${command ? reportCopyButton(command) : ''}${(p.classification === 'tooling' || p.classification === 'possibly-unused') && listReasons(p).length ? `<div class="details-line">${listReasons(p).map(e).join(' · ')}</div>` : ''}${opts.details && listSymbols(p) ? `<div class="details-line">Top symbols: ${e(listSymbols(p))}</div>` : ''}${opts.details && p.usage.fileList?.length ? `<details class="details-line"><summary>Files</summary><ul>${p.usage.fileList.map((file) => `<li>${e(file)}</li>`).join('')}</ul></details>` : ''}</article>`;
   const group = (g: ListGroup): string =>
-    `<section class="package"><header><h2>${e(g.name)}</h2><div class="meta"><span>${g.members.length} packages</span><span>${e(groupVersions(g))}</span></div>${reportCommand(groupCommand(g, commands))}</header>${g.members.map((p) => row(p)).join('')}</section>`;
+    `<section class="package"><header><h2>${e(g.name)}</h2><div class="meta"><span>${e(groupCount(g))}</span><span>${e(groupVersions(g))}</span></div>${reportCommand(groupCommand(g, commands))}</header>${g.members.map((p) => row(p)).join('')}</section>`;
   const standalone = (p: ListedDependency): string => row(p, listCommand([p], commands));
   const collapsed = (label: string, packages: ListedDependency[]): string =>
     packages.length
