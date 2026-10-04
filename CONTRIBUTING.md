@@ -75,7 +75,9 @@ one is not merged, whatever else it does.
   and hooks are never touched, and nothing outside Uptide's own temporary directory is
   deleted.
 - Code leaves the machine only for assisted fixes, with the user's own API key, and
-  `--no-llm` turns that off. No telemetry, no account, no server.
+  `--no-llm` turns that off. Anonymous telemetry requires opt-in and the strict field allowlist in
+  `docs/telemetry.md`; never add source, paths, repo/user names, or unproven package names.
+  No account or Uptide server.
 - Nothing is pushed or published without an explicit flag from the user.
 
 ## Pull requests

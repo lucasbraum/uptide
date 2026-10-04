@@ -36,6 +36,8 @@ import {
   locateDependencies,
   SUPPORTED as PACKED,
 } from './status.js';
+import { createTelemetry, type Telemetry } from './telemetry/client.js';
+import { checkMetrics, fixMetrics, listMetrics } from './telemetry/metrics.js';
 
 /** Replaced by the bundler with this package's version; tests and tsx run the source. */
 declare const __UPTIDE_VERSION__: string | undefined;
@@ -155,6 +157,7 @@ export async function run(
   argv: string[],
   io: Io,
   engine: Engine = defaultEngine(),
+  telemetry?: Telemetry,
 ): Promise<number> {
   let code: number = EXIT.ok;
 
@@ -216,6 +219,28 @@ export async function run(
     .enablePositionalOptions()
     .allowExcessArguments(true);
 
+  program.hook('preAction', async (_parent, command) => {
+    await telemetry?.begin(command.name(), command.optsWithGlobals()).catch(() => {});
+  });
+  shared(
+    program
+      .command('telemetry')
+      .description('Control opt-in anonymous telemetry')
+      .argument('<action>', 'on, off, status or show'),
+  ).action((action: string, flags: Shared) =>
+    act(flags, async () => {
+      if (!['on', 'off', 'status', 'show'].includes(action))
+        throw new CliError('Expected telemetry on, off, status or show.');
+      const value = (telemetry ?? createTelemetry(io, { version: VERSION })).control(
+        action,
+        flags.ci,
+      );
+      if (flags.json || action === 'show') emit(value);
+      else io.out(`Telemetry: ${JSON.stringify(value, null, 2)}\n`);
+      return EXIT.ok;
+    }),
+  );
+
   shared(program)
     .addHelpText(
       'after',
@@ -242,6 +267,14 @@ ${PRIVACY}`,
           () => collectStatus(repo, engine),
           (s) => (s.registryError ? 'registry unreachable' : 'lockfile and registry read'),
         );
+        telemetry?.record(() => ({
+          repo: repo.root,
+          packages: status.dependencies.map((d) => ({
+            name: d.name,
+            versions: [d.installed, d.latest].filter((v): v is string => !!v),
+          })),
+          counts: { packages: status.dependencies.length, workspaces: status.workspaces.length },
+        }));
         if (flags.json) emit(status);
         else io.out(`\n${formatStatus(status, { color: ui.color })}`);
         return EXIT.ok;
@@ -265,6 +298,7 @@ ${PRIVACY}`,
         if (!engine.list) throw new CliError('this build cannot list dependencies');
         const discover = engine.list;
         const report = await progress.phase('Discovery', () => discover({ cwd: repo.root }));
+        telemetry?.record(() => listMetrics(report));
         if (flags.json) emit(report);
         else
           io.out(
@@ -438,6 +472,7 @@ ${EXIT_CODES(
               },
               (r) => `${r.summary.breaking} breaking, ${r.summary.deprecated} deprecated`,
             );
+            telemetry?.record(() => checkMetrics(report));
             timingNotes(report, progress);
             const ms = io.now() - started;
             if (quiet && !ui.interactive) io.err(`done in ${elapsed(ms)}\n`);
@@ -544,6 +579,10 @@ ${EXIT_CODES('a plan was made', 'not used', ';\n     or a dependency failed to a
             );
             const ms = io.now() - started;
             if (!flags.verbose && !ui.interactive) io.err(`done in ${elapsed(ms)}\n`);
+            telemetry?.record(() => {
+              const metrics = checkMetrics(result.report);
+              return { ...metrics, counts: { ...metrics.counts, steps: result.plan.steps.length } };
+            });
             const fixable = FIX_MANAGERS.includes(repo.manager);
             const planOptions = {
               header: headerOf(repo, ms),
@@ -747,6 +786,7 @@ ${PRIVACY}`,
               (r) => `verification ${r.verification.passed ? 'passed' : 'failed'}`,
             );
             if (quiet && !ui.interactive) io.err(`done in ${elapsed(io.now() - started)}\n`);
+            telemetry?.record(() => fixMetrics(report, repo.root));
             // The report as a page, next to the stored run; the summary points at it.
             try {
               report.html = writeMigrationHtml(report, {
@@ -847,6 +887,7 @@ ${EXIT_CODES('the branch verifies: no new type errors, tests and lint pass', 've
           );
           if (flags.json) emit(report);
           else io.out(`\n${formatFix(report)}`);
+          telemetry?.record(() => fixMetrics(report, cwd));
           io.err(whereItRan(report));
           return report.verification.passed ? EXIT.ok : EXIT.breaking;
         }),
@@ -874,6 +915,9 @@ ${EXIT_CODES('done', 'not used')}`,
             next: 'uptide clean --days 7',
           });
         const result = engine.clean(days);
+        telemetry?.record(() => ({
+          counts: { removed: result.removed.length, kept: result.kept.length },
+        }));
         if (flags.json) emit(result);
         else {
           for (const path of result.removed) io.out(`removed ${path}\n`);
@@ -918,7 +962,7 @@ ${EXIT_CODES('PR opened (or plan printed without --yes)', 'not used')}`,
       act(flags, async ({ cwd }) => {
         if (!engine.pr) throw new CliError('pr is not available in this build of uptide');
         try {
-          const { url } = await engine.pr(
+          const { url, report } = await engine.pr(
             {
               cwd,
               branch: flags.branch,
@@ -928,6 +972,7 @@ ${EXIT_CODES('PR opened (or plan printed without --yes)', 'not used')}`,
             },
             (text) => io.err(`${text}\n`),
           );
+          telemetry?.record(() => fixMetrics(report, cwd));
           if (flags.json) emit({ url });
           else io.out(`${url}\n`);
           return EXIT.ok;
@@ -998,6 +1043,10 @@ ${EXIT_CODES('description rendered (and updated unless --preview)', 'not used')}
           () => engine.diff(name, from, to),
           (c) => `${c.length} changes`,
         );
+        telemetry?.record(() => ({
+          packages: [{ name, versions: [changes[0]?.from ?? from, changes[0]?.to ?? to] }],
+          counts: { changes: changes.length },
+        }));
         if (flags.json) emit(changes);
         else io.out(formatHuman(changes, { all: flags.all, color: ui.color }));
         return EXIT.ok;
@@ -1011,5 +1060,6 @@ ${EXIT_CODES('description rendered (and updated unless --preview)', 'not used')}
     // Help and --version are answers, not failures; anything else is a usage error.
     return err.exitCode === 0 ? EXIT.ok : EXIT.error;
   }
+  telemetry?.finish(code);
   return code;
 }

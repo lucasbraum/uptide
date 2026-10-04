@@ -181,11 +181,13 @@ rewritten by rule.
 Analysis runs locally. Your code is sent only to the LLM provider (Anthropic), only
 for assisted fixes in `uptide fix`, and only with your own ANTHROPIC_API_KEY: for each
 site the rules cannot migrate, the finding, the enclosing function and the compiler
-error. `uptide fix --no-llm` turns assisted fixes off. No telemetry, no account.
-Other network use: your npm registry for package metadata and tarballs, and GitHub
-only when you pass `fix --pr` or run `pr-body`.
+error. `uptide fix --no-llm` turns assisted fixes off. No account.
+Anonymous telemetry is off by default and asks for consent in an interactive terminal.
+Set UPTIDE_TELEMETRY=0 to disable it. No IP, code, paths or repo names are collected.
+Other network use: your npm registry for package metadata and tarballs, PostHog EU only
+after telemetry opt-in, and GitHub when you pass `fix --pr` or run `pr` / `pr-body`.
 
-There is no Uptide server. In a table:
+There is no Uptide server. With telemetry off (the default):
 
 | | Where it runs | What leaves your machine |
 | --- | --- | --- |
@@ -197,6 +199,22 @@ There is no Uptide server. In a table:
 
 Without a key, or with `--no-llm`, those sites are listed for you instead. The full model, and how to report a problem, is in
 [SECURITY.md](SECURITY.md).
+
+## Optional anonymous telemetry
+
+On your first interactive run, Uptide asks once whether to share anonymous usage;
+pressing Enter means **no**. CI and piped/JSON runs never prompt. Use
+`uptide telemetry on`, `off`, `status`, or `show` (the last sanitized event).
+`UPTIDE_TELEMETRY=0` always disables collection. CI requires `UPTIDE_TELEMETRY=1`,
+even when the saved preference is on.
+
+With consent, events contain a random installation ID, a salted repository hash,
+command/version, proven public npm package versions, aggregate counts, verification
+result, timings and cost. No IP, code, paths, repository names or user names are
+collected. Data is stored in **PostHog Cloud EU**, with a **90-day retention policy**.
+Delivery is best effort in a short-lived background process; unavailable telemetry
+never fails a command. Builds without a capture key send nothing.
+See [the exact fields, controls and deployment requirements](docs/telemetry.md).
 
 ## Exit codes
 

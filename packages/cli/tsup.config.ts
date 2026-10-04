@@ -17,6 +17,7 @@ const cjsGlobals = [
 export default defineConfig({
   entry: {
     index: 'src/index.ts',
+    'telemetry-sender': 'src/telemetry/sender.ts',
     // Analysis runs in this thread so the main one can keep drawing progress.
     'engine-worker': 'src/engine-worker.ts',
     // The engine starts `./worker.js` next to whichever file holds its code; chunks and
@@ -35,6 +36,10 @@ export default defineConfig({
   minifySyntax: true,
   // The engine is bundled in: it learns the published version (and so its dist-tag) here.
   define: {
+    __UPTIDE_TELEMETRY_KEY__: JSON.stringify(process.env.UPTIDE_TELEMETRY_BUILD_KEY ?? ''),
+    __UPTIDE_TELEMETRY_HOST__: JSON.stringify(
+      process.env.UPTIDE_TELEMETRY_BUILD_HOST ?? 'https://eu.i.posthog.com',
+    ),
     __UPTIDE_VERSION__: JSON.stringify(version),
     __UPTIDE_CLI_VERSION__: JSON.stringify(version),
   },

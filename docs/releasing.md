@@ -54,3 +54,13 @@ git commit -am "release: uptide x.y.z" && git tag vx.y.z && git push --follow-ta
 ```
 
 Running this workflow is the owner's decision; no other workflow or script moves `latest`.
+
+## Optional telemetry capture
+
+Both release workflows embed `UPTIDE_TELEMETRY_BUILD_KEY` from the same-named GitHub
+Actions repository secret and use `https://eu.i.posthog.com` as the build host.
+Without the secret, published builds send no telemetry. Configure only a write-only
+project capture key after enabling discard-client-IP and verifying automatic 90-day
+deletion in the EU project. See [the telemetry deployment checklist](telemetry.md#release-configuration-maintainers).
+Do not use a personal API key. This key is intentionally public in the CLI bundle;
+it is supplied through the pipeline rather than committed to source.

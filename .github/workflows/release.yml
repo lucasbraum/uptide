@@ -26,6 +26,9 @@ jobs:
       # npm provenance: the registry verifies this workflow's OIDC identity.
       id-token: write
     env:
+      # Set the write-only key only after the privacy/90-day setup in docs/telemetry.md.
+      UPTIDE_TELEMETRY_BUILD_KEY: ${{ secrets.UPTIDE_TELEMETRY_BUILD_KEY }}
+      UPTIDE_TELEMETRY_BUILD_HOST: https://eu.i.posthog.com
       # The one flag for provenance: 'true' only when the repository is public.
       UPTIDE_PROVENANCE: ${{ github.event.repository.visibility == 'public' }}
     steps:

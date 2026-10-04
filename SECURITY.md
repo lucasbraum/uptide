@@ -33,7 +33,10 @@ compare runtime behavior. It makes no LLM call.
 assisted fixes in `fix`, only with your own `ANTHROPIC_API_KEY`, and never with `--no-llm`:
 the request carries the finding, the enclosing function or declaration and the compiler
 error for one site at a time. GitHub, through your own `gh`, only when you pass `--pr` or
-run `uptide pr` / `uptide pr-body`. No telemetry, no account, no Uptide server.
+run `uptide pr` / `uptide pr-body`. No account or Uptide server.
+Anonymous telemetry is off by default; opt-in sends only the fields documented in
+[docs/telemetry.md](docs/telemetry.md) to PostHog EU. No IP, code, paths or repo/user names
+are collected. `UPTIDE_TELEMETRY=0` always disables it.
 
 **Not a sandbox.** Uptide does not contain a malicious repository: `fix` runs that
 repository's tests with your user's permissions, as you would. Run it on code you would

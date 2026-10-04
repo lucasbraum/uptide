@@ -20,7 +20,9 @@ describe('privacy statement', () => {
     expect(text).toContain('Analysis runs locally.');
     expect(text).toContain('only for assisted fixes');
     expect(text).toContain('only with your own ANTHROPIC_API_KEY');
-    expect(text).toContain('No telemetry, no account.');
+    expect(text).toContain('Anonymous telemetry is off by default');
+    expect(text).toContain('UPTIDE_TELEMETRY=0');
+    expect(text).toContain('No IP, code, paths or repo names are collected.');
   });
 
   it.each([[[]], [['fix']]])('is part of `uptide %s --help`', async (command) => {
@@ -56,7 +58,7 @@ describe('fix --no-llm', () => {
     await run(['fix', '--only', 'zod'], io, engine);
     expect(engine.calls[0]).toMatchObject({ llm: true });
     expect(io.stderr()).toContain('note: assisted fixes are on.');
-    expect(io.stderr()).toContain('Pass --no-llm to keep everything on this machine.');
+    expect(io.stderr()).toContain('Pass --no-llm to keep code on this machine.');
   });
 
   it('gives the engine no fixer at all, even with a key in the environment', async () => {

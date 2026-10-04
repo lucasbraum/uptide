@@ -5,7 +5,7 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**"],
       "cache": false,
-      "env": ["UPTIDE_BUILD_CLEAN"]
+      "env": ["UPTIDE_BUILD_CLEAN", "UPTIDE_TELEMETRY_BUILD_KEY", "UPTIDE_TELEMETRY_BUILD_HOST"]
     },
     "typecheck": {
       "dependsOn": ["^build"]
