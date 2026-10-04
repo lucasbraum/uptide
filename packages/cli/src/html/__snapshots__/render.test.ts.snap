@@ -74,21 +74,14 @@ exports[`HTML report > renders skipped from report JSON without requiring JS 1`]
 <input id="search" type="search" aria-label="Search file paths and change rules" placeholder="Search files or rules…">
 </div>
 <section aria-label="Dependency summary" class="summary">
-<a class="dep" href="#dependency-0" data-package="dependency-0">
-<div>
-<strong>stripe (packages/api)</strong>
-<span class="mono muted">14.25.0 → 22.6.2 · major</span>
-</div>
-<div class="unverified">– not analyzed: Registry unreachable</div>
-</a>
+<p class="more safe">✓ Nothing to upgrade. No findings in the analyzed scope.</p>
 </section>
 <p id="empty-filter" class="notice" hidden>No findings match these filters.</p>
-<section class="package" id="dependency-0">
+<section class="package" id="not-analyzed">
 <header>
-<h2>stripe (packages/api)</h2>
-<span class="mono muted">14.25.0 → 22.6.2</span>
+<h2>Not analyzed</h2>
 </header>
-<p class="more">– not analyzed: Registry unreachable</p>
+<p class="more breaking">stripe 14.25.0: Registry unreachable; workspace analysis incomplete</p>
 </section>
 <details class="notes">
 <summary>Analysis notes · 3 notes</summary>
@@ -140,7 +133,7 @@ exports[`HTML report > renders stripe from report JSON without requiring JS 1`] 
 <a class="dep" href="#dependency-0" data-package="dependency-0">
 <div>
 <strong>stripe (packages/api)</strong>
-<span class="mono muted">14.25.0 → 23.0.0 · major</span>
+<span class="mono muted">14.25.0 → 23.0.0 · major · verified</span>
 </div>
 <div class="breaking">✗ 4 breaking in 3 files<div class="muted">1 by rule · 3 by agent</div>
 </div>
@@ -150,7 +143,7 @@ exports[`HTML report > renders stripe from report JSON without requiring JS 1`] 
 <section class="package" id="dependency-0">
 <header>
 <h2>stripe (packages/api)</h2>
-<span class="mono muted">14.25.0 → 23.0.0</span>
+<span class="mono muted">14.25.0 → 23.0.0 · verified</span>
 </header>
 <details class="group" data-severity="breaking" data-rule="fixture-cast">
 <summary>
@@ -228,7 +221,7 @@ exports[`HTML report > renders zod from report JSON without requiring JS 1`] = `
 <a class="dep" href="#dependency-0" data-package="dependency-0">
 <div>
 <strong>zod</strong>
-<span class="mono muted">3.25.76 → 4.6.5 · major</span>
+<span class="mono muted">3.25.76 → 4.6.5 · major · verified</span>
 </div>
 <div class="breaking">✗ 28 breaking in 7 files<div class="muted">24 by rule · 4 by agent</div>
 </div>
@@ -238,7 +231,7 @@ exports[`HTML report > renders zod from report JSON without requiring JS 1`] = `
 <section class="package" id="dependency-0">
 <header>
 <h2>zod</h2>
-<span class="mono muted">3.25.76 → 4.6.5</span>
+<span class="mono muted">3.25.76 → 4.6.5 · verified</span>
 </header>
 <details class="group" data-severity="breaking" data-rule="error-params">
 <summary>
