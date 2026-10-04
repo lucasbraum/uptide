@@ -3,8 +3,7 @@ import { expect, it, vi } from 'vitest';
 
 vi.mock('./memory.js', () => ({
   freeMemoryBytes: () => 512 * 1024 ** 2,
-  estimateWorkspaceMb: () => 8192,
-  estimateDeclarationHeapMb: () => 0,
+  estimateScopedHeapMb: () => 8192,
   memoryPolicy: () => ({ workers: 1, heapMb: 200, budgetMb: 307 }),
 }));
 vi.mock('../fetch/npm-fetcher.js', () => ({

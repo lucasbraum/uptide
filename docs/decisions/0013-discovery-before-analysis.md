@@ -17,6 +17,13 @@ only matching versions/workspaces; consumers must rerun check after editing thei
 Unknown effort never means safe. Peer metadata comes from the registry, not tarballs.
 
 Analysis workers reserve at most about 60% of OS-available memory including estimated
-native overhead. CPU count and a source/dependency-size and installed-declaration estimate limit concurrency;
-workspaces estimated too large are reported as skipped. Estimates cannot guarantee RSS;
-unexpected worker failures remain partial results. User overrides cannot exceed the budget.
+native overhead. Named checks load only importing workspaces; baseline and target programs start
+from the importers and follow their imports. Cache keys include the roots. Memory estimates use
+that resolved graph (including ambient types and workspace source mappings), weighted for source,
+declaration and per-root checker costs. Calibration uses actual peak process RSS on public repos.
+Concurrency is capped by CPU count, active workspaces and memory; a single workspace receives the
+full reservation. Parallel memory failures are retried serially after all other programs release
+memory. Skipping is reserved for a scoped program that cannot fit alone, with the workspace,
+estimate and available memory reported. Estimates cannot guarantee RSS; failures remain partial
+results. User overrides cannot exceed the budget. Every importing root receives baseline/target
+diagnostics, even when an unused or JSX binding has no attributed API usage.

@@ -1,5 +1,5 @@
 import { readFileSync, realpathSync } from 'node:fs';
-import { join, resolve, sep } from 'node:path';
+import { join, relative, resolve, sep } from 'node:path';
 import { typescriptAdapter } from '../adapters/typescript/index.js';
 import { createFsSurfaceCache } from '../cache/fs-surface-cache.js';
 import { diffDirs } from '../diff-package.js';
@@ -28,6 +28,7 @@ import {
 import { createNpmFetcher, releasePackage } from '../fetch/npm-fetcher.js';
 import { maxSatisfying } from '../fetch/range.js';
 import { planPackage } from '../fix/plan.js';
+import { scanImports } from '../list/scan.js';
 import { packFixability } from '../packs/fixability.js';
 import { stripePack } from '../packs/stripe/index.js';
 import type { MigrationPack } from '../packs/types.js';
@@ -38,12 +39,7 @@ import { arbitrateUnchecked } from './file-kind.js';
 import { groupName, releaseGroups } from './groups.js';
 import { importedByText, importFileCounts } from './importers.js';
 import { match } from './match.js';
-import {
-  estimateDeclarationHeapMb,
-  estimateWorkspaceMb,
-  freeMemoryBytes,
-  memoryPolicy,
-} from './memory.js';
+import { estimateScopedHeapMb, freeMemoryBytes, memoryPolicy } from './memory.js';
 import { mergeSignals } from './merge.js';
 import {
   hasTopLevelAwait,
@@ -53,7 +49,7 @@ import {
   resolveNodeVersion,
   shipsTypes,
 } from './module-format.js';
-import { mapWithLimit } from './pool.js';
+import { mapWithLimit, mapWithSerialRetry } from './pool.js';
 import { isBehind, rankCandidates } from './rank.js';
 import { groupRootCauses } from './root-cause.js';
 import { runtimeChangeFindings } from './runtime-changes.js';
@@ -120,6 +116,7 @@ export interface CheckOptions {
 export interface WorkspaceJob {
   cwd: string;
   workspace: string;
+  rootFiles?: string[];
   workspaces: string[];
   installedByWorkspace: Record<string, Record<string, string>>;
   /** Packages each workspace's own sources import, declared or not (a text scan). */
@@ -150,14 +147,10 @@ export async function check(opts: CheckOptions): Promise<CheckResult> {
   const ctx: Ctx = { adapter, fetcher: memoizingFetcher(fetcher), cache, findUsages, opts };
   const installedByWorkspace: Record<string, Record<string, string>> = {};
   const catalogByWorkspace: Record<string, string[]> = {};
-  const declaredByWorkspace: Record<string, string[]> = {};
   for (const workspace of workspaces) {
     const repo = { dir: resolve(opts.cwd, workspace) };
     installedByWorkspace[workspace] = Object.fromEntries(await adapter.installedDependencies(repo));
     const specifiers = (await adapter.declaredSpecifiers?.(repo)) ?? new Map<string, string>();
-    declaredByWorkspace[workspace] = [
-      ...new Set([...specifiers.keys(), ...Object.keys(installedByWorkspace[workspace] ?? {})]),
-    ];
     catalogByWorkspace[workspace] = [...specifiers]
       .filter(([, spec]) => spec.startsWith('catalog:'))
       .map(([name]) => name);
@@ -167,9 +160,26 @@ export async function check(opts: CheckOptions): Promise<CheckResult> {
   const candidates = opts.only ?? [
     ...new Set(Object.values(installedByWorkspace).flatMap((deps) => Object.keys(deps))),
   ];
+  const scopedImports =
+    opts.only && !opts.adapter ? scanImports(opts.cwd, candidates, workspaces) : undefined;
+  const roots = new Map<string, string[]>();
+  for (const workspace of workspaces) {
+    const files = new Set<string>();
+    for (const usage of scopedImports?.values() ?? [])
+      for (const file of usage.files) {
+        const owner =
+          [...workspaces]
+            .sort((a, b) => b.length - a.length)
+            .find((w) => w !== '.' && file.startsWith(`${w}/`)) ?? '.';
+        if (owner === workspace) files.add(resolve(opts.cwd, file));
+      }
+    if (scopedImports) roots.set(workspace, [...files].sort());
+  }
   const importedByWorkspace: Record<string, string[]> = {};
   for (const workspace of workspaces)
-    importedByWorkspace[workspace] = importedByText(opts.cwd, workspace, candidates, workspaces);
+    importedByWorkspace[workspace] = scopedImports
+      ? candidates.filter((name) => scopedImports.get(name)?.workspaces.includes(workspace))
+      : importedByText(opts.cwd, workspace, candidates, workspaces);
   // Most likely to hurt first: the order every workspace follows, and what the time budget cuts.
   const linked = (version: string | undefined): boolean =>
     version !== undefined && /^(link|workspace|file):/.test(version);
@@ -232,6 +242,7 @@ export async function check(opts: CheckOptions): Promise<CheckResult> {
     .map((workspace) => ({
       cwd: opts.cwd,
       workspace,
+      ...(roots.has(workspace) ? { rootFiles: roots.get(workspace) as string[] } : {}),
       workspaces,
       installedByWorkspace,
       importedByWorkspace,
@@ -239,44 +250,21 @@ export async function check(opts: CheckOptions): Promise<CheckResult> {
     }));
   const injected =
     opts.adapter !== undefined || opts.fetcher !== undefined || opts.cache !== undefined;
-  const workspaceName = new Map(
-    workspaces.map((w) => [readManifest(resolve(opts.cwd, w))?.name, w]),
-  );
-  const reachableWorkspaces = (workspace: string): string[] => {
-    const found = new Set([workspace]);
-    for (const current of found)
-      for (const dependency of declaredByWorkspace[current] ?? []) {
-        const local = workspaceName.get(dependency);
-        if (local && local !== '.') found.add(local);
-      }
-    return [...found];
-  };
-  const declarationsMb = injected ? 0 : estimateDeclarationHeapMb(opts.cwd);
   const estimates = new Map(
     jobs.map((job) => [
       job.workspace,
-      injected
+      injected || job.rootFiles?.length === 0
         ? 0
-        : 512 +
-          reachableWorkspaces(job.workspace).reduce(
-            (sum, w) =>
-              sum +
-              estimateWorkspaceMb(
-                resolve(job.cwd, w),
-                Object.keys(installedByWorkspace[w] ?? {}).length,
-              ) -
-              512,
-            0,
-          ),
+        : estimateScopedHeapMb(resolve(job.cwd, job.workspace), job.rootFiles),
     ]),
   );
-  if (!injected)
-    for (const [workspace, estimate] of estimates)
-      estimates.set(workspace, Math.max(estimate, declarationsMb));
   const policy = memoryPolicy(
     undefined,
     undefined,
-    opts.workspaceConcurrency,
+    Math.min(
+      opts.workspaceConcurrency ?? Number.MAX_SAFE_INTEGER,
+      jobs.filter((j) => (estimates.get(j.workspace) ?? 0) > 0).length || 1,
+    ),
     Math.max(1024, ...estimates.values()),
   );
   const workers = injected ? 1 : policy.workers;
@@ -287,14 +275,14 @@ export async function check(opts: CheckOptions): Promise<CheckResult> {
   const guarded = (run: (job: WorkspaceJob) => Promise<PackageReport[]>) => (job: WorkspaceJob) =>
     (async () => {
       const estimate = estimates.get(job.workspace) ?? 0;
-      const available = Math.min(policy.heapMb, memoryPolicy(undefined, 1, 1).heapMb);
+      const available = job.opts.workerHeapMb ?? policy.heapMb;
       const active = (importedByWorkspace[job.workspace] ?? []).some((name) =>
         behindNames.has(name),
       );
       if (!injected && (active || opts.allDeps) && estimate > available)
         throw new UptideError(
           'MEMORY_BUDGET',
-          `workspace ${job.workspace} needs approximately ${estimate} MB of heap; ${available} MB fits the 60% available-memory budget. Close other applications or check a smaller workspace.`,
+          `workspace ${job.workspace}: scoped program estimate ${estimate} MB of heap; ${available} MB available for a single worker within the ${policy.budgetMb} MB memory budget (60% of available memory). Close other applications or check a smaller workspace.`,
         );
       return run(job);
     })().catch((err: unknown): PackageReport[] => {
@@ -316,16 +304,34 @@ export async function check(opts: CheckOptions): Promise<CheckResult> {
             errorCode(err) === 'MEMORY_BUDGET'
               ? (err as Error).message
               : /memory/i.test(String((err as Error).message))
-                ? `analysis failed: out of memory in ${job.workspace} (try uptide check ${name} in a smaller workspace or free more memory)`
+                ? `workspace ${job.workspace}: scoped program exhausted its memory reservation (estimate ${estimates.get(job.workspace) ?? 0} MB of heap; ${job.opts.workerHeapMb ?? policy.heapMb} MB available). No safety verdict; free more memory and retry.`
                 : `analysis failed: ${(err as Error).message ?? String(err)}`,
           ],
         }));
     });
   const results = !injected
-    ? await mapWithLimit(
+    ? await mapWithSerialRetry(
         jobs,
         workers,
-        guarded((job) => runInWorker(job, opts.onProgress)),
+        guarded((job) =>
+          job.rootFiles?.length === 0 && !opts.allDeps
+            ? checkWorkspace(ctx, job)
+            : runInWorker(job, opts.onProgress),
+        ),
+        (reports) =>
+          reports.some(
+            (p) => p.skipReason === 'ERR_WORKER_OUT_OF_MEMORY' || p.skipReason === 'MEMORY_BUDGET',
+          ),
+        async (job) => {
+          // The graph estimate cannot predict every expensive type instantiation. Retry
+          // only after parallel jobs release memory, respecting the original reservation.
+          const serial = memoryPolicy(undefined, 1, 1);
+          const heapMb = Math.min(serial.heapMb, Math.floor(policy.budgetMb / 1.4));
+          return guarded((retry) => runInWorker(retry, opts.onProgress))({
+            ...job,
+            opts: { ...job.opts, workspaceConcurrency: 1, workerHeapMb: heapMb },
+          });
+        },
       )
     : await mapWithLimit(
         jobs,
@@ -645,7 +651,10 @@ async function runInWorker(
         void worker.terminate().then(() => resolvePromise(message.reports));
       }
     });
-    worker.once('error', reject);
+    worker.once('error', (err) => {
+      settled = true;
+      void worker.terminate().then(() => reject(err));
+    });
     worker.once('exit', (code) => {
       if (!settled) reject(new Error(`workspace ${job.workspace}: worker exited with ${code}`));
     });
@@ -720,7 +729,7 @@ async function checkWorkspace(ctx: Ctx, job: WorkspaceJob): Promise<PackageRepor
   }
   {
     const dir = resolve(opts.cwd, workspace);
-    const repo: RepoDir = { dir };
+    const repo: RepoDir = { dir, ...(job.rootFiles ? { rootFiles: job.rootFiles } : {}) };
     const installed = new Map(Object.entries(installedByWorkspace[workspace] ?? {}));
     // Another workspace that declares the dependency itself answers for its own files, whether
     // nested under this one (the root's include) or pulled in through a project reference.
@@ -735,7 +744,7 @@ async function checkWorkspace(ctx: Ctx, job: WorkspaceJob): Promise<PackageRepor
             installedByWorkspace[w]?.[name] !== undefined || importedByWorkspace[w]?.includes(name),
         )
         .map((w) => resolve(opts.cwd, w));
-      return exclude.length > 0 ? { dir, exclude } : repo;
+      return exclude.length > 0 ? { ...repo, exclude } : repo;
     };
     const imported = opts.allDeps
       ? undefined
@@ -1469,7 +1478,14 @@ async function checkGroup(
             ),
             {
               fetcher: ctx.fetcher,
-              files: [...new Set(allUsages.map((u) => u.file))],
+              files: [
+                ...new Set([
+                  ...allUsages.map((u) => u.file),
+                  // A removed JSX/import binding can have no attributed usage. Every scoped
+                  // importer must still receive baseline/target diagnostics.
+                  ...(repo.rootFiles ?? []).map((file) => relative(repo.dir, file)),
+                ]),
+              ],
               ...(baselineTargets.length > 0 ? { baselineTargets } : {}),
             },
           ),

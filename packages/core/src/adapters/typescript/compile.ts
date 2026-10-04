@@ -535,7 +535,7 @@ export async function compileAgainstTargets(
 ): Promise<CompileSignal> {
   let repo: LoadedRepo;
   try {
-    repo = loadedRepo(realpathSync(repoRef.dir));
+    repo = loadedRepo(realpathSync(repoRef.dir), repoRef.rootFiles);
   } catch (err) {
     const message = (err instanceof Error ? err.message : String(err)).split('\n')[0] ?? '';
     return {

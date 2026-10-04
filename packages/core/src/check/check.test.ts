@@ -52,6 +52,32 @@ process.env.UPTIDE_CACHE_DIR = mkdtempSync(join(tmpdir(), 'uptide-test-cache-'))
 
 const adapter = createTypescriptAdapter({ now: () => new Date('2026-09-27T00:00:00.000Z') });
 
+it('compiles every named importer even when an unused removed binding has no attributed usage', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'uptide-scoped-import-'));
+  cpSync(CONSUMER, dir, { recursive: true });
+  const config = JSON.parse(readFileSync(join(dir, 'tsconfig.json'), 'utf8'));
+  for (const key of Object.keys(config.compilerOptions.paths))
+    config.compilerOptions.paths[key] = config.compilerOptions.paths[key].map((p: string) =>
+      resolve(CONSUMER, p),
+    );
+  writeFileSync(join(dir, 'tsconfig.json'), JSON.stringify(config));
+  writeFileSync(join(dir, 'unused.ts'), "import { parseLegacy } from 'synthetic';\nexport {};\n");
+  const result = await check({
+    cwd: dir,
+    only: ['synthetic'],
+    fetcher,
+    cache: memoryCache(),
+    runtime: false,
+  });
+  expect(result.packages[0]?.findings).toContainEqual(
+    expect.objectContaining({
+      severity: 'breaking',
+      evidence: 'compiler',
+      usage: expect.objectContaining({ file: 'unused.ts', line: 1 }),
+    }),
+  );
+});
+
 describe('check on the synthetic consumer', () => {
   it('produces one package report with both signals and the expected findings', {
     timeout: 30_000,

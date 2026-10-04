@@ -1,9 +1,10 @@
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { PackageFetcher } from '../../domain/io.js';
 import { compileAgainstTarget, compileAgainstTargets, readableMessage } from './compile.js';
+import { loadedRepo } from './repo.js';
 
 const ROOT = resolve(import.meta.dirname, '../../../../../fixtures');
 const CONSUMER = join(ROOT, 'repos/synthetic-consumer');
@@ -51,6 +52,34 @@ describe('Signal B: compile against the target version', () => {
     expect(signal.diagnostics.map((d) => `${d.file}:${d.line} ${d.code}`)).toEqual([
       'src/chains.ts:6 2554',
     ]);
+  });
+
+  it('scopes both baseline and target roots, following imports without loading unrelated files', async () => {
+    const dir = consumerCopy((d) => {
+      writeFileSync(join(d, 'src/root.ts'), "import './chains';\n");
+      writeFileSync(join(d, 'src/unrelated.ts'), 'export const broken: number = "bad";\n');
+    });
+    const rootFiles = [join(dir, 'src/root.ts')];
+    const scoped = loadedRepo(dir, rootFiles);
+    expect(scoped.project.getProgram().compilerObject.getRootFileNames()).toEqual(
+      rootFiles.map((file) => realpathSync(file)),
+    );
+    expect(scoped.project.getSourceFiles().some((f) => f.getBaseName() === 'chains.ts')).toBe(true);
+    expect(scoped.project.getSourceFiles().some((f) => f.getBaseName() === 'unrelated.ts')).toBe(
+      false,
+    );
+    const signal = await compileAgainstTarget(
+      { dir, rootFiles },
+      'synthetic',
+      join(ROOT, 'synthetic-v2'),
+    );
+    expect(signal.baselineErrors).toBe(0);
+    expect(signal.diagnostics.map((d) => `${d.file}:${d.line} ${d.code}`)).toEqual([
+      'src/chains.ts:6 2554',
+    ]);
+    // A scoped cache entry must never contaminate an unscoped compile in the same process.
+    const full = await compileAgainstTarget({ dir }, 'synthetic', join(ROOT, 'synthetic-v2'));
+    expect(full.baselineErrors).toBe(1);
   });
 
   it('counts modules the target imports that neither it nor the consumer can resolve, without making findings of them', async () => {

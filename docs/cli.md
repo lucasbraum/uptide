@@ -61,8 +61,13 @@ A dependency whose analysis fails (the registry refuses, a tarball cannot be fet
 workspace runs out of memory) is listed under "Not analyzed" with the reason, and the
 others are reported as usual. CPU count and available memory choose concurrency. About
 60% of available physical memory (including OS-reported reclaimable memory) is reserved for
-worker heaps plus native overhead. Source size, dependency count and installed declaration volume estimate workspace cost;
-a workspace that does not fit is skipped with a clear reason. `UPTIDE_WORKER_HEAP_MB` can
+worker heaps plus native overhead. Only workspaces importing the named packages load programs.
+Both baseline and target start from those importers, following their imports with the repository's
+compiler options. The estimate counts reachable sources/declarations and importer roots, not all
+installed declarations. If parallel execution does not fit, workspaces run serially with the full
+reservation. An unexpected parallel memory failure is retried serially after other workers finish.
+Only a scoped program that cannot fit alone is skipped, naming the workspace, estimate and available
+memory. Partial or failed analysis is never called clean. `UPTIDE_WORKER_HEAP_MB` can
 lower the limit, but cannot override the memory budget. Unexpected allocation failures
 remain isolated to the workspace. Recursion failures name the package and give no safety verdict.
 

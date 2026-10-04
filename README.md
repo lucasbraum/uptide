@@ -213,7 +213,11 @@ fully answered. `list` exits 2 when discovery is incomplete, while retaining suc
 
 Analysis concurrency uses CPU count and available memory (including reclaimable memory
 reported by the OS), reserving at most about 60% for worker heaps and estimated overhead.
-A workspace estimated too large is skipped with its estimate and budget, not called safe.
+Named checks build their baseline and target programs from the files importing those packages;
+TypeScript follows their imports. Workspaces with no such imports load no program. The estimate
+uses only that reachable graph. Workspaces run serially with the full reservation when they
+cannot fit in parallel; unexpected parallel memory failures get one serial retry. Only a scoped
+program that cannot fit alone is skipped, with its workspace, estimate and available budget.
 `--workspaces` and `UPTIDE_WORKER_HEAP_MB` can lower limits, never bypass the memory cap.
 Compiler allocations are estimates; unexpected worker failures still preserve other results.
 

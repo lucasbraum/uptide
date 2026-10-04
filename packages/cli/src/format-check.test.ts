@@ -459,3 +459,29 @@ describe('tiers, the time budget and failures on the first screen', () => {
     expect(out).not.toMatch(/^pg +8/m);
   });
 });
+
+it('renders one TypeScript API cause with 112 sites, expanding locations only in details', () => {
+  const cause = removed('scripts/compiler.ts', 1);
+  cause.change = { ...cause.change, kind: 'cause', path: 'cause:typescript-no-js-api' };
+  cause.reason = 'TypeScript 7 has no JavaScript compiler API in its main entry';
+  cause.rule = 'typescript-no-js-api';
+  cause.evidence = 'compiler';
+  cause.downstream = Array.from({ length: 112 }, (_, i) => ({
+    file: 'scripts/compiler.ts',
+    line: i + 1,
+    column: 1,
+    code: 2339,
+    message: 'Compiler API member missing',
+    snippet: 'ts.createProgram()',
+  }));
+  const data = report([pkg({ name: 'typescript', status: 'breaking', findings: [cause] })]);
+  const normal = formatCheck(data, { color: false });
+  expect(normal).toMatch(
+    /TypeScript 7 has no JavaScript compiler API in its main entry +112 sites/,
+  );
+  expect(normal).not.toContain('scripts/compiler.ts');
+  expect(normal).not.toContain('ts.createProgram()');
+  const details = formatCheck(data, { color: false, details: true });
+  expect(details).toContain('scripts/compiler.ts:112');
+  expect(details.match(/Compiler API member missing/g)).toHaveLength(112);
+});

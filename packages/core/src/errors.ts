@@ -99,6 +99,7 @@ export type ErrorCode =
   | 'ANALYSIS_FAILED'
   | 'TIME_BUDGET'
   | 'MEMORY_BUDGET'
+  | 'ERR_WORKER_OUT_OF_MEMORY'
   | 'ANALYSIS_STACK_OVERFLOW'
   | 'NO_FIXER'
   | 'RUN_STALE';

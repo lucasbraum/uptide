@@ -152,7 +152,7 @@ export function createTypescriptAdapter(opts: TypescriptAdapterOptions = {}): Ty
       return workspacePackagesOf(root.dir);
     },
     async repoWarnings(repo) {
-      return loadedRepo(realpathSync(repo.dir)).warnings;
+      return loadedRepo(realpathSync(repo.dir), repo.rootFiles).warnings;
     },
     async declaredSpecifiers(repo) {
       const { packageJson } = readInstalled(realpathSync(repo.dir));
