@@ -49,7 +49,7 @@ export function formatFixSummary(report: FixReport, opts: FormatFixOptions = {})
       : []),
     ...(report.llm.costLimit
       ? [
-          `  ${pad('Agent', 9)} stopped at $${report.llm.costLimit.limitUsd.toFixed(2)} (--max-cost): ${report.llm.costLimit.notAttempted} site${report.llm.costLimit.notAttempted === 1 ? '' : 's'} not attempted`,
+          `  ${pad('Agent', 9)} stopped at $${report.llm.costLimit.limitUsd.toFixed(2)} (--max-cost): ${report.llm.costLimit.notAttempted} site${report.llm.costLimit.notAttempted === 1 ? '' : 's'} not completed`,
         ]
       : []),
     '',

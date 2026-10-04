@@ -94,3 +94,5 @@ one is not merged, whatever else it does.
 By contributing you agree that your contribution is licensed under the [MIT license](LICENSE).
 Everyone taking part is expected to follow the [code of conduct](CODE_OF_CONDUCT.md).
 Security problems go through [SECURITY.md](SECURITY.md), not public issues.
+
+Provider adapter tests replay synthetic protocol fixtures with mocked HTTPS; CI must never call a live LLM. Update dated pricing and the telemetry model allowlist together. Run live storefront comparisons only with environment keys, never record keys or customer source in fixtures.

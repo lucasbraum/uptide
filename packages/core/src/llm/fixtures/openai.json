@@ -1,0 +1,21 @@
+{
+  "status": "completed",
+  "output": [
+    {
+      "type": "function_call",
+      "name": "submit_patch",
+      "arguments": "{\"diff\": \"--- a/src/a.ts\\n+++ b/src/a.ts\\n@@ -1 +1 @@\\n-export const n: number = \\\"bad\\\";\\n+export const n: number = 42;\\n\", \"explanation\": \"Protocol fixture only\"}"
+    }
+  ],
+  "usage": {
+    "input_tokens": 100,
+    "input_tokens_details": {
+      "cached_tokens": 10,
+      "cache_write_tokens": 20
+    },
+    "output_tokens": 20,
+    "output_tokens_details": {
+      "reasoning_tokens": 5
+    }
+  }
+}

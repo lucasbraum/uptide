@@ -19,7 +19,7 @@ describe('privacy statement', () => {
     const text = flat(PRIVACY);
     expect(text).toContain('Analysis runs locally.');
     expect(text).toContain('only for assisted fixes');
-    expect(text).toContain('only with your own ANTHROPIC_API_KEY');
+    expect(text).toContain('only with your own API key from ANTHROPIC_API_KEY');
     expect(text).toContain('Anonymous telemetry is off by default');
     expect(text).toContain('UPTIDE_TELEMETRY=0');
     expect(text).toContain('No IP, code, paths or repo names are collected.');

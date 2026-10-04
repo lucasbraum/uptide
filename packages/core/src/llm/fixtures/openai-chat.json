@@ -1,0 +1,31 @@
+{
+  "model": "gpt-6.1-sol",
+  "choices": [
+    {
+      "finish_reason": "tool_calls",
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "type": "function",
+            "function": {
+              "name": "submit_patch",
+              "arguments": "{\"diff\": \"--- a/src/a.ts\\n+++ b/src/a.ts\\n@@ -1 +1 @@\\n-export const n: number = \\\"bad\\\";\\n+export const n: number = 42;\\n\", \"explanation\": \"Protocol fixture only\"}"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 100,
+    "completion_tokens": 20,
+    "prompt_tokens_details": {
+      "cached_tokens": 10
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 5
+    }
+  }
+}

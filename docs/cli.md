@@ -117,13 +117,84 @@ site with evidence goes to the agent, one at a time, and an edit is kept only if
 site's compiler error disappears and no new one appears. The verification and the publish
 gate are the same as for a verified dependency.
 
-- It needs `ANTHROPIC_API_KEY`. Without one, or with `--no-llm`, it says what it cannot do
+- It needs the selected provider’s environment API key (see Choosing a model). Without one, or with `--no-llm`, it says what it cannot do
   and exits before creating a clone, a branch or an install.
-- `--max-cost <usd>` (default 1) stops the agent once its calls have cost that much. Sites
-  not attempted stay manual, the summary and the pull request say how many, and a run with
+- `--max-cost <usd>` (default 1) reserves the worst-case cost before every call, including retries. Sites
+  not completed stay manual, the summary and the pull request say how many, and a run with
   sites left does not verify, so it cannot be published.
 - The pull request opens with a note that no migration pack covers the package, and its
   risk is never Low.
+
+## Choosing a model
+
+Assisted fixes support Anthropic, OpenAI and Gemini, with the same prompts, tool,
+verification and publish gate. Set the chosen provider's key in your environment:
+`ANTHROPIC_API_KEY`, `OPENAI_API_KEY` or `GEMINI_API_KEY`. Never put keys in repository
+config or command arguments.
+
+```sh
+uptide fix zod --provider openai --model gpt-6.1-sol
+UPTIDE_PROVIDER=gemini UPTIDE_MODEL=gemini-3.8-flash uptide fix stripe
+uptide fix zod --max-cost 1
+uptide fix zod --no-llm
+```
+
+For each setting, precedence is flag → `UPTIDE_PROVIDER` / `UPTIDE_MODEL` → nearest
+`uptide.config.json` up to the Git root. Without a provider setting, detection checks
+`ANTHROPIC_API_KEY`, then `OPENAI_API_KEY`, then `GEMINI_API_KEY`; Anthropic remains the
+overall default. An explicitly selected provider never falls back to another provider.
+The selected provider/model prints before the fix starts, and spend prints at the end.
+
+The optional config accepts **only** `provider` and `model` strings:
+
+```json
+{ "provider": "openai", "model": "gpt-6.1-sol" }
+```
+
+Unknown fields, nested settings and key-like values are rejected, including when flags
+would override them. Keys are read only from the environment. No key: a generic fix
+exits before cloning, installing or creating a branch; migration packs still apply
+rule-based fixes and leave assisted sites manual. `--no-llm` disables all model calls.
+
+Defaults checked against official documentation on 2026-10-04:
+
+| Provider | Default | Reference |
+| --- | --- | --- |
+| Anthropic | `claude-sonnet-5-5` (`medium` effort) | [Sonnet 5.5](https://platform.claude.com/docs/en/models/sonnet-5-5/overview); selected after the storefront comparison |
+| OpenAI | `gpt-6.1-sol` | [GPT-6.1 Sol](https://developers.openai.com/api/docs/models/gpt-6.1-sol), through the Responses API |
+| Gemini | `gemini-3.8-flash` | [Gemini 3.8 Flash](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash) |
+
+See the [measured storefront comparison](provider-evaluation.md) for verification,
+attempts, spend, reservations and time for each default.
+
+Tool choice follows each model’s capabilities. Sonnet 5.5 uses `auto` with a strict
+`submit_patch` schema and a tool-only system instruction; Sonnet 4.6, OpenAI and Gemini
+use forced tool calls. Missing or invalid calls consume an attempt and their reported
+cost, then receive the feedback “respond only by calling submit_patch”. HTTP 429 is
+reported as rate limiting, waits for `Retry-After` (60 seconds when absent), and retries
+only when another reservation fits the budget.
+
+`--max-cost` defaults to **$1 per package**, including zod and stripe. Before every
+call and retry, Uptide reserves its worst-case input and maximum output cost. A call
+that would exceed the remaining budget is never sent. Actual returned usage replaces
+the reservation; failures without valid usage keep the full reservation, shown
+separately as unknown spend. Rejected patches still consume budget. Unfinished sites
+remain manual and cannot pass the publish gate. Unknown models use the provider's
+highest listed rates with a warning. See [model pricing](model-pricing.md) for
+rates, token estimation and the scope of accounting.
+
+`OPENAI_BASE_URL` selects an OpenAI **Chat Completions-compatible, not verified**
+endpoint. Uptide appends `/chat/completions` to the supplied API base URL and uses
+Bearer authentication, strict functions and forced `submit_patch`. The official OpenAI
+endpoint uses Responses when this override is absent. HTTPS is required, except HTTP
+localhost for local servers. Custom deployments must support this protocol and the
+supplied model ID; Azure-specific authentication and routing are not inferred. Custom
+endpoint prices may differ from the built-in OpenAI table.
+
+**Privacy:** assisted fixes send the finding, enclosing code snippet and compiler
+error to the provider you chose (or your `OPENAI_BASE_URL`). Your provider's data policy
+applies. `--no-llm` keeps assisted fixes off. Anonymous telemetry, when enabled, adds
+only the provider and a public model ID; private/custom model IDs become `custom`.
 
 ## `uptide fix <package>`, step by step
 
@@ -140,7 +211,7 @@ Everything happens in a temporary clone of your repository, never in your checko
 3. **Rule-based fixes.** Deterministic rewrites for the changes it has rules for, such as
    zod's `required_error` / `invalid_type_error` (add `--include-deprecated` for
    `z.string().email()`-style chains). One commit.
-4. **Assisted fixes (optional).** With `ANTHROPIC_API_KEY` set, sites the rules cannot
+4. **Assisted fixes (optional).** With the selected provider’s API key set, sites the rules cannot
    migrate go to the LLM one at a time. A patch is kept only if it removes its compiler
    error and introduces none; otherwise it is reverted and the site is left for you.
    `--no-llm` turns this off.

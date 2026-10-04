@@ -1,7 +1,11 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 import { Node, Project, SyntaxKind } from 'ts-morph';
 import type { ProgressListener } from '../domain/progress.js';
+import { ACCEPTED_KEYS } from '../llm/config.js';
+import { CostLimitError, DEFAULT_MAX_COST_USD } from '../llm/fixer.js';
+import { nanos } from '../llm/pricing.js';
 import type { MigrationPack, PackContext } from '../packs/types.js';
 import { applyFilePatch } from './patch.js';
 import { git } from './process.js';
@@ -108,10 +112,19 @@ export async function assist(
   const llm: FixReport['llm'] = {
     available: !!fixer,
     ...(disabled ? { disabled: true } : {}),
-    ...(fixer ? { model: fixer.id } : {}),
+    ...(fixer ? { model: fixer.id, ...(fixer.provider ? { provider: fixer.provider } : {}) } : {}),
     inputTokens: 0,
     outputTokens: 0,
     costUsd: 0,
+  };
+  const limit = limits.maxCostUsd ?? DEFAULT_MAX_COST_USD;
+  let halted = false;
+  // A rate limit applies across sites, including when the final attempt at a site failed.
+  let retryAfterMs = 0;
+  const stopForBudget = (site: FixSite, reason: string) => {
+    llm.costLimit ??= { limitUsd: limit, notAttempted: 0 };
+    llm.costLimit.notAttempted++;
+    site.reason += `; stopped before calling: ${reason} (--max-cost $${limit.toFixed(2)})`;
   };
   for (const site of [...sites].sort(
     (a, b) =>
@@ -119,18 +132,10 @@ export async function assist(
       a.finding.usage.line - b.finding.usage.line,
   )) {
     if (site.outcome !== 'manual') continue;
-    // The budget is checked before a site starts: what a site costs is only known afterwards,
-    // so the last one may overshoot, and nothing is abandoned half-way.
-    if (fixer && limits.maxCostUsd !== undefined && llm.costUsd >= limits.maxCostUsd) {
-      llm.costLimit ??= { limitUsd: limits.maxCostUsd, notAttempted: 0 };
-      llm.costLimit.notAttempted++;
-      site.reason += `; not attempted: the cost limit of $${limits.maxCostUsd.toFixed(2)} was reached (--max-cost)`;
-      continue;
-    }
     if (!fixer) {
       site.reason += disabled
         ? '; assisted fixes disabled (--no-llm), left manual'
-        : '; no ANTHROPIC_API_KEY, left manual';
+        : `; no LLM API key (${ACCEPTED_KEYS}), left manual`;
       continue;
     }
     const file = join(root, site.finding.usage.file);
@@ -170,6 +175,54 @@ export async function assist(
     }
     let retry: string | undefined;
     for (let attempt = 0; attempt < 3; attempt++) {
+      const request = {
+        finding: site.finding,
+        guide: pack.guide(site.finding, context),
+        // The import the site must extend is shown exactly: a shared helper's module.
+        enclosingFunction: enclosingContext(
+          original,
+          diagnostic.line,
+          diagnostic.column,
+          (context?.helpers ?? []).flatMap((h) => Object.values(h.specifiers)),
+        ),
+        source: original,
+        compilerError: `${diagnostic.file}:${diagnostic.line}:${diagnostic.column} TS${diagnostic.code}: ${diagnostic.message}${diagnostic.expected ? `\nExpected type: ${diagnostic.expected}` : ''}`,
+        ...(retry ? { retry } : {}),
+      };
+      const remaining =
+        (Math.floor(limit * 1e9) - nanos(llm.costUsd) - nanos(llm.unreportedCostUsd ?? 0)) / 1e9;
+      const reservation = fixer.estimate?.(request);
+      if (
+        halted ||
+        reservation === undefined ||
+        !Number.isFinite(reservation) ||
+        reservation < 0 ||
+        nanos(reservation) > Math.floor(remaining * 1e9)
+      ) {
+        stopForBudget(
+          site,
+          halted
+            ? 'provider accounting cannot be trusted'
+            : reservation === undefined
+              ? 'fixer supplied no worst-case estimate'
+              : `next call needs $${reservation.toFixed(6)}, remaining $${Math.max(0, remaining).toFixed(6)}`,
+        );
+        break;
+      }
+      if (retryAfterMs > 0) {
+        onProgress?.({
+          phase: 'assist',
+          package: pack.name,
+          detail: `rate limited; waiting ${Math.ceil(retryAfterMs / 1000)}s before retry`,
+          state: 'start',
+        });
+        // Do not retry early, and allow cancellation/event processing during long waits.
+        while (retryAfterMs > 0) {
+          const wait = Math.min(60_000, retryAfterMs);
+          await delay(wait);
+          retryAfterMs -= wait;
+        }
+      }
       const where = `${site.finding.usage.file}:${site.finding.usage.line}${attempt ? ` (attempt ${attempt + 1})` : ''}`;
       const started = performance.now();
       onProgress?.({ phase: 'assist', package: pack.name, detail: where, state: 'start' });
@@ -186,20 +239,12 @@ export async function assist(
       site.attempts ??= [];
       site.attempts.push(log);
       try {
-        const response = await fixer.fix({
-          finding: site.finding,
-          guide: pack.guide(site.finding, context),
-          // The import the site must extend is shown exactly: a shared helper's module.
-          enclosingFunction: enclosingContext(
-            original,
-            diagnostic.line,
-            diagnostic.column,
-            (context?.helpers ?? []).flatMap((h) => Object.values(h.specifiers)),
-          ),
-          source: original,
-          compilerError: `${diagnostic.file}:${diagnostic.line}:${diagnostic.column} TS${diagnostic.code}: ${diagnostic.message}${diagnostic.expected ? `\nExpected type: ${diagnostic.expected}` : ''}`,
-          ...(retry ? { retry } : {}),
-        });
+        const response = await fixer.fix(request, remaining);
+        log.responseModel = response.responseModel;
+        log.reservationUsd = response.reservationUsd ?? reservation;
+        log.unreportedCostUsd = response.unreportedCostUsd;
+        log.failureKind = response.failureKind;
+        retryAfterMs = response.retryAfterMs ?? 0;
         log.inputTokens = response.inputTokens;
         log.outputTokens = response.outputTokens;
         log.costUsd = response.costUsd ?? 0;
@@ -207,7 +252,12 @@ export async function assist(
         log.diff = response.diff;
         llm.inputTokens += response.inputTokens;
         llm.outputTokens += response.outputTokens;
-        llm.costUsd += response.costUsd ?? 0;
+        llm.costUsd = (nanos(llm.costUsd) + nanos(response.costUsd ?? 0)) / 1e9;
+        if (response.unreportedCostUsd)
+          llm.unreportedCostUsd =
+            (nanos(llm.unreportedCostUsd ?? 0) + nanos(response.unreportedCostUsd)) / 1e9;
+        if (response.halt) halted = true;
+        if (response.failure) throw new Error(response.failure);
         const patched = applyFilePatch(original, site.finding.usage.file, response.diff);
         const objection = pack.validateAssisted?.(
           patched,
@@ -245,8 +295,13 @@ export async function assist(
           newErrors: newErrors.map((d) => `${d.file}:${d.line} TS${d.code} ${d.message}`),
         });
       } catch (e) {
+        if (e instanceof CostLimitError) {
+          stopForBudget(site, e.message);
+          break;
+        }
         retry = e instanceof Error ? e.message : String(e);
       } finally {
+        log.durationMs = performance.now() - started;
         if (site.outcome !== 'agent') {
           writeFileSync(file, original);
           log.explanation = [log.explanation, retry].filter(Boolean).join('; ');

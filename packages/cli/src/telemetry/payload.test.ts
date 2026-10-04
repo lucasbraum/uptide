@@ -178,3 +178,42 @@ it('reduces assisted fixes and verification to counts, result, durations and cos
   report.verificationPending = true;
   expect(fixMetrics(report, repo).verification).toBe('not_run');
 });
+
+it('emits only known provider/model names; custom deployments, secrets and source never leave', async () => {
+  const { PRICES } = await import('@uptide/core');
+  const { TELEMETRY_MODELS } = await import('./payload.js');
+  for (const [provider, models] of Object.entries(PRICES))
+    expect([...(TELEMETRY_MODELS[provider] ?? [])].sort()).toEqual(Object.keys(models).sort());
+  for (const model of ['private-org/private-model', 'const privateCode = 1', 'sk-private-secret']) {
+    const event = buildEvent(
+      identity({ consent: true }),
+      'fix',
+      '0.1.0',
+      { provider: 'openai', model },
+      1,
+      0,
+      () => false,
+    ) as Event;
+    expect(event.properties).toMatchObject({ provider: 'openai', model: 'custom' });
+    expect(JSON.stringify(event)).not.toContain(model);
+  }
+  const known = buildEvent(
+    identity({ consent: true }),
+    'fix',
+    '0.1.0',
+    { provider: 'openai', model: 'gpt-6.1-sol' },
+    1,
+    0,
+    () => false,
+  ) as Event;
+  expect(known.properties.model).toBe('gpt-6.1-sol');
+  const poisoned = sanitizeEvent(
+    {
+      ...known,
+      properties: { ...known.properties, provider: 'private-company', model: 'private-deployment' },
+    },
+    () => false,
+  ) as Event;
+  expect(poisoned.properties.provider).toBeUndefined();
+  expect(poisoned.properties.model).toBeUndefined();
+});

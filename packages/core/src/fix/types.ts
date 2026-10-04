@@ -1,4 +1,5 @@
 import type { Finding, Tier } from '../domain/report.js';
+import type { Provider } from '../llm/types.js';
 import type { ApiChangeFacts, PackContext } from '../packs/types.js';
 import type { BehaviorResult } from './behavior.js';
 import type { InstallReport } from './managers/upgrade.js';
@@ -26,7 +27,19 @@ export interface FixSite {
   resolvedBy?: string;
   attempts?: AssistedAttempt[];
 }
+export type LlmFailureKind =
+  | 'no-tool-call'
+  | 'invalid-tool-call'
+  | 'rate-limited'
+  | 'api-error'
+  | 'usage-unavailable'
+  | 'token-bounds';
 export interface AssistedAttempt {
+  responseModel?: string;
+  reservationUsd?: number;
+  unreportedCostUsd?: number;
+  failureKind?: LlmFailureKind;
+  durationMs?: number;
   attempt: number;
   outcome: 'accepted' | 'reverted';
   before: FixDiagnostic[];
@@ -86,6 +99,14 @@ export interface FixRequest {
   retry?: string;
 }
 export interface FixResponse {
+  responseModel?: string;
+  reservationUsd?: number;
+  failureKind?: LlmFailureKind;
+  retryAfterMs?: number;
+  failure?: string;
+  halt?: boolean;
+  /** Budget retained for a call whose API did not report usage. */
+  unreportedCostUsd?: number;
   diff: string;
   explanation?: string;
   inputTokens: number;
@@ -94,7 +115,10 @@ export interface FixResponse {
 }
 export interface Fixer {
   readonly id: string;
-  fix(input: FixRequest): Promise<FixResponse>;
+  readonly provider?: Provider;
+  /** Worst-case USD reservation, including the output cap. Required for budgeted calls. */
+  estimate?(input: FixRequest): number;
+  fix(input: FixRequest, remainingUsd?: number): Promise<FixResponse>;
 }
 export interface FixReport {
   /** `generic`: no pack covers the upgrade; every edit is the agent's, verified by the compiler. */
@@ -141,13 +165,16 @@ export interface FixReport {
     workspaceTypes?: { workspace: string; errors: number }[];
   };
   llm: {
+    provider?: Provider;
     model?: string;
+    /** Worst-case reservation for calls with no trustworthy usage. Not reported spend. */
+    unreportedCostUsd?: number;
     inputTokens: number;
     outputTokens: number;
     costUsd: number;
     available: boolean;
     disabled?: boolean;
-    /** Set when `--max-cost` stopped the agent: the limit, and the sites it never attempted. */
+    /** Set when `--max-cost` stopped the agent: the limit and unfinished sites (including stopped retries). */
     costLimit?: { limitUsd: number; notAttempted: number };
   };
   timingMs: number;

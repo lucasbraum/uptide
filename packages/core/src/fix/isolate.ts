@@ -16,6 +16,7 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { workspacePackagesOf } from '../adapters/typescript/repo.js';
 import { UptideError } from '../errors.js';
+import { ACCEPTED_KEYS, selectLlm } from '../llm/config.js';
 import { uptideVersionInfo } from '../version.js';
 import { git, projectRoot } from './process.js';
 import { prBody } from './report.js';
@@ -338,6 +339,24 @@ export async function isolatedFix(
   options: FixOptions & { keep?: boolean },
   services?: FixServices,
 ): Promise<FixReport> {
+  const selected = selectLlm(options.cwd, options);
+  if (
+    options.maxCostUsd !== undefined &&
+    (!Number.isFinite(options.maxCostUsd) || options.maxCostUsd <= 0)
+  )
+    throw new Error('--max-cost must be a positive finite amount in USD');
+  if (
+    !options.fixer &&
+    !['zod', 'stripe'].includes(options.only) &&
+    !options.pack?.rules.length &&
+    (options.fixer === null || !selected.available)
+  )
+    throw new UptideError(
+      'NO_FIXER',
+      `No agent available. Set the selected provider's key in one of: ${ACCEPTED_KEYS}. Rule-based packs also work with --no-llm.`,
+    );
+  // Freeze selection before cloning: the remote base may have a different config.
+  options = { ...options, provider: selected.provider, model: selected.model };
   // The whole repository is cloned; the run works in the project inside it. Everything that
   // can refuse the run does so here, before a clone exists.
   const { top: source, project } = projectRoot(options.cwd);
