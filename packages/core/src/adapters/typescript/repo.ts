@@ -20,6 +20,7 @@ export interface LoadedRepo {
     name?: string;
     dependencies?: Record<string, string>;
     devDependencies?: Record<string, string>;
+    optionalDependencies?: Record<string, string>;
   };
   lockfile: Lockfile | undefined;
   /** name -> exact installed version for this package's direct dependencies (from the lockfile). */
@@ -48,18 +49,21 @@ const SYNTHETIC_EXCLUDES = ['**/node_modules/**', '**/dist/**', '**/build/**'];
 const repos = new Map<string, LoadedRepo>();
 
 /** `loadRepo`, cached by directory: a parsed program is reused across every package checked in a workspace. */
-export function loadedRepo(dir: string): LoadedRepo {
-  let repo = repos.get(dir);
+export function loadedRepo(dir: string, rootFiles?: string[]): LoadedRepo {
+  dir = realpathSync(dir);
+  rootFiles = rootFiles?.map((file) => realpathSync(file));
+  const key = JSON.stringify([dir, rootFiles?.slice().sort()]);
+  let repo = repos.get(key);
   if (!repo) {
-    repo = loadRepo(dir);
-    repos.set(dir, repo);
+    repo = loadRepo(dir, rootFiles);
+    repos.set(key, repo);
   }
   return repo;
 }
 
 /** Forget a cached repository (after a workspace is done, in tests, or after the user edits files). */
 export function forgetRepo(dir: string): void {
-  repos.delete(dir);
+  for (const key of repos.keys()) if (JSON.parse(key)[0] === dir) repos.delete(key);
 }
 
 /**
@@ -101,7 +105,11 @@ export function readInstalled(
     readFileSync(join(dir, 'package.json'), 'utf8'),
   ) as LoadedRepo['packageJson'];
   const declared = new Map(
-    Object.entries({ ...packageJson.dependencies, ...packageJson.devDependencies }),
+    Object.entries({
+      ...packageJson.dependencies,
+      ...packageJson.devDependencies,
+      ...packageJson.optionalDependencies,
+    }),
   );
   const lockfile = readLockfile(dir, declared);
   return { dir, packageJson, lockfile, installed: new Map(lockfile?.installed ?? []) };
@@ -141,7 +149,7 @@ const formatAwareResolution: ResolutionHostFactory = (host, getOptions) => {
   };
 };
 
-export function loadRepo(cwd: string): LoadedRepo {
+export function loadRepo(cwd: string, rootFiles?: string[]): LoadedRepo {
   const { dir, packageJson, lockfile, installed } = readInstalled(cwd);
 
   const tsconfig = join(dir, 'tsconfig.json');
@@ -153,6 +161,7 @@ export function loadRepo(cwd: string): LoadedRepo {
     const declared = sourcePaths ? declaredPaths(tsconfig) : { paths: {} };
     project = new Project({
       tsConfigFilePath: tsconfig,
+      skipAddingFilesFromTsConfig: rootFiles !== undefined,
       skipFileDependencyResolution: true,
       resolutionHost: formatAwareResolution,
       compilerOptions: {
@@ -162,7 +171,7 @@ export function loadRepo(cwd: string): LoadedRepo {
       },
     });
     // Project references one level down: their files are part of what this repo compiles.
-    for (const ref of readReferences(tsconfig)) {
+    for (const ref of rootFiles === undefined ? readReferences(tsconfig) : []) {
       try {
         project.addSourceFilesFromTsConfig(ref);
       } catch {
@@ -184,12 +193,14 @@ export function loadRepo(cwd: string): LoadedRepo {
         ...(sourcePaths ? { paths: sourcePaths } : {}),
       },
     });
-    project.addSourceFilesAtPaths([
-      join(dir, '**/*.ts'),
-      join(dir, '**/*.tsx'),
-      ...SYNTHETIC_EXCLUDES.map((e) => `!${join(dir, e)}`),
-    ]);
+    if (rootFiles === undefined)
+      project.addSourceFilesAtPaths([
+        join(dir, '**/*.ts'),
+        join(dir, '**/*.tsx'),
+        ...SYNTHETIC_EXCLUDES.map((e) => `!${join(dir, e)}`),
+      ]);
   }
+  if (rootFiles !== undefined) project.addSourceFilesAtPaths(rootFiles);
   project.resolveSourceFileDependencies();
   return {
     dir,

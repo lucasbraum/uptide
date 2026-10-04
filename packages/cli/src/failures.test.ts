@@ -22,7 +22,7 @@ const manifest = JSON.stringify({ name: 'shop', dependencies: { zod: '^3.23.8' }
 describe('friendly failures: each says what to run next', () => {
   it('no TypeScript/JS project', async () => {
     const cwd = tempRepo({ 'notes.txt': '' });
-    for (const argv of [[], ['check'], ['fix', '--only', 'zod']]) {
+    for (const argv of [[], ['check', 'zod', 'stripe'], ['fix', '--only', 'zod']]) {
       const { code, stderr } = await fail(argv, cwd);
       expect(code).toBe(2);
       expect(stderr).toContain(`error: no package.json in ${cwd} or any parent directory`);
@@ -31,12 +31,12 @@ describe('friendly failures: each says what to run next', () => {
   });
 
   it('no lockfile: install with the declared package manager, npm otherwise', async () => {
-    const npm = await fail(['check'], tempRepo({ 'package.json': manifest }));
+    const npm = await fail(['check', 'zod', 'stripe'], tempRepo({ 'package.json': manifest }));
     expect(npm.code).toBe(2);
     expect(npm.stderr).toContain('error: no lockfile found for');
     expect(npm.stderr).toContain('Next: npm install\n');
     const pnpm = await fail(
-      ['check'],
+      ['check', 'zod', 'stripe'],
       tempRepo({ 'package.json': '{"packageManager":"pnpm@10.17.1"}' }),
     );
     expect(pnpm.stderr).toContain('Next: pnpm install\n');
@@ -44,7 +44,7 @@ describe('friendly failures: each says what to run next', () => {
 
   it('unsupported package manager: binary bun lockfile', async () => {
     const { code, stderr } = await fail(
-      ['check'],
+      ['check', 'zod', 'stripe'],
       tempRepo({ 'package.json': manifest, 'bun.lockb': '' }),
     );
     expect(code).toBe(2);
@@ -54,7 +54,7 @@ describe('friendly failures: each says what to run next', () => {
 
   it("unsupported package manager: Yarn Plug'n'Play", async () => {
     const { code, stderr } = await fail(
-      ['check'],
+      ['check', 'zod', 'stripe'],
       tempRepo({ 'package.json': manifest, 'yarn.lock': '', '.pnp.cjs': '' }),
     );
     expect(code).toBe(2);
@@ -67,7 +67,7 @@ describe('friendly failures: each says what to run next', () => {
     const { code, stderr, engine } = await fail(['fix', '--only', 'zod'], root);
     expect(code).toBe(2);
     expect(stderr).toContain('error: fix does not support bun repositories yet');
-    expect(stderr).toContain('Next: uptide check --only zod --details');
+    expect(stderr).toContain('Next: uptide check zod --details');
     expect(engine.calls).toEqual([]);
   });
 
@@ -77,19 +77,19 @@ describe('friendly failures: each says what to run next', () => {
     ['yarn.lock', 'yarn install --frozen-lockfile'],
   ])('missing node_modules with %s: %s', async (lockfile, next) => {
     const { code, stderr, engine } = await fail(
-      ['check'],
+      ['check', 'zod', 'stripe'],
       tempRepo({ 'package.json': manifest, [lockfile]: '' }),
     );
     expect(code).toBe(2);
     expect(stderr).toContain('✖ Dependencies');
-    expect(stderr).toContain('error: stripe and zod are in the lockfile but not installed');
+    expect(stderr).toContain('error: zod and stripe are in the lockfile but not installed');
     expect(stderr).toContain(`Next: ${next}\n`);
     expect(engine.calls).toEqual([]);
   });
 
   it('missing Berry installation names the immutable install command', async () => {
     const { code, stderr } = await fail(
-      ['check'],
+      ['check', 'zod', 'stripe'],
       tempRepo({
         'package.json': manifest,
         'yarn.lock': '__metadata:\n  version: 8\n',
@@ -109,7 +109,7 @@ describe('friendly failures: each says what to run next', () => {
       'node_modules/stripe/package.json': '{}',
     });
     const engine = fakeEngine({ workspaces: async () => ['.', 'packages/api'] });
-    expect((await fail(['check'], cwd, engine)).code).toBe(0);
+    expect((await fail(['check', 'zod', 'stripe'], cwd, engine)).code).toBe(0);
   });
 
   it('declared but missing from the lockfile', async () => {
@@ -131,10 +131,10 @@ describe('friendly failures: each says what to run next', () => {
       declared: async () => new Map([['react', '^18.0.0']]),
       installed: async () => new Map([['react', '18.3.1']]),
     });
-    const { code, stdout } = await fail(['check'], cwd, engine);
+    const { code, stdout } = await fail(['check', 'react'], cwd, engine);
     expect(code).toBe(0);
     expect(engine.calls).toHaveLength(1);
-    expect(engine.calls[0]).toMatchObject({ only: undefined, maxTimeMs: 60_000 });
+    expect(engine.calls[0]).toMatchObject({ only: ['react'] });
     expect(stdout).toContain('Nothing to upgrade: every checked dependency is up to date.');
   });
 
@@ -166,12 +166,12 @@ describe('friendly failures: each says what to run next', () => {
       },
     ];
     const { code, stderr, stdout } = await fail(
-      ['check'],
+      ['check', 'zod', 'stripe'],
       npmRepo(),
       fakeEngine({ check: async () => report }),
     );
     expect(code).toBe(2);
-    expect(stderr).toContain('✖ Analysis of every dependency that is behind');
+    expect(stderr).toContain('✖ Analysis of zod, stripe');
     expect(stderr).toContain('error: cannot reach the npm registry');
     expect(stderr).toContain('Next: npm ping');
     expect(stdout).toBe('');
@@ -212,7 +212,7 @@ describe('friendly failures: each says what to run next', () => {
       },
     ];
     const { code, stderr, stdout } = await fail(
-      ['check'],
+      ['check', 'zod', 'stripe'],
       npmRepo(),
       fakeEngine({ check: async () => report }),
     );
@@ -247,7 +247,11 @@ describe('friendly failures: each says what to run next', () => {
     const breaking: PackageReport = { ...failedOne(), name: 'zod', status: 'breaking', notes: [] };
     delete breaking.skipReason;
     report.packages = [failedOne(), breaking];
-    const { code } = await fail(['check'], npmRepo(), fakeEngine({ check: async () => report }));
+    const { code } = await fail(
+      ['check', 'zod', 'stripe'],
+      npmRepo(),
+      fakeEngine({ check: async () => report }),
+    );
     expect(code).toBe(1);
   });
 
@@ -260,7 +264,7 @@ describe('friendly failures: each says what to run next', () => {
         );
       },
     });
-    const { code, stderr } = await fail(['check'], npmRepo(), engine);
+    const { code, stderr } = await fail(['check', 'zod', 'stripe'], npmRepo(), engine);
     expect(code).toBe(2);
     expect(stderr).toContain('error: the npm registry answered HTTP 503');
     expect(stderr).toContain('Next: run the same command again in a minute');
@@ -272,7 +276,7 @@ describe('friendly failures: each says what to run next', () => {
         throw new UptideError('REGISTRY_UNREACHABLE', 'registry disconnected');
       },
     });
-    const { code, stderr } = await fail(['check'], npmRepo(), engine);
+    const { code, stderr } = await fail(['check', 'zod', 'stripe'], npmRepo(), engine);
     expect(code).toBe(2);
     expect(stderr).toContain('error: cannot reach the npm registry');
     expect(stderr).toContain('(registry disconnected)');

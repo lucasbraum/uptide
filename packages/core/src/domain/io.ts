@@ -10,6 +10,7 @@ export interface PackageFetcher {
   /** An exact version for a version or dist-tag (`latest`). */
   resolve(name: string, requested: string): Promise<string>;
   /** Every published version, oldest first. Optional: without it ranges cannot be satisfied from the registry. */
+  metadata?(name: string, version: string): Promise<{ peerDependencies?: Record<string, string> }>;
   versions?(name: string): Promise<string[]>;
   /**
    * Done with a fetched directory. A fetcher that extracts into a persistent cache keeps it;

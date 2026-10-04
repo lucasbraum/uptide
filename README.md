@@ -8,11 +8,12 @@ your compiler and tests. TypeScript repositories; verified migrations for **zod 
 
 ## Quickstart (30 seconds)
 
-No account, no config. In your repository, with dependencies installed:
+No account, no config. In your repository:
 
 ```sh
-npx uptide check                         # which of your lines the upgrade breaks
-npx uptide fix --only zod                # migrate on a new branch, verified; nothing is pushed
+npx uptide list                          # fast discovery; no install or compilation
+npx uptide check zod                     # analyze one or more named dependencies (install first)
+npx uptide fix zod                # migrate on a new branch, verified; nothing is pushed
 npx uptide pr --branch uptide/zod-4.6.5   # prints the plan; add --yes to push and open the PR
 ```
 
@@ -28,12 +29,11 @@ tests. Everything below is real output from it.
 **Before: `check`.** What breaks, where, and who can fix it:
 
 ```console
-$ npx uptide check
+$ npx uptide check zod stripe
 uptide check · storefront (pnpm, 2 packages) · 10s
 
 zod                    3.25.76 → 4.6.5    major · latest on npm   verified   ✗ 28 breaking in 7 files    24 by rule · 4 by agent
 stripe (packages/api)  14.25.0 → 23.0.0   major · latest on npm   verified   ✗ 4 breaking in 3 files     1 by rule · 3 by agent
-vitest                 3.2.4 → 5.0.3      major · latest on npm   generic    ✓ no impact (9 call sites)
 
 verified: migration pack · generic: no pack, breaking only if the compiler or the runtime probe confirms it
 
@@ -50,39 +50,39 @@ stripe
     1 API change since 2023-10-16 affects your code
 
 Next
-  npx uptide fix --only zod       migrate on a new branch, verify, no push
-  npx uptide fix --only stripe    migrate on a new branch, verify, no push
+  npx uptide fix zod       migrate on a new branch, verify, no push
+  npx uptide fix stripe    migrate on a new branch, verify, no push
   npx uptide plan                 the order to upgrade in, with the effort
-  npx uptide check --details      every site and reason
+  npx uptide check zod stripe --details      every site and reason
 ```
 
-`check` looks at every direct dependency that is behind, the ones most likely to hurt
-first, for a minute (`--max-time`); what it did not reach is listed with the command that
-includes it. `uptide plan` turns the same analysis into an order to upgrade in:
+`list` reads manifests, lockfiles, source imports and registry metadata. Majors come first,
+then packages imported in the most files. Each row gives current → latest, upgrade kind,
+verified/generic tier, importing files, direct call/new/JSX sites, top symbols and workspaces.
+Minor/patch upgrades collapse into one line; `--all` expands them. `--json` gives every row.
+Declared packages with no source imports are separate: consider removing them, but check
+scripts and configuration first. Usage is syntactic: indirect aliases and reflection are
+not followed. With different locked versions, usage is shown across the repository.
 
-```console
-$ npx uptide plan
-uptide plan · storefront (pnpm, 2 packages) · 10s
+`check` requires names (`uptide check zod stripe`). With no names it points to `uptide list`
+and exits 2 before doing work. It retains tiers and partial results per named package.
 
-1  vitest 3.2.4 → 5.0.3   generic
-   no code changes expected
+`uptide plan` uses discovery, with **unknown** effort until a matching check result is supplied:
 
-2  stripe 14.25.0 → 23.0.0   verified
-   small · 4 sites: 1 by rule, 3 by agent
-   npx uptide fix --only stripe
-
-3  zod 3.25.76 → 4.6.5   verified
-   small · 28 sites: 24 by rule, 4 by agent
-   npx uptide fix --only zod
-
-verified: migration pack · generic: no pack, breaking only if the compiler or the runtime probe confirms it
-Effort is an estimate from the findings: none (nothing affected), small (rules, or up to 5 sites by hand or agent), medium (up to 25), large (more).
+```sh
+npx uptide check zod stripe --json > check.json
+npx uptide plan --results check.json
 ```
+
+Planning never implicitly compiles every dependency or downloads tarballs. Matching saved
+results (same repository, versions and workspaces) supply effort estimates; rerun `check`
+after source changes. Registry peer metadata and available installed manifests constrain
+the upgrade order. Missing peer metadata is disclosed.
 
 **After: `fix`**, one dependency at a time, each on its own verified branch:
 
 ```console
-$ npx uptide fix --only zod
+$ npx uptide fix zod
 uptide fix · zod 3.25.76 → 4.6.5 (latest on npm) · verification passed · 36s
 
   Risk      Medium: request validation in webhooks
@@ -102,7 +102,7 @@ pull request, so you can check that nothing else reads that text:
 ```
 
 ```console
-$ npx uptide fix --only stripe
+$ npx uptide fix stripe
 uptide fix · stripe 14.25.0 → 23.0.0 (latest on npm) · verification passed · 41s
 
   Risk      High: behavior changes
@@ -129,7 +129,7 @@ repository already had are subtracted, never blamed on the upgrade.
 
 ## What is supported
 
-Every dependency is checked. What differs is how much Uptide knows about it:
+Every direct dependency can be discovered and selected for analysis. What differs is how much Uptide knows about it:
 
 | Tier | Dependencies | What you get |
 | --- | --- | --- |
@@ -189,6 +189,7 @@ There is no Uptide server. In a table:
 
 | | Where it runs | What leaves your machine |
 | --- | --- | --- |
+| `list`, `plan` | locally | package names/versions requested from your npm registry; metadata only, no source code |
 | `check` | locally | nothing of yours; it downloads package tarballs from your npm registry. No LLM call, and nothing in your repository is executed. |
 | `fix`, rules and verification | locally, in a temporary clone | nothing of yours |
 | `fix`, assisted fixes | Anthropic's API, with **your** `ANTHROPIC_API_KEY` | per site no rule covers: the finding, the enclosing function or declaration, and the compiler error |
@@ -206,10 +207,19 @@ it cannot answer, it says why and prints the exact command to run next.
 One dependency failing (a registry error, an analysis that ran out of memory) does not
 empty the report: the others are shown and the failed one is named with its reason. The
 exit code is then 1 if anything breaking was found, else 2, because the question was not
-fully answered. Dependencies left out by `--max-time` are listed and do not change the
-exit code; use `--max-time 0` or `--only` when a script needs every answer. `fix` and
-`verify` exit 0 when the migration verifies and 1 when it does not; `plan` exits 0 with a
-plan.
+fully answered. `list` exits 2 when discovery is incomplete, while retaining successful rows.
+`fix` and `verify` exit 0 when the migration verifies and 1 when it does not; `plan` exits
+0 with a plan, or 2 when discovery is incomplete.
+
+Analysis concurrency uses CPU count and available memory (including reclaimable memory
+reported by the OS), reserving at most about 60% for worker heaps and estimated overhead.
+Named checks build their baseline and target programs from the files importing those packages;
+TypeScript follows their imports. Workspaces with no such imports load no program. The estimate
+uses only that reachable graph. Workspaces run serially with the full reservation when they
+cannot fit in parallel; unexpected parallel memory failures get one serial retry. Only a scoped
+program that cannot fit alone is skipped, with its workspace, estimate and available budget.
+`--workspaces` and `UPTIDE_WORKER_HEAP_MB` can lower limits, never bypass the memory cap.
+Compiler allocations are estimates; unexpected worker failures still preserve other results.
 
 ## Documentation
 

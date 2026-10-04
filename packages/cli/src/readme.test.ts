@@ -27,7 +27,7 @@ describe('README', () => {
       readme.indexOf('## Quickstart'),
       readme.indexOf('## Before and after'),
     );
-    for (const command of ['npx uptide ', 'npx uptide check', 'npx uptide fix --only zod'])
+    for (const command of ['npx uptide ', 'npx uptide check', 'npx uptide fix zod'])
       expect(quickstart).toContain(command);
     expect(quickstart).toContain('No account, no config.');
   });

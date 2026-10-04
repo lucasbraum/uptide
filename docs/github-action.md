@@ -31,3 +31,11 @@ It also proves that a final-verification failure cannot push. The generated READ
 contains commands to publish your throwaway repository. **No hosted GitHub run or PR
 is created by this evaluation.** The real workflow requires a bot-authored PR; a
 human-authored imitation is intentionally rejected.
+
+## Discovery before analysis
+
+For a repository-wide inventory run `npx uptide list --json`; this needs no installed
+dependencies. Locally use `npx uptide list` → `npx uptide check <pkg>` →
+`npx uptide fix <pkg>`. The Action already selects the dependency names and targets
+from the upgrade PR before calling the core check; it never performs an implicit
+whole-repository check. Its automatic migration path remains limited to verified packs.

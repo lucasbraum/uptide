@@ -130,7 +130,7 @@ describe('formatCheck, the first screen', () => {
     expect(out).toContain('Summary: 2 packages need attention · 32 breaking · 15 deprecated');
     // The way back to the short view replaces the pointer to --details.
     expect(out.trimEnd().split('\n').at(-1)).toMatch(
-      /^ {2}npx uptide@next check +the summary, one line per change$/,
+      /^ {2}npx uptide@next check zod stripe vitest +the summary, one line per change$/,
     );
   });
 
@@ -235,7 +235,7 @@ describe('formatCheck, the first screen', () => {
   it('says so when there is nothing to upgrade', () => {
     const out = formatCheck(report([pkg({ notes: ['up to date'] })]), { color: false });
     expect(out).toContain('Nothing to upgrade: every checked dependency is up to date.');
-    expect(out).toContain('  npx uptide check --details    every site and reason');
+    expect(out).toContain('  npx uptide check <package> --details    every site and reason');
   });
 
   it('colors a terminal and stays plain otherwise', () => {
@@ -252,10 +252,10 @@ describe('the Next block', () => {
 
   it('ends with the exact commands for this repository', () => {
     expect(next(formatCheck(storefront, shown))).toEqual([
-      'npx uptide@next fix --only zod | migrate on a new branch, verify, no push',
-      'npx uptide@next fix --only stripe | migrate on a new branch, verify, no push',
+      'npx uptide@next fix zod | migrate on a new branch, verify, no push',
+      'npx uptide@next fix stripe | migrate on a new branch, verify, no push',
       'npx uptide@next plan | the order to upgrade in, with the effort',
-      'npx uptide@next check --details | every site and reason',
+      'npx uptide@next check zod stripe vitest --details | every site and reason',
     ]);
   });
 
@@ -265,10 +265,10 @@ describe('the Next block', () => {
       repeat: { cwd: '../storefront', only: 'zod', targets: { zod: '4.6.5' } },
     });
     expect(next(out)).toEqual([
-      'npx uptide@next fix --only zod --target 4.6.5 --cwd ../storefront | migrate on a new branch, verify, no push',
-      'npx uptide@next fix --only stripe --cwd ../storefront | migrate on a new branch, verify, no push',
+      'npx uptide@next fix zod --target 4.6.5 --cwd ../storefront | migrate on a new branch, verify, no push',
+      'npx uptide@next fix stripe --cwd ../storefront | migrate on a new branch, verify, no push',
       'npx uptide@next plan --only zod --cwd ../storefront | the order to upgrade in, with the effort',
-      'npx uptide@next check --only zod --target zod@4.6.5 --details --cwd ../storefront | every site and reason',
+      'npx uptide@next check zod --target zod@4.6.5 --details --cwd ../storefront | every site and reason',
     ]);
   });
 
@@ -276,7 +276,7 @@ describe('the Next block', () => {
     // A bun repository: check works, fix does not.
     expect(next(formatCheck(storefront, { ...shown, fixable: [] }))).toEqual([
       'npx uptide@next plan | the order to upgrade in, with the effort',
-      'npx uptide@next check --details | every site and reason',
+      'npx uptide@next check zod stripe vitest --details | every site and reason',
     ]);
     const named = (name: string): PackageReport =>
       storefront.packages.find((p) => p.name === name) as PackageReport;
@@ -289,10 +289,10 @@ describe('the Next block', () => {
       ],
     };
     expect(next(formatCheck(deprecatedOnly, shown))).toEqual([
-      'npx uptide@next fix --only stripe | migrate on a new branch, verify, no push',
-      'npx uptide@next fix --only zod --include-deprecated | migrate the deprecated calls on a new branch, no push',
+      'npx uptide@next fix stripe | migrate on a new branch, verify, no push',
+      'npx uptide@next fix zod --include-deprecated | migrate the deprecated calls on a new branch, no push',
       'npx uptide@next plan | the order to upgrade in, with the effort',
-      'npx uptide@next check --details | every site and reason',
+      'npx uptide@next check stripe zod --details | every site and reason',
     ]);
   });
 });
@@ -379,8 +379,8 @@ describe('tiers, the time budget and failures on the first screen', () => {
       [
         'Not analyzed',
         '  ⚠ 2 behind, out of time (--max-time 60): react, next',
-        '    npx uptide check --only react,next    by name, no time limit',
-        '    npx uptide check --max-time 300    a longer budget (0: no limit)',
+        '    npx uptide check react next    by name, no time limit',
+        '    npx uptide list    discover upgrades, then check named packages',
         '  ✗ pg 8.11.0: could not fetch pg@9.0.0: HTTP 503',
       ].join('\n'),
     );
@@ -458,4 +458,30 @@ describe('tiers, the time budget and failures on the first screen', () => {
     expect(out).not.toMatch(/^react +5/m);
     expect(out).not.toMatch(/^pg +8/m);
   });
+});
+
+it('renders one TypeScript API cause with 112 sites, expanding locations only in details', () => {
+  const cause = removed('scripts/compiler.ts', 1);
+  cause.change = { ...cause.change, kind: 'cause', path: 'cause:typescript-no-js-api' };
+  cause.reason = 'TypeScript 7 has no JavaScript compiler API in its main entry';
+  cause.rule = 'typescript-no-js-api';
+  cause.evidence = 'compiler';
+  cause.downstream = Array.from({ length: 112 }, (_, i) => ({
+    file: 'scripts/compiler.ts',
+    line: i + 1,
+    column: 1,
+    code: 2339,
+    message: 'Compiler API member missing',
+    snippet: 'ts.createProgram()',
+  }));
+  const data = report([pkg({ name: 'typescript', status: 'breaking', findings: [cause] })]);
+  const normal = formatCheck(data, { color: false });
+  expect(normal).toMatch(
+    /TypeScript 7 has no JavaScript compiler API in its main entry +112 sites/,
+  );
+  expect(normal).not.toContain('scripts/compiler.ts');
+  expect(normal).not.toContain('ts.createProgram()');
+  const details = formatCheck(data, { color: false, details: true });
+  expect(details).toContain('scripts/compiler.ts:112');
+  expect(details.match(/Compiler API member missing/g)).toHaveLength(112);
 });

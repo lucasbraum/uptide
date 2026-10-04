@@ -144,7 +144,7 @@ export function formatStatus(report: StatusReport, opts: { color?: boolean } = {
   else if (
     used.some((d) => !d.latest || !d.installed || compareVersions(d.installed, d.latest) < 0)
   )
-    lines.push(`Run ${colors.bold('`uptide check`')} for impact.`);
+    lines.push(`Run ${colors.bold('`uptide list`, then `uptide check <package>`')} for impact.`);
   else lines.push('Nothing to upgrade.');
   return `${lines.join('\n')}\n`;
 }

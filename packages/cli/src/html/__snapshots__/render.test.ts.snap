@@ -39,7 +39,7 @@ exports[`HTML report > renders clean from report JSON without requiring JS 1`] =
 <h2>Next</h2>
 <p class="muted">every site and reason</p>
 <div class="command">
-<code>npx uptide check --details --cwd /repo</code>
+<code>npx uptide check &lt;package&gt; --details --cwd /repo</code>
 <button type="button" data-copy hidden aria-label="Copy command">Copy</button>
 </div>
 </section>
@@ -95,7 +95,7 @@ exports[`HTML report > renders skipped from report JSON without requiring JS 1`]
 <h2>Next</h2>
 <p class="muted">every site and reason</p>
 <div class="command">
-<code>npx uptide check --details --cwd /repo</code>
+<code>npx uptide check &lt;package&gt; --details --cwd /repo</code>
 <button type="button" data-copy hidden aria-label="Copy command">Copy</button>
 </div>
 </section>
@@ -178,12 +178,12 @@ exports[`HTML report > renders stripe from report JSON without requiring JS 1`] 
 <h2>Next</h2>
 <p class="muted">migrate on a new branch, verify, no push</p>
 <div class="command">
-<code>npx uptide fix --only stripe --cwd /repo</code>
+<code>npx uptide fix stripe --cwd /repo</code>
 <button type="button" data-copy hidden aria-label="Copy command">Copy</button>
 </div>
 <p class="muted">every site and reason</p>
 <div class="command">
-<code>npx uptide check --details --cwd /repo</code>
+<code>npx uptide check stripe --details --cwd /repo</code>
 <button type="button" data-copy hidden aria-label="Copy command">Copy</button>
 </div>
 </section>
@@ -285,12 +285,12 @@ exports[`HTML report > renders zod from report JSON without requiring JS 1`] = `
 <h2>Next</h2>
 <p class="muted">migrate on a new branch, verify, no push</p>
 <div class="command">
-<code>npx uptide fix --only zod --cwd /repo</code>
+<code>npx uptide fix zod --cwd /repo</code>
 <button type="button" data-copy hidden aria-label="Copy command">Copy</button>
 </div>
 <p class="muted">every site and reason</p>
 <div class="command">
-<code>npx uptide check --details --cwd /repo</code>
+<code>npx uptide check zod --details --cwd /repo</code>
 <button type="button" data-copy hidden aria-label="Copy command">Copy</button>
 </div>
 </section>

@@ -87,7 +87,18 @@ function siteLines(
   colors: Colors,
   tint: (s: string) => string,
 ): string[] {
-  return findings.flatMap((f) => findingLines(f, mark, colors, tint));
+  return findings.flatMap((f) => {
+    if (f.change.kind !== 'cause') return findingLines(f, mark, colors, tint);
+    const sites = f.downstream ?? [];
+    return [
+      `  ${tint(mark)} ${f.reason} (${plural(sites.length, 'site')})`,
+      ...sites.flatMap((site) => [
+        `      ${site.file}:${site.line}  ${site.snippet ?? ''}`.trimEnd(),
+        colors.dim(`        TS${site.code}: ${site.message}`),
+      ]),
+      ...(f.details ?? []).map((detail) => colors.dim(`      ${detail}`)),
+    ];
+  });
 }
 
 function packageLines(p: PackageReport, opts: DetailOptions, colors: Colors): string[] {

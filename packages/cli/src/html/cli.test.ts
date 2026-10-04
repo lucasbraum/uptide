@@ -24,7 +24,11 @@ it('writes to the OS temp directory, retains terminal output and never opens in 
   const before = readdirSync(root);
   const io = memoryIo({ cwd: root });
   expect(
-    await run(['check', '--html', '--open'], io, fakeEngine({ check: async () => checkResult() })),
+    await run(
+      ['check', 'zod', 'stripe', '--html', '--open'],
+      io,
+      fakeEngine({ check: async () => checkResult() }),
+    ),
   ).toBe(0);
   const path = io.stderr().match(/HTML report: (.*)\n/)?.[1];
   expect(path).toBeTruthy();
@@ -53,7 +57,11 @@ it.each([
   roots.push(root);
   const path = join(root, 'report.html');
   const io = memoryIo({ cwd: root, outTty: tty, errTty: tty });
-  await run(['check', '--html', path, '--open', ...(ci ? ['--ci'] : [])], io, fakeEngine());
+  await run(
+    ['check', 'zod', 'stripe', '--html', path, '--open', ...(ci ? ['--ci'] : [])],
+    io,
+    fakeEngine(),
+  );
   expect(existsSync(path)).toBe(true);
   expect(openHtml).toHaveBeenCalledTimes(!ci && tty ? 1 : 0);
 });
@@ -63,7 +71,7 @@ it('keeps JSON stdout pure and preserves breaking exit status', async () => {
   const io = memoryIo({ cwd: root });
   expect(
     await run(
-      ['check', '--json', '--html', 'report.html'],
+      ['check', 'zod', 'stripe', '--json', '--html', 'report.html'],
       io,
       fakeEngine({ check: async () => checkResult({ breaking: 2 }) }),
     ),
@@ -71,15 +79,11 @@ it('keeps JSON stdout pure and preserves breaking exit status', async () => {
   expect(JSON.parse(io.stdout()).summary.breaking).toBe(2);
   expect(io.stderr()).toContain('HTML report:');
 });
-it('writes a clean HTML report when the repo declares no supported dependency', async () => {
+it('writes a clean HTML report when the selected dependencies have no findings', async () => {
   const root = npmRepo();
   roots.push(root);
   const io = memoryIo({ cwd: root });
-  await run(
-    ['check', '--html', 'report.html'],
-    io,
-    fakeEngine({ declared: async () => new Map() }),
-  );
+  await run(['check', 'zod', 'stripe', '--html', 'report.html'], io, fakeEngine());
   expect(readFileSync(join(root, 'report.html'), 'utf8')).toContain('Nothing to upgrade');
   expect(io.stderr().trim().split('\n').at(-1)).toContain('HTML report:');
 });
@@ -87,9 +91,9 @@ it('requires --html for --open and reports write failures', async () => {
   const root = npmRepo();
   roots.push(root);
   const io = memoryIo({ cwd: root });
-  expect(await run(['check', '--open'], io, fakeEngine())).toBe(2);
+  expect(await run(['check', 'zod', 'stripe', '--open'], io, fakeEngine())).toBe(2);
   expect(io.stderr()).toContain('--open requires --html');
-  expect(await run(['check', '--html', root], io, fakeEngine())).toBe(2);
+  expect(await run(['check', 'zod', 'stripe', '--html', root], io, fakeEngine())).toBe(2);
 });
 it('opens a literal path with platform-specific commands without shell interpolation', () => {
   expect(browserCommand('/tmp/a b.html', 'darwin')).toEqual(['open', ['/tmp/a b.html']]);

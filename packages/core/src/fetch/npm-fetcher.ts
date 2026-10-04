@@ -141,6 +141,15 @@ export function createNpmFetcher(opts: NpmFetcherOptions = {}): PackageFetcher {
   }
 
   return {
+    metadata: (name, version) =>
+      remembered(
+        [...packagePathSegments(name), `peers-${version}`],
+        EXACT_VERSION.test(version),
+        async () => ({
+          peerDependencies:
+            (await resolveVersion(name, version, config, fetchFn)).peerDependencies ?? {},
+        }),
+      ),
     async resolve(name, requested) {
       return (await resolved(name, requested)).version;
     },

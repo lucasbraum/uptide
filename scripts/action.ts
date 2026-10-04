@@ -26,6 +26,7 @@ const comments = githubComments(repository, event.number, token, api);
 const server = env.GITHUB_SERVER_URL ?? 'https://github.com';
 const remote = `${server}/${repository}.git`;
 const services: ActionServices = {
+  // PR-derived names are always explicit; discovery is a separate CLI step (uptide list).
   check,
   install,
   diagnostics,

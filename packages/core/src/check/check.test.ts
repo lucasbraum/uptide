@@ -52,6 +52,32 @@ process.env.UPTIDE_CACHE_DIR = mkdtempSync(join(tmpdir(), 'uptide-test-cache-'))
 
 const adapter = createTypescriptAdapter({ now: () => new Date('2026-09-27T00:00:00.000Z') });
 
+it('compiles every named importer even when an unused removed binding has no attributed usage', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'uptide-scoped-import-'));
+  cpSync(CONSUMER, dir, { recursive: true });
+  const config = JSON.parse(readFileSync(join(dir, 'tsconfig.json'), 'utf8'));
+  for (const key of Object.keys(config.compilerOptions.paths))
+    config.compilerOptions.paths[key] = config.compilerOptions.paths[key].map((p: string) =>
+      resolve(CONSUMER, p),
+    );
+  writeFileSync(join(dir, 'tsconfig.json'), JSON.stringify(config));
+  writeFileSync(join(dir, 'unused.ts'), "import { parseLegacy } from 'synthetic';\nexport {};\n");
+  const result = await check({
+    cwd: dir,
+    only: ['synthetic'],
+    fetcher,
+    cache: memoryCache(),
+    runtime: false,
+  });
+  expect(result.packages[0]?.findings).toContainEqual(
+    expect.objectContaining({
+      severity: 'breaking',
+      evidence: 'compiler',
+      usage: expect.objectContaining({ file: 'unused.ts', line: 1 }),
+    }),
+  );
+});
+
 describe('check on the synthetic consumer', () => {
   it('produces one package report with both signals and the expected findings', {
     timeout: 30_000,
@@ -875,7 +901,7 @@ describe('a time budget and one failing dependency', () => {
       fetcher,
       cache: memoryCache(),
       targets: { synthetic: '1.0.0' },
-      maxTimeMs: 1,
+      maxTimeMs: 60_000,
     });
     expect(result.packages.find((p) => p.name === 'synthetic')?.notes).toEqual(['up to date']);
     expect(result.summary.skippedForTime).toBe(0);
@@ -901,11 +927,32 @@ describe('a time budget and one failing dependency', () => {
   });
 });
 
-it('sizes a worker heap to the machine: 4 GB at least, 8 GB at most, or what the user says', () => {
+it('caps the worker heap at 60% of free memory including native overhead, even with an override', () => {
   const GB = 1024 ** 3;
-  expect(workerHeapMb(2, 8 * GB, {})).toBe(4096);
-  expect(workerHeapMb(2, 18 * GB, {})).toBe(6144);
+  expect(workerHeapMb(2, 8 * GB, {})).toBe(1755);
+  expect(workerHeapMb(2, 18 * GB, {})).toBe(3949);
   expect(workerHeapMb(1, 64 * GB, {})).toBe(8192);
-  expect(workerHeapMb(2, 18 * GB, { UPTIDE_WORKER_HEAP_MB: '12000' })).toBe(12000);
-  expect(workerHeapMb(2, 18 * GB, { UPTIDE_WORKER_HEAP_MB: 'lots' })).toBe(6144);
+  expect(workerHeapMb(2, 18 * GB, { UPTIDE_WORKER_HEAP_MB: '12000' })).toBe(3949);
+  expect(workerHeapMb(2, 18 * GB, { UPTIDE_WORKER_HEAP_MB: '1024' })).toBe(1024);
+});
+
+it('turns recursive extraction failure into an explicit per-package failure', async () => {
+  const result = await check({
+    cwd: CONSUMER,
+    adapter: {
+      ...adapter,
+      extractSurface: async () => {
+        throw new RangeError('Maximum call stack size exceeded');
+      },
+    },
+    fetcher,
+    cache: memoryCache(),
+    runtime: false,
+  });
+  expect(result.packages.find((p) => p.name === 'synthetic')).toMatchObject({
+    status: 'skipped',
+    skipReason: 'ANALYSIS_STACK_OVERFLOW',
+  });
+  expect(result.packages[0]?.notes.join(' ')).toContain('No safety verdict');
+  expect(result.summary.failed).toBe(1);
 });

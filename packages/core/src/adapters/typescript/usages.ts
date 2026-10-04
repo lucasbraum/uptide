@@ -513,7 +513,7 @@ export async function findUsagesInRepo(
   pkg: string,
   surface: ApiSurface,
 ): Promise<FindUsagesResult> {
-  const repo = loadedRepo(realpathSync(repoRef.dir));
+  const repo = loadedRepo(realpathSync(repoRef.dir), repoRef.rootFiles);
   // Types served by DefinitelyTyped: the declarations to map live in @types/<pkg>, not in the package.
   const declarationsPkg =
     surface.package.startsWith('@types/') && surface.package !== pkg ? surface.package : pkg;
@@ -983,7 +983,7 @@ export async function findUsagesInRepo(
 
 /** Where the repository's compiler finds `pkg`, as a package root, or undefined. */
 export function installedPackageDir(repoRef: RepoDir, pkg: string): string | undefined {
-  return resolvePackageDir(loadedRepo(realpathSync(repoRef.dir)), pkg);
+  return resolvePackageDir(loadedRepo(realpathSync(repoRef.dir), repoRef.rootFiles), pkg);
 }
 
 /** Direct dependencies and their installed versions, from the lockfile. Never parses sources: the caller may only be listing. */
@@ -995,7 +995,7 @@ export function installedDependenciesOf(repoRef: RepoDir): Map<string, string> {
 
 /** Bare package names imported anywhere in the repo's sources, including require() and dynamic import(). */
 export function importedPackagesOf(repoRef: RepoDir): Set<string> {
-  const repo = loadedRepo(realpathSync(repoRef.dir));
+  const repo = loadedRepo(realpathSync(repoRef.dir), repoRef.rootFiles);
   const out = new Set<string>();
   const packageOf = (specifier: string): string | undefined => {
     if (specifier.startsWith('.') || specifier.startsWith('/') || specifier.startsWith('node:'))

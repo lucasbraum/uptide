@@ -17,7 +17,7 @@ describe('uptide (no command)', () => {
     expect(await run([], io, fakeEngine())).toBe(0);
     expect(io.stdout()).toContain('zod     3.23.8 installed, latest 4.6.5, 1 major behind');
     expect(io.stdout()).toContain('stripe  14.25.0 installed, latest 22.6.2, 8 majors behind');
-    expect(io.stdout()).toContain('Run `uptide check` for impact.');
+    expect(io.stdout()).toContain('Run `uptide list`, then `uptide check <package>` for impact.');
     expect(io.stderr()).toMatch(/✔ Repository {2}shop \(npm\) \(\d+ms\)/);
   });
 
@@ -73,83 +73,72 @@ describe('uptide (no command)', () => {
 });
 
 describe('uptide check', () => {
-  it('checks every dependency that is behind by default, within a minute, and exits 0 when nothing breaks', async () => {
-    const cwd = npmRepo();
+  it('requires names before touching the repository and removes the implicit budget', async () => {
     const engine = fakeEngine();
+    const missing = memoryIo({ cwd: '/does-not-exist' });
+    expect(await run(['check'], missing, engine)).toBe(2);
+    expect(missing.stderr()).toContain('uptide list');
+    expect(engine.calls).toEqual([]);
+    const cwd = npmRepo();
     const io = memoryIo({ cwd });
-    expect(await run(['check'], io, engine)).toBe(0);
+    expect(await run(['check', 'zod', 'stripe'], io, engine)).toBe(0);
     expect(engine.calls).toEqual([
       {
         cwd,
         targets: {},
-        only: undefined,
+        only: ['zod', 'stripe'],
         compile: true,
         runtime: true,
         allDeps: undefined,
-        workspaceConcurrency: 2,
-        maxTimeMs: 60_000,
       },
     ]);
-    // A dependency asked for by name gets the time it needs; --max-time sets it either way.
-    await run(['check', '--only', 'zod'], memoryIo({ cwd }), engine);
-    await run(['check', '--max-time', '0'], memoryIo({ cwd }), engine);
-    await run(['check', '--only', 'zod', '--max-time', '5'], memoryIo({ cwd }), engine);
-    const asked = engine.calls.slice(1) as { only?: string[]; maxTimeMs?: number }[];
-    expect(asked.map((c) => [c.only, c.maxTimeMs])).toEqual([
-      [['zod'], undefined],
-      [undefined, undefined],
-      [['zod'], 5000],
-    ]);
-    const bad = memoryIo({ cwd });
-    expect(await run(['check', '--max-time', 'soon'], bad, engine)).toBe(2);
-    expect(bad.stderr()).toContain('--max-time soon: expected seconds, 0 for no limit');
-    expect(io.stdout()).toMatch(/^uptide check · shop \(npm\) · \d+ms\n/);
-    expect(io.stdout()).toContain('Next\n  npx uptide check --details    every site and reason\n');
+    expect(await run(['check', 'zod', '--max-time', '60'], memoryIo({ cwd }), engine)).toBe(2);
+    expect(io.stdout()).toContain('npx uptide check zod stripe --details');
   });
 
   it('prints only the start line and the final timing as progress, without a terminal', async () => {
     const io = memoryIo({ cwd: npmRepo() });
-    await run(['check'], io, fakeEngine());
+    await run(['check', 'zod', 'stripe'], io, fakeEngine());
     expect(io.stderr()).toMatch(/^uptide check · shop \(npm\)\ndone in \d+ms\n$/);
     const ci = memoryIo({ cwd: npmRepo(), outTty: true, errTty: true });
-    await run(['check', '--ci'], ci, fakeEngine());
+    await run(['check', 'zod', 'stripe', '--ci'], ci, fakeEngine());
     expect(ci.stderr()).toMatch(/^uptide check · shop \(npm\)\ndone in \d+ms\n$/);
   });
 
   it('leaves no progress line behind on a terminal', async () => {
     const io = memoryIo({ cwd: npmRepo(), outTty: true, errTty: true });
-    await run(['check'], io, fakeEngine());
+    await run(['check', 'zod', 'stripe'], io, fakeEngine());
     expect(io.stderr()).not.toContain('\n');
   });
 
   it('prints one line per phase with --verbose', async () => {
     const io = memoryIo({ cwd: npmRepo() });
-    await run(['check', '--verbose'], io, fakeEngine());
+    await run(['check', 'zod', 'stripe', '--verbose'], io, fakeEngine());
     expect(io.stderr()).toContain('✔ Repository  shop (npm)');
-    expect(io.stderr()).toMatch(
-      /✔ Analysis of every dependency that is behind {2}0 breaking, 0 deprecated \(/,
-    );
+    expect(io.stderr()).toMatch(/✔ Analysis of zod, stripe {2}0 breaking, 0 deprecated \(/);
     expect(io.stderr()).not.toContain('done in');
   });
 
   it('renders every site with --details', async () => {
     const io = memoryIo({ cwd: npmRepo() });
-    await run(['check', '--details'], io, fakeEngine());
+    await run(['check', 'zod', 'stripe', '--details'], io, fakeEngine());
     expect(io.stdout()).toContain('Summary: 0 packages need attention');
-    expect(io.stdout()).toContain('  npx uptide check    the summary, one line per change\n');
+    expect(io.stdout()).toContain(
+      '  npx uptide check zod stripe    the summary, one line per change\n',
+    );
   });
 
   it('repeats --cwd and --only in the suggested commands', async () => {
     const cwd = npmRepo();
     const io = memoryIo({ cwd: '/' });
     await run(['check', '--cwd', cwd, '--only', 'zod'], io, fakeEngine());
-    expect(io.stdout()).toContain(`  npx uptide check --only zod --details --cwd ${cwd}`);
+    expect(io.stdout()).toContain(`  npx uptide check zod --details --cwd ${cwd}`);
   });
 
   it('exits 1 when a breaking change reaches the code', async () => {
     const engine = fakeEngine({ check: async () => checkResult({ breaking: 3 }) });
     const io = memoryIo({ cwd: npmRepo() });
-    expect(await run(['check'], io, engine)).toBe(1);
+    expect(await run(['check', 'zod', 'stripe'], io, engine)).toBe(1);
   });
 
   it('exits 2 when the engine cannot answer, with the reason on stderr', async () => {
@@ -159,8 +148,8 @@ describe('uptide check', () => {
       },
     });
     const io = memoryIo({ cwd: npmRepo() });
-    expect(await run(['check'], io, engine)).toBe(2);
-    expect(io.stderr()).toContain('✖ Analysis of every dependency that is behind');
+    expect(await run(['check', 'zod', 'stripe'], io, engine)).toBe(2);
+    expect(io.stderr()).toContain('✖ Analysis of zod, stripe');
     expect(io.stderr()).toContain('error: adapter exploded');
     expect(io.stdout()).toBe('');
   });
@@ -171,19 +160,19 @@ describe('uptide check', () => {
     const io = memoryIo({ cwd: '/' });
     await run(['check', '--cwd', cwd, '--only', 'zod', '--target', '4.6.5'], io, engine);
     expect(engine.calls[0]).toMatchObject({ cwd, only: ['zod'], targets: { zod: '4.6.5' } });
-    await run(['check', '--cwd', cwd, '--only', 'all', '--target', 'zod@4.0.0'], io, engine);
-    expect(engine.calls[1]).toMatchObject({ only: undefined, targets: { zod: '4.0.0' } });
+    await run(['check', 'zod', 'stripe', '--cwd', cwd, '--target', 'zod@4.0.0'], io, engine);
+    expect(engine.calls[1]).toMatchObject({ only: ['zod', 'stripe'], targets: { zod: '4.0.0' } });
   });
 
   it('refuses a bare --target version when several packages are selected', async () => {
     const io = memoryIo({ cwd: npmRepo() });
-    expect(await run(['check', '--target', '4.6.5'], io, fakeEngine())).toBe(2);
+    expect(await run(['check', 'zod', 'stripe', '--target', '4.6.5'], io, fakeEngine())).toBe(2);
     expect(io.stderr()).toContain('--target 4.6.5: expected <package>@<version> or latest');
   });
 
   it('keeps stdout pure JSON with --json; progress goes to stderr', async () => {
     const io = memoryIo({ cwd: npmRepo() });
-    expect(await run(['check', '--json'], io, fakeEngine())).toBe(0);
+    expect(await run(['check', 'zod', 'stripe', '--json'], io, fakeEngine())).toBe(0);
     expect(JSON.parse(io.stdout()).summary.breaking).toBe(0);
     expect(io.stderr()).toContain('uptide check · shop (npm)');
   });
@@ -207,7 +196,11 @@ describe('uptide check', () => {
       },
     ];
     const io = memoryIo({ cwd: npmRepo() });
-    await run(['check', '--verbose'], io, fakeEngine({ check: async () => report }));
+    await run(
+      ['check', 'zod', 'stripe', '--verbose'],
+      io,
+      fakeEngine({ check: async () => report }),
+    );
     expect(io.stderr()).toContain('  zod 3.23.8 → 4.6.5: fetch 1.2s, diff 300ms, usages 2.1s\n');
   });
 });
@@ -216,13 +209,13 @@ describe('color and --ci', () => {
   const terminal = { outTty: true, errTty: true };
   it('colors a terminal', async () => {
     const io = memoryIo({ cwd: npmRepo(), ...terminal });
-    await run(['check'], io, fakeEngine());
+    await run(['check', 'zod', 'stripe'], io, fakeEngine());
     expect(io.stdout()).toContain(ESC);
   });
   it.each([
-    ['--ci', ['check', '--ci'], {}],
-    ['--no-color', ['check', '--no-color'], {}],
-    ['NO_COLOR', ['check'], { NO_COLOR: '1' }],
+    ['--ci', ['check', 'zod', 'stripe', '--ci'], {}],
+    ['--no-color', ['check', 'zod', 'stripe', '--no-color'], {}],
+    ['NO_COLOR', ['check', 'zod', 'stripe'], { NO_COLOR: '1' }],
   ])('emits no escape codes on stdout with %s', async (_name, argv, env) => {
     const io = memoryIo({ cwd: npmRepo(), ...terminal, env });
     await run(argv, io, fakeEngine());
@@ -230,7 +223,7 @@ describe('color and --ci', () => {
   });
   it('emits nothing but plain lines anywhere with --ci', async () => {
     const io = memoryIo({ cwd: npmRepo(), ...terminal });
-    await run(['check', '--ci'], io, fakeEngine());
+    await run(['check', 'zod', 'stripe', '--ci'], io, fakeEngine());
     expect(io.stderr()).not.toContain(ESC);
     expect(io.stderr()).not.toContain('\r');
   });
@@ -290,7 +283,7 @@ describe('uptide fix', () => {
         ['fix', '--only', 'react', '--no-llm'],
         { ANTHROPIC_API_KEY: 'test-key' },
         'assisted fixes are off (--no-llm)',
-        'Next: uptide check --only react --details',
+        'Next: uptide check react --details',
       ],
     ] as const) {
       const engine = fakeEngine();
@@ -591,7 +584,7 @@ describe('uptide pr-body', () => {
 });
 
 describe('--help', () => {
-  it.each(['check', 'fix', 'pr-body'])(
+  it.each(['check', 'zod', 'stripe', 'fix', 'pr-body'])(
     '%s documents the shared flags and exit codes',
     async (command) => {
       const io = memoryIo();
@@ -615,7 +608,7 @@ describe('--help', () => {
 
   it('exits 2 on an unknown option and 0 on --version', async () => {
     const io = memoryIo();
-    expect(await run(['check', '--frobnicate'], io, fakeEngine())).toBe(2);
+    expect(await run(['check', 'zod', 'stripe', '--frobnicate'], io, fakeEngine())).toBe(2);
     expect(io.stderr()).toContain("unknown option '--frobnicate'");
     expect(await run(['--version'], memoryIo(), fakeEngine())).toBe(0);
   });
