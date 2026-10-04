@@ -2,7 +2,7 @@
   "name": "uptide-monorepo",
   "private": true,
   "version": "0.1.0",
-  "description": "Renovate updates the version. We update the code.",
+  "description": "Migrations you can merge.",
   "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@10.17.1",

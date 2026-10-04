@@ -8,7 +8,21 @@ const readme = readFileSync(new URL('README.md', root), 'utf8');
 
 describe('README', () => {
   it('opens with the pitch and a quickstart that needs no setup', () => {
-    expect(readme).toContain('Renovate updates the version. We update the code.');
+    // The tagline is the first line under the title, then the one-sentence pitch npm shows.
+    expect(readme.split('\n').slice(0, 3)).toEqual([
+      '# Uptide',
+      '',
+      '**Migrations you can merge.**',
+    ]);
+    const pitch =
+      'Uptide finds what a dependency upgrade breaks in your code, migrates it, and proves it with your compiler and tests.';
+    expect(readme.replace(/\s+/g, ' ')).toContain(pitch);
+    expect(
+      JSON.parse(readFileSync(new URL('packages/cli/package.json', root), 'utf8')).description,
+    ).toBe(pitch);
+    // Renovate and Dependabot are tools Uptide works alongside, named once, never the framing.
+    expect(readme.match(/Renovate/g)).toHaveLength(1);
+    expect(readme).not.toContain('Renovate updates');
     const quickstart = readme.slice(
       readme.indexOf('## Quickstart'),
       readme.indexOf('## Before and after'),
