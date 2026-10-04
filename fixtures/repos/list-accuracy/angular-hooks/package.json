@@ -1,0 +1,14 @@
+{
+  "name": "synthetic-angular-hooks",
+  "private": true,
+  "dependencies": {
+    "husky": "1.0.0",
+    "lint-staged": "1.0.0",
+    "pretty-quick": "1.0.0",
+    "prettier": "1.0.0",
+    "standard": "1.0.0",
+    "webpack": "1.0.0",
+    "webpack-cli": "1.0.0",
+    "orphan": "1.0.0"
+  }
+}

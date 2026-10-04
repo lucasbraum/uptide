@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
+import { configConsumers, manifestCommands, type TaskCommands } from './config.js';
 
 export interface Manifest {
   [key: string]: unknown;
@@ -29,9 +30,11 @@ export function installedManifest(
 }
 
 export const isConfig = (file: string): boolean =>
+  configConsumers(file).length > 0 ||
   /(?:^|\/)(?:tsconfig[^/]*\.jsonc?|nest-cli\.json|\.(?:eslintrc|prettierrc|babelrc|commitlintrc|czrc|cz-config)(?:\.[^/]+)?|[^/]*\.config\.[^/]+|(?:karma\.conf|gulpfile|jest|eslint|prettier|webpack|commitlint|cz)[^/]*\.(?:json|[cm]?[jt]s))$/.test(
     file,
-  ) || /(?:^|\/)\.husky\//.test(file);
+  ) ||
+  /(?:^|\/)\.husky\//.test(file);
 
 export const knownTool = (name: string): boolean =>
   /^(?:eslint|prettier)/.test(name) ||
@@ -58,6 +61,7 @@ export function toolingReasons(
   scripts: string,
   configs: string,
   manifests: Manifest[] = [],
+  tasks: TaskCommands[] = [],
 ): string[] {
   const reasons: string[] = [];
   if (knownTool(name)) reasons.push('known configuration or build tool');
@@ -74,7 +78,15 @@ export function toolingReasons(
     reasons.push('used by package scripts');
   if (referencesPackage(configs, name) || bins.some((bin) => mentions(configs, bin)))
     reasons.push('referenced by configuration');
+  for (const command of [...tasks, ...manifests.flatMap(manifestCommands)]) {
+    if (
+      [name, ...bins].some((bin) => mentions(command.text, bin)) ||
+      command.text.split(/[\s;&|\x22\x27`]+/).some((token) => bins.includes(basename(token)))
+    )
+      reasons.push(command.reason);
+  }
   for (const manifest of manifests) {
+    if (Object.hasOwn(manifest, name)) reasons.push(`package.json field: ${name}`);
     for (const [field, consumers] of Object.entries(CONFIG_FIELDS)) {
       const value =
         field === 'config.commitizen'
@@ -96,6 +108,7 @@ export function toolingReasons(
 const CONFIG_FIELDS: Record<string, string[]> = {
   husky: ['husky'],
   'lint-staged': ['lint-staged'],
+  'simple-git-hooks': ['simple-git-hooks'],
   'config.commitizen': ['commitizen'],
   prettier: ['prettier'],
   eslintConfig: ['eslint'],

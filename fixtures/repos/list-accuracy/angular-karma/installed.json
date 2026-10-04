@@ -1,0 +1,19 @@
+{
+  "karma-jasmine": {
+    "dependencies": {
+      "jasmine-core": "^1.0.0",
+      "direct-helper": "^1.0.0"
+    },
+    "peerDependencies": {
+      "peer-helper": "^1.0.0"
+    },
+    "devDependencies": {
+      "dev-only-helper": "^1.0.0"
+    }
+  },
+  "direct-helper": {
+    "dependencies": {
+      "karma-jasmine": "^1.0.0"
+    }
+  }
+}

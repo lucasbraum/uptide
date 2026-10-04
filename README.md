@@ -63,8 +63,9 @@ kind and major gap, verified/generic tier, importing files, calls, references an
 Workspace columns appear only in workspaces. Top symbols require `--details`; terminal
 columns fit the available width, and only verified packages carry a tier tag. Minor/patch upgrades, tooling and possibly
 unused packages are collapsed; `--all` expands them. Tools used by scripts/configs, runtime
-types and required peers are classified separately from possibly unused packages. This includes
-package.json tool settings, installed bin names, gulp/Karma and hook configs, stylesheet
+types and required direct dependencies/peers are classified separately from possibly unused packages. This includes
+package.json tool settings (including keys matching dependency names), tool rc file presence,
+installed bin names (including collisions), hook/task commands, Karma plugin mappings and auto-loading, stylesheet
 imports and HTML assets under node_modules. Expanded rows explain the evidence; “possibly
 unused” means no usage was found by Uptide's scan, so verify before removing.
 
@@ -73,7 +74,8 @@ registries and host/path-scoped credentials. Discovery uses abbreviated metadata
 16 concurrent requests, a 10-second timeout per attempt (including response bodies), and one
 retry for timeouts or HTTP 5xx. Only a host that returns 401, 403 or 405 is blocked for the
 rest of that run. Credentials and registry responses are never written to the discovery cache.
-Unresolved packages stay in JSON's `unknown` list, the summary reports “N not checked (network)”,
+Unresolved packages stay in JSON's `unknown` list, the summary reports the shared reason (e.g. “3 not checked (access denied)”)
+or simply “N not checked” for mixed reasons,
 and HTML keeps one named row per incomplete package. Repeated failures are grouped by host and
 reason (more than five network errors, or multiple access failures); `--details` lists names.
 Successful packages remain visible; incomplete discovery exits 2. Analysis commands retain
@@ -89,6 +91,13 @@ usage scanning and adding `registryName` to aliased upgrade rows in JSON.
 commands and no source code or file paths by default; `--details` adds file lists.
 Usage is syntactic: indirect aliases and reflection are not followed. With different locked
 versions, usage is shown across the repository.
+
+`list --verbose` prints phase timings and file counts to stderr: manifest read, registry,
+source scan, config scan and render. Source scan includes file traversal and stylesheet/HTML
+assets; config scan includes configuration parsing and classification. Render covers terminal/JSON
+and optional HTML writing, excluding browser launch. With `--json`, verbose phase/count data is
+also included under `timing`; default JSON stays unchanged. This helps distinguish registry
+latency from repositories with many source/config files. Configs are read statically, never executed.
 
 `check` requires names (`uptide check zod stripe`). With no names it points to `uptide list`
 and exits 2 before doing work. It retains tiers and partial results per named package.

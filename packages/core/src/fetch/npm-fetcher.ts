@@ -161,7 +161,11 @@ export function createNpmFetcher(opts: NpmFetcherOptions = {}): PackageFetcher {
         EXACT_VERSION.test(version),
         async () => {
           const manifest = await resolveVersion(name, version, config, fetchFn);
-          return { peerDependencies: manifest.peerDependencies ?? {}, bin: manifest.bin };
+          return {
+            ...(manifest.dependencies ? { dependencies: manifest.dependencies } : {}),
+            peerDependencies: manifest.peerDependencies ?? {},
+            bin: manifest.bin,
+          };
         },
       ),
     async resolve(name, requested) {

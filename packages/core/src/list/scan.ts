@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { ts } from 'ts-morph';
+import { scanConfig, type TaskCommands } from './config.js';
 import { isConfig } from './evidence.js';
 
 const SKIP = new Set([
@@ -21,6 +22,14 @@ export interface ImportUsage {
   workspaces: string[];
 }
 
+export interface ScanStats {
+  sourceMs: number;
+  configMs: number;
+  visitedFiles: number;
+  sourceFiles: number;
+  configFiles: number;
+  assetFiles: number;
+}
 /** Syntax only: no project, type checker, module resolution, or execution. Counts direct
  * calls/new/JSX and value/type references through imported bindings; indirect aliases and reflection are not followed. */
 export function scanImports(
@@ -29,7 +38,18 @@ export function scanImports(
   workspaces: string[],
   configs?: string[],
   evidence?: Map<string, string[]>,
+  stats?: ScanStats,
+  tasks?: TaskCommands[],
 ): Map<string, ImportUsage> {
+  const start = performance.now();
+  const counts: ScanStats = {
+    sourceMs: 0,
+    configMs: 0,
+    visitedFiles: 0,
+    sourceFiles: 0,
+    configFiles: 0,
+    assetFiles: 0,
+  };
   const result = new Map<string, ImportUsage>();
   const wanted = new Set(names);
   const packageOf = (specifier: string): string | undefined => {
@@ -49,33 +69,16 @@ export function scanImports(
         continue;
       }
       const file = relative(root, path).replaceAll('\\', '/');
+      counts.visitedFiles++;
       if (isConfig(file)) {
-        const text = readFileSync(path, 'utf8');
-        if (/(?:^|\/)\.husky\//.test(file)) configs?.push(text.replace(/^\s*#.*$/gm, ''));
-        else {
-          // Read literals without executing configs or counting comments as evidence.
-          const scanner = ts.createScanner(
-            ts.ScriptTarget.Latest,
-            true,
-            ts.LanguageVariant.Standard,
-            text,
-          );
-          const literals: string[] = [];
-          for (
-            let token = scanner.scan();
-            token !== ts.SyntaxKind.EndOfFileToken;
-            token = scanner.scan()
-          )
-            if (
-              token === ts.SyntaxKind.StringLiteral ||
-              token === ts.SyntaxKind.NoSubstitutionTemplateLiteral
-            )
-              literals.push(scanner.getTokenValue());
-          configs?.push(literals.join('\n'));
-        }
+        const started = performance.now();
+        configs?.push(scanConfig(file, readFileSync(path, 'utf8'), names, evidence, tasks));
+        counts.configFiles++;
+        counts.configMs += performance.now() - started;
         continue;
       }
       if (/\.(?:scss|sass|less|css|html?)$/i.test(entry.name)) {
+        counts.assetFiles++;
         const text = readFileSync(path, 'utf8');
         const add = (specifier: string, reason: string): void => {
           const clean = specifier.replace(/^~/, '').replace(/^(?:\.\.?\/|\/)*node_modules\//, '');
@@ -112,6 +115,7 @@ export function scanImports(
         continue;
       }
       if (!/\.[cm]?[jt]sx?$/.test(entry.name) || /\.d\.[cm]?ts$/.test(entry.name)) continue;
+      counts.sourceFiles++;
       const workspace =
         [...workspaces]
           .sort((a, b) => b.length - a.length)
@@ -303,5 +307,7 @@ export function scanImports(
     }
   };
   walk(resolve(root));
+  counts.sourceMs = performance.now() - start - counts.configMs;
+  if (stats) Object.assign(stats, counts);
   return result;
 }

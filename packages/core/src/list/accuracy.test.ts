@@ -268,6 +268,6 @@ it('recognizes installed bin aliases inside hook scripts', async () => {
   });
   expect(report.packages.find((p) => p.name === 'commitizen')).toMatchObject({
     classification: 'tooling',
-    reasons: ['referenced by configuration'],
+    reasons: ['referenced by configuration', 'hook/task command in prepare-commit-msg'],
   });
 });

@@ -1,0 +1,4 @@
+'*.js':
+  - pretty-quick --staged
+  - standard --fix
+  - webpack --mode production

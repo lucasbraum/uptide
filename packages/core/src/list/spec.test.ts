@@ -243,3 +243,41 @@ it('checks an explicit registry alias even when its name matches a local workspa
   expect(report.failures).toEqual([]);
   expect(report.packages[0]).toMatchObject({ name: 'local', current: '1.0.0', latest: '2.0.0' });
 });
+
+it('resolves default and named pnpm catalogs before classifying dependency sources', async () => {
+  const cwd = root();
+  writeFileSync(
+    join(cwd, 'package.json'),
+    JSON.stringify({
+      name: 'catalog-app',
+      dependencies: {
+        ordinary: 'catalog:',
+        alias: 'catalog:tools',
+        local: 'catalog:',
+        missing: 'catalog:missing',
+      },
+    }),
+  );
+  writeFileSync(
+    join(cwd, 'pnpm-workspace.yaml'),
+    `catalog:
+  ordinary: 1.0.0
+  local: github:example/synthetic
+catalogs:
+  tools:
+    alias: npm:real-runtime@1.0.0
+`,
+  );
+  const resolve = vi.fn(async () => '2.0.0');
+  const report = await listDependencies({ cwd, fetcher: { resolve, metadata: async () => ({}) } });
+  expect(report.packages.map((p) => p.name).sort()).toEqual(['alias', 'ordinary']);
+  expect(report.packages.find((p) => p.name === 'alias')?.registryName).toBe('real-runtime');
+  expect(report.skipped).toEqual([expect.objectContaining({ name: 'local', source: 'github' })]);
+  expect(report.failures).toEqual([
+    expect.objectContaining({
+      name: 'missing',
+      reason: 'malformed dependency declaration in package.json',
+    }),
+  ]);
+  expect(resolve).toHaveBeenCalledTimes(2);
+});

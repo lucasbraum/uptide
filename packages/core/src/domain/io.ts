@@ -13,7 +13,11 @@ export interface PackageFetcher {
   metadata?(
     name: string,
     version: string,
-  ): Promise<{ peerDependencies?: Record<string, string>; bin?: string | Record<string, string> }>;
+  ): Promise<{
+    dependencies?: Record<string, string>;
+    peerDependencies?: Record<string, string>;
+    bin?: string | Record<string, string>;
+  }>;
   versions?(name: string): Promise<string[]>;
   /**
    * Done with a fetched directory. A fetcher that extracts into a persistent cache keeps it;

@@ -15,6 +15,7 @@ export interface ResolvedVersion {
   name: string;
   version: string;
   tarball: string;
+  dependencies?: Record<string, string>;
   peerDependencies?: Record<string, string>;
   bin?: string | Record<string, string>;
   /** SRI string (`sha512-…`) when the registry provides one. */
@@ -24,6 +25,7 @@ export interface ResolvedVersion {
 }
 
 interface Manifest {
+  dependencies?: Record<string, string>;
   peerDependencies?: Record<string, string>;
   bin?: string | Record<string, string>;
   version?: string;
@@ -130,6 +132,7 @@ function toResolved(name: string, manifest: Manifest | undefined): ResolvedVersi
     name,
     version: manifest.version,
     tarball: manifest.dist.tarball,
+    ...(manifest.dependencies ? { dependencies: manifest.dependencies } : {}),
     peerDependencies: manifest.peerDependencies ?? {},
   };
   if (manifest.bin) resolved.bin = manifest.bin;

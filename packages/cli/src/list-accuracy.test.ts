@@ -131,7 +131,7 @@ it.each([false, true])(
     report.failures.push({ ...first, workspace: 'child' });
     const text = formatList(report, { color });
     expect(text).toMatchSnapshot();
-    expect(text).toContain('not checked (network)');
+    expect(text).toContain('not checked (timed out)');
     expect(text).toContain('6 packages on registry.npmjs.org: timed out, skipped');
     expect(text).not.toContain('@example/package-');
     expect(text).not.toContain('up to date');
@@ -139,7 +139,7 @@ it.each([false, true])(
     for (const unknown of report.unknown ?? []) expect(details.split(unknown.name)).toHaveLength(2);
     const html = renderListHtml(report, opts);
     expect(html).toContain('<strong>6</strong><span class="label">Unknown</span>');
-    expect(html).toContain('6 not checked (network)');
+    expect(html).toContain('6 not checked (timed out)');
     expect(html.match(/class="incomplete-row"/g)).toHaveLength(6);
     for (const unknown of report.unknown ?? [])
       expect(html.split(`<strong>${unknown.name}</strong>`)).toHaveLength(2);

@@ -40,7 +40,7 @@ registry tarball URLs in lockfiles do not cause false skips. Additional tests co
 alias locks, different alias targets in workspaces, malformed declarations, exit codes, and
 collapsed terminal/HTML output without source URLs or local paths.
 
-Re-run: `pnpm --filter @uptide/core exec vitest run src/list/accuracy.test.ts src/list/registry.test.ts src/list/spec.test.ts`.
+Re-run: `pnpm --filter @uptide/core exec vitest run src/list/accuracy.test.ts src/list/registry.test.ts src/list/spec.test.ts src/list/tool-config.test.ts`.
 
 ## Public registry runs
 
@@ -68,3 +68,44 @@ checkouts produces:
 
 `prettier-2` now resolves `prettier`, comparing 2.8.8 → 3.9.9. The GitHub `tooling`
 dependency is reported as “not checked: non-registry source (github)”.
+
+## Hook / Karma follow-up
+
+Measured against PR #9 commit `e1beaaa` and this follow-up, with synthetic registry
+responses and installed manifests. Each declaration resolves from 1.0.0 to 2.0.0.
+
+| Fixture | Tooling before → after | Possibly unused before → after |
+| --- | --- | --- |
+| angular-hooks | 2 → 7 | 6 → 1 |
+| angular-karma | 1 → 11 | 12 → 2 |
+| task-fields | 5 → 10 | 6 → 1 |
+| rc-configs (all variants) | 2 → 9 | 8 → 1 |
+| Total | 10 → 37 | 32 → 5 |
+
+The five remaining packages are deliberate controls: one `orphan` per fixture, plus
+`dev-only-helper`, which is only a development dependency of an installed tool.
+The real private application was not used or copied. Expected named packages now have evidence:
+
+| Package | Example reason |
+| --- | --- |
+| husky | config file .huskyrc |
+| lint-staged | hook/task command in .huskyrc; config file .lintstagedrc.yaml |
+| pretty-quick | hook/task command in .lintstagedrc.yaml |
+| prettier | config file .prettierrc |
+| standard | hook/task command in .lintstagedrc.yaml |
+| jasmine-core | Karma frameworks: jasmine; required by karma-jasmine |
+
+Prettier was already Tooling via the known-tool heuristic; it gains concrete config evidence.
+`rc-configs/cases.json` is materialized one file at a time by tests to verify every rc variant
+independently. JS fixture configs throw if executed; discovery only parses their syntax.
+Hook tests cover JSON, JavaScript and YAML values, package.json husky/lint-staged/simple-git-hooks,
+and two installed packages exposing `webpack`. Karma tests cover explicit plugins, plugins
+unset, short-name mappings, required dependencies/peers, cycles and exclusion of dev dependencies.
+Verbose tests cover all five phases, file counts, stderr separation and unchanged default JSON.
+
+Live `list --all --json --ci --verbose` on webpack v5.50.0 after this follow-up:
+73 outdated, 1 intentional GitHub skip, 0 unknown/failures, exit 0, 3.140 s total.
+Manifest read: 6.8 ms; registry: 1504.4 ms; source scan: 1536.0 ms; config scan:
+92.4 ms; JSON render: below 1 ms. Visited 6,192 files: 4,796 source, 813 config,
+61 stylesheet/HTML assets; 1 package manifest, no installed manifests. Live network
+timings vary; dependency count alone does not describe source scanning work.

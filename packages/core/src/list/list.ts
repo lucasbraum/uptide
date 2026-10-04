@@ -11,6 +11,7 @@ import { errorCode } from '../errors.js';
 import { loadRegistryConfig, registryFor } from '../fetch/npmrc.js';
 import { stripePack } from '../packs/stripe/index.js';
 import { zodPack } from '../packs/zod/index.js';
+import type { TaskCommands } from './config.js';
 import {
   installedManifest,
   knownTool,
@@ -25,8 +26,8 @@ import {
   registryFailure,
   registryHost,
 } from './registry.js';
-import { scanImports } from './scan.js';
-import { dependencySource } from './spec.js';
+import { type ScanStats, scanImports } from './scan.js';
+import { catalogSpec, dependencySource } from './spec.js';
 
 const compareText = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
@@ -75,7 +76,23 @@ export interface ListReport {
     summary?: string;
     status?: number;
   }[];
-  timing: { totalMs: number };
+  timing: {
+    totalMs: number;
+    phases?: {
+      manifestReadMs: number;
+      registryMs: number;
+      sourceScanMs: number;
+      configScanMs: number;
+    };
+    files?: {
+      manifests: number;
+      installedManifests: number;
+      visited: number;
+      source: number;
+      config: number;
+      assets: number;
+    };
+  };
 }
 export interface ListOptions {
   cwd: string;
@@ -83,11 +100,13 @@ export interface ListOptions {
   adapter?: LanguageAdapter;
   fetcher?: Pick<PackageFetcher, 'resolve' | 'metadata'>;
   details?: boolean;
+  verbose?: boolean;
 }
 
 /** Discovery only. Reads manifests, lockfiles, source syntax and registry metadata. */
 export async function listDependencies(opts: ListOptions): Promise<ListReport> {
   const start = Date.now();
+  const manifestStart = performance.now();
   const adapter = opts.adapter ?? typescriptAdapter;
   const config = loadRegistryConfig({ cwd: opts.cwd });
   const fetcher = opts.fetcher ?? createDiscoveryFetcher({ cwd: opts.cwd, config });
@@ -165,7 +184,7 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
       ...manifest.devDependencies,
       ...manifest.optionalDependencies,
     })) {
-      const source = dependencySource(name, spec);
+      const source = dependencySource(name, catalogSpec(dir, name, spec));
       if (source.kind === 'invalid') {
         failures.push({
           name,
@@ -205,31 +224,53 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
       declared.set(key, versions);
     }
   }
+  let manifestReadMs = performance.now() - manifestStart;
   const names = [...declared.keys()].sort();
   const configs: string[] = [];
   const fileEvidence = new Map<string, string[]>();
+  const scanStats: ScanStats = {
+    sourceMs: 0,
+    configMs: 0,
+    visitedFiles: 0,
+    sourceFiles: 0,
+    configFiles: 0,
+    assetFiles: 0,
+  };
+  const tasks: TaskCommands[] = [];
   const usage = scanImports(
     opts.cwd,
     [...new Set(names.map(localName))],
     workspaces,
     configs,
     fileEvidence,
+    scanStats,
+    tasks,
   );
   const scripts = manifests.flatMap((m) => Object.values(m.scripts ?? {})).join('\n');
   const metadata = new Map<string, Manifest[]>();
   const targets = new Map<string, Manifest>();
   const latestVersions = new Map<string, string>();
-  await mapWithLimit(names, 16, async (name) => {
+  const missingVersions = new Map<string, string[]>();
+  const installedStart = performance.now();
+  let installedManifests = 0;
+  for (const name of names) {
     const items: Manifest[] = [];
     const missing: string[] = [];
     for (const [version, locations] of declared.get(name) ?? []) {
       const local = locations
         .map((w) => installedManifest(opts.cwd, w, localName(name)))
         .filter((m): m is Manifest => !!m && (!m.version || m.version === version));
+      installedManifests += local.length;
       if (local.length) items.push(...local);
       else missing.push(version);
     }
     metadata.set(name, items);
+    missingVersions.set(name, missing);
+  }
+  manifestReadMs += performance.now() - installedStart;
+  const registryStart = performance.now();
+  await mapWithLimit(names, 16, async (name) => {
+    const items = metadata.get(name) as Manifest[];
     // Resolve each package independently within the bounded request pool.
     if (!opts.only || opts.only.includes(localName(name))) {
       try {
@@ -252,7 +293,7 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
         blocked.add(name);
       }
     }
-    for (const version of missing) {
+    for (const version of missingVersions.get(name) ?? []) {
       if (!fetcher.metadata || blocked.has(name)) break;
       try {
         items.push({
@@ -264,6 +305,8 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
       }
     }
   });
+  const registryMs = performance.now() - registryStart;
+  const configStart = performance.now();
   const configText = configs.join('\n');
   const reasons = new Map(
     names.map((name) => [
@@ -275,6 +318,7 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
           scripts,
           configText,
           manifests,
+          tasks,
         ),
         ...(!knownTool(localName(name)) && knownTool(registryName(name))
           ? ['known configuration or build tool']
@@ -283,17 +327,24 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
       ],
     ]),
   );
-  // Peers of used packages (including up-to-date ones) are required without source imports.
+  // Runtime/peer dependencies of used direct packages are required, even without imports.
+  // Iterate the growing set to include chains/cycles; never follow devDependencies.
   const needed = new Set(
     names.filter((name) => usage.has(localName(name)) || (reasons.get(name)?.length ?? 0) > 0),
   );
   for (const name of needed) {
     for (const m of metadata.get(name) ?? []) {
-      for (const peer of Object.keys(m.peerDependencies ?? {})) {
+      for (const peer of new Set([
+        ...Object.keys(m.dependencies ?? {}),
+        ...Object.keys(m.peerDependencies ?? {}),
+      ])) {
         for (const key of names.filter((key) => localName(key) === peer)) {
           const evidence = reasons.get(key) as string[];
-          const reason = `peer dependency of ${localName(name)}`;
+          const reason = `required by ${localName(name)}`;
           if (!evidence.includes(reason)) evidence.push(reason);
+          const peerReason = `peer dependency of ${localName(name)}`;
+          if (m.peerDependencies?.[peer] && !evidence.includes(peerReason))
+            evidence.push(peerReason);
           needed.add(key);
         }
       }
@@ -410,6 +461,26 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
     ),
     unknown: [...unknown.values()],
     failures: [...failuresByName.values()],
-    timing: { totalMs: Date.now() - start },
+    timing: {
+      totalMs: Date.now() - start,
+      ...(opts.verbose
+        ? {
+            phases: {
+              manifestReadMs,
+              registryMs,
+              sourceScanMs: scanStats.sourceMs,
+              configScanMs: scanStats.configMs + performance.now() - configStart,
+            },
+            files: {
+              manifests: workspaces.length,
+              installedManifests,
+              visited: scanStats.visitedFiles,
+              source: scanStats.sourceFiles,
+              config: scanStats.configFiles,
+              assets: scanStats.assetFiles,
+            },
+          }
+        : {}),
+    },
   };
 }

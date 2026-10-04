@@ -117,6 +117,42 @@ export function skippedSources(
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([reason, members]) => ({ reason, members }));
 }
+/** Only use a reason-specific summary when every unknown has that same reason. */
+export function notCheckedLabel(report: ListReport): string {
+  const reasons = new Set(
+    (report.unknown ?? []).map((unknown) => {
+      const failure = report.failures.find((f) => f.name === unknown.name);
+      if (failure?.status === 403) return 'access denied';
+      if (failure?.status === 401) return 'auth required';
+      if (failure?.status === 404) return 'not found';
+      if (failure?.summary) return failure.summary.replace(/ \(\d{3}\)$/, '');
+      const reason = failure?.reason ?? unknown.reason;
+      return [
+        'access denied',
+        'auth required',
+        'timed out',
+        'not found',
+        'network request failed',
+      ].find((label) => reason.toLowerCase().includes(label));
+    }),
+  );
+  const reason = reasons.size === 1 ? [...reasons][0] : undefined;
+  return `not checked${reason ? ` (${reason})` : ''}`;
+}
+export function formatListTimings(report: ListReport, renderMs: number): string {
+  const phases = report.timing.phases;
+  const files = report.timing.files;
+  if (!phases || !files) return `render ${Math.max(0, renderMs).toFixed(1)} ms\n`;
+  return [
+    `manifest read  ${phases.manifestReadMs.toFixed(1)} ms · ${plural(files.manifests, 'package manifest')} · ${plural(files.installedManifests, 'installed manifest')}`,
+    `registry       ${phases.registryMs.toFixed(1)} ms`,
+    `source scan    ${phases.sourceScanMs.toFixed(1)} ms · ${plural(files.source, 'source file')} · ${plural(files.assets, 'asset file')}`,
+    `config scan    ${phases.configScanMs.toFixed(1)} ms · ${plural(files.config, 'config file')}`,
+    `render         ${Math.max(0, renderMs).toFixed(1)} ms`,
+    `files          ${files.visited} visited (excluding ignored directories and symlinks)`,
+    '',
+  ].join('\n');
+}
 export function formatList(report: ListReport, opts: FormatListOptions = {}): string {
   const color = opts.color ?? false;
   const c = pc.createColors(color);
@@ -130,7 +166,7 @@ export function formatList(report: ListReport, opts: FormatListOptions = {}): st
   lines.push(
     [
       stat(report.packages.length, 'outdated'),
-      ...(report.unknown?.length ? [stat(report.unknown.length, 'not checked (network)')] : []),
+      ...(report.unknown?.length ? [stat(report.unknown.length, notCheckedLabel(report))] : []),
       stat(report.packages.filter((p) => p.change === 'major').length, 'major'),
       stat(report.packages.filter((p) => p.change === 'minor').length, 'minor'),
       ...(report.packages.some((p) => p.change === 'patch')

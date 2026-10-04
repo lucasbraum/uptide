@@ -1,0 +1,32 @@
+{
+  "husky": {
+    "bin": {
+      "husky": "bin/run.js"
+    }
+  },
+  "lint-staged": {
+    "bin": {
+      "lint-staged": "bin/run.js"
+    }
+  },
+  "pretty-quick": {
+    "bin": {
+      "pretty-quick": "bin/run.js"
+    }
+  },
+  "standard": {
+    "bin": {
+      "standard": "bin/run.js"
+    }
+  },
+  "webpack": {
+    "bin": {
+      "webpack": "bin/run.js"
+    }
+  },
+  "webpack-cli": {
+    "bin": {
+      "webpack": "bin/run.js"
+    }
+  }
+}

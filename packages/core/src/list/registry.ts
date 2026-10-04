@@ -43,6 +43,7 @@ export function registryFailure(error: unknown, host: string): string {
 
 interface Manifest {
   version?: string;
+  dependencies?: Record<string, string>;
   peerDependencies?: Record<string, string>;
   bin?: string | Record<string, string>;
 }
@@ -203,7 +204,11 @@ export function createDiscoveryFetcher(opts: {
     resolve: async (name, version) => (await manifest(name, version)).version,
     metadata: async (name, version) => {
       const result = await manifest(name, version);
-      return { peerDependencies: result.peerDependencies ?? {}, bin: result.bin };
+      return {
+        ...(result.dependencies ? { dependencies: result.dependencies } : {}),
+        peerDependencies: result.peerDependencies ?? {},
+        bin: result.bin,
+      };
     },
   };
 }

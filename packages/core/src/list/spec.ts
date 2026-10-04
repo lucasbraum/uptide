@@ -1,3 +1,7 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { parseDocument } from 'yaml';
+
 export type DependencySource =
   | { kind: 'registry'; name: string; range: string }
   | { kind: 'non-registry'; source: string }
@@ -46,4 +50,19 @@ function nonRegistrySource(spec: string): string | undefined {
     return 'file';
   if (/^[\w.-]+\/[\w.-]+(?:#.*)?$/.test(spec)) return 'github';
   return undefined;
+}
+
+/** Catalog entries are declarations too; resolve them before classifying their source. */
+export function catalogSpec(dir: string, name: string, spec: unknown): unknown {
+  if (typeof spec !== 'string' || !spec.startsWith('catalog:')) return spec;
+  for (let current = resolve(dir); ; current = dirname(current)) {
+    const file = join(current, 'pnpm-workspace.yaml');
+    if (existsSync(file)) {
+      const document = parseDocument(readFileSync(file, 'utf8'), { logLevel: 'silent' });
+      if (document.errors.length) return undefined;
+      const catalog = spec.slice('catalog:'.length);
+      return document.getIn(catalog ? ['catalogs', catalog, name] : ['catalog', name]);
+    }
+    if (dirname(current) === current) return undefined;
+  }
 }

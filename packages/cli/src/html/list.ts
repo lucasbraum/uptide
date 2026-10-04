@@ -10,6 +10,7 @@ import {
   listSections,
   listSymbols,
   listUsage,
+  notCheckedLabel,
   UNUSED_HINT,
 } from '../format-list.js';
 import { escapeHtml as e } from './escape.js';
@@ -69,7 +70,7 @@ export function renderListHtml(report: ListReport, opts: ListHtmlOptions): strin
         { label: 'Tooling', value: tooling.length },
       ],
     )}
-${report.unknown?.length ? `<p class="more">${report.unknown.length} not checked (network). Latest versions are unknown.</p>` : ''}
+${report.unknown?.length ? `<p class="more">${report.unknown.length} ${e(notCheckedLabel(report))}. Latest versions are unknown.</p>` : ''}
 ${groups.length ? sectionLabel(nextSection(), 'Groups', 'Upgrade together') + groups.map(group).join('') : ''}
 ${used.length ? `${sectionLabel(nextSection(), 'Packages')}<section class="package">${used.map(standalone).join('')}</section>` : ''}
 ${collapsed('Tooling', tooling)}${collapsed('Possibly unused', unused)}

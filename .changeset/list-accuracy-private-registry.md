@@ -17,3 +17,8 @@ sections sequentially according to the sections present.
 Classify non-registry declarations and aliases as intentional skips, with collapsed terminal/HTML
 reasons and no error exit. Resolve npm registry aliases by their real package names, preserve
 local import usage, and read the correct pnpm/Yarn alias versions from lockfiles.
+
+Recognize tool rc files, hook/task commands, generic package configuration fields, Karma
+short names and auto-loaded plugins, colliding bins and required direct dependencies.
+Show the actual shared failure reason in discovery summaries. Add opt-in list --verbose
+phase timings and file counts, and preserve pnpm default/named catalog discovery.
