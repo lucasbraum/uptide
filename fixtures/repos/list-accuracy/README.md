@@ -110,7 +110,7 @@ Manifest read: 6.8 ms; registry: 1504.4 ms; source scan: 1536.0 ms; config scan:
 61 stylesheet/HTML assets; 1 package manifest, no installed manifests. Live network
 timings vary; dependency count alone does not describe source scanning work.
 
-## Legacy lint-staged and scan performance
+## Legacy lint-staged and initial scan performance (superseded ignore policy)
 
 `legacy-lint-staged` mirrors the requested v7–v9 shape: `.huskyrc` invokes lint-staged;
 `.lintstagedrc` has a `linters` map invoking prettier/standard and an `ignore` array.
@@ -120,7 +120,8 @@ The terminal/HTML group follows its lead, while independently classified members
 their own sections. Group commands and JSON retain both members. Tests cover legacy and flat
 formats in JSON, YAML, CommonJS, ESM, TypeScript and package.json, including ignored-glob false positives.
 
-Before/after against commit `9a6e7b7`, Node 22, same webpack checkout as above. Registry responses
+Historical measurements before the tool-ignore correction below. Before/after against commit
+`9a6e7b7`, Node 22, same webpack checkout as above. Registry responses
 are fixed in this benchmark to isolate scanning; the table reports source-scan wall time,
 including file traversal, text/lexer gates and worker startup. Synthetic construction happens
 before timing. These are local measurements, not a run on the private AngularJS application.
@@ -148,3 +149,35 @@ A live packaged CLI run after the optimization reports **73 outdated, 1 intentio
 0.820 s source scan and 0.127 s config scan. Network time varies independently.
 Regression tests compare parallel/sequential outputs, protect require/import/re-export/JSX and
 shadowing semantics, cover ignore negation/scoping, and run the bundled worker via a local mock registry.
+
+## Tool ignore scopes must not hide runtime usage
+
+`tool-ignore-scope` has `.prettierignore` containing `**/*.js`, plus blanket ESLint,
+standard and lint-staged ignores and a stylelint ignore file. Four minimal synthetic modules
+import nanoid, jquery, pdfjs-dist and axios. **Each remains Used, with 1 file and 1 call**;
+removing every tool ignore file/setting produces identical usage counts. Legacy lint-staged
+format tests now also verify that its ignore array cannot hide a real import or count as a command.
+
+Only Git ignores and the explicit built-in/generated exclusions affect source selection.
+The >50% guard is tested at 50%, 75% and 100%, including whole ignored directories, combined
+patterns, nested negation, and source text gates that must not trigger warnings. Summary/HTML
+warnings name the patterns; verbose adds candidate/excluded counts. JSON warnings remain
+available without `--verbose`; warning-only runs still exit 0. Long terminal warnings wrap so
+patterns are not truncated.
+
+Re-ran the **unchanged** benchmark generator after removing tool ignores (Node 22, fixed
+registry responses, source-scan wall time including traversal, gates and worker startup):
+
+| Repository | Prior tool-ignore implementation (`7b2ce1b`) | Corrected scan | Sources read | Full parses | Workers |
+| --- | --- | --- | --- | --- | --- |
+| webpack v5.50.0 | 0.730 s | 1.154 s | 4,793 (was 660) | 490 | 0 |
+| Synthetic: 1,844 source + 1,293 asset files | 0.779 s | **1.132 s** | 744 (was 544) | 160 | 4 |
+
+The corrected synthetic scan reads 200 more application files that standard.ignore previously
+hid. It still preserves **160 usage files / 160 calls**, processes all 1,293 assets, and stays
+under 2 seconds in this local run. There are 1,044 application-source candidates, of which
+300 are Git-ignored; the 800 vendor/bower files are excluded by built-in directory rules.
+Git-ignored files are counted without reading source contents. This is synthetic validation,
+not a timing claim for the unavailable private application.
+
+Reproduce: `pnpm build` then `node scripts/list-scan-benchmark.mjs /path/to/webpack-v5.50.0`.

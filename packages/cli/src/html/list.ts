@@ -72,6 +72,7 @@ export function renderListHtml(report: ListReport, opts: ListHtmlOptions): strin
         { label: 'Tooling', value: tooling.length },
       ],
     )}
+${(report.scanWarnings ?? []).map((warning) => `<p class="more">${e(warning)}</p>`).join('')}
 ${report.unknown?.length ? `<p class="more">${report.unknown.length} ${e(notCheckedLabel(report))}. Latest versions are unknown.</p>` : ''}
 ${groups.length ? sectionLabel(nextSection(), 'Groups', 'Upgrade together') + groups.map(group).join('') : ''}
 ${used.length ? `${sectionLabel(nextSection(), 'Packages')}<section class="package">${used.map(standalone).join('')}</section>` : ''}

@@ -39,8 +39,8 @@ it('prunes vendor/generated directories and files, respects scoped ignore rules 
   write(cwd, 'nested/local.js');
   write(cwd, 'nested/allowed.ignored.js');
   write(cwd, 'elsewhere/local.js');
-  write(cwd, '.eslintignore', 'eslint-only.js\n');
-  write(cwd, 'eslint-only.js');
+  write(cwd, '.eslintignore', 'lint-excluded.js\n');
+  write(cwd, 'lint-excluded.js');
   write(cwd, '.prettierignore', 'prettier-only.scss\n');
   write(cwd, 'prettier-only.scss', '@use "sample";');
   write(
@@ -65,17 +65,22 @@ it('prunes vendor/generated directories and files, respects scoped ignore rules 
     'app.js',
     'elsewhere/local.js',
     'keep.ignored.js',
+    'lint-excluded.js',
+    'lint-output/hidden.js',
+    'mixed/hidden.js',
     'mixed/keep.js',
     'nested/allowed.ignored.js',
+    'old/hidden.js',
   ]);
-  expect(usage.get('sample')?.callSites).toBe(5);
-  expect(counts.parsedFiles).toBe(5);
+  expect(usage.get('sample')?.callSites).toBe(9);
+  expect(counts.parsedFiles).toBe(9);
+  expect(
+    Object.keys(counts.skipped ?? {}).some((rule) =>
+      /eslint|prettier|standard|lint-staged/.test(rule),
+    ),
+  ).toBe(false);
   expect(counts.skipped).toMatchObject({
-    '.gitignore': { files: 2, directories: 1 },
-    '.eslintignore': { files: 1, directories: 0 },
-    '.prettierignore': { files: 1, directories: 0 },
-    'standard.ignore': { files: 2, directories: 0 },
-    'lint-staged.ignore': { files: 0, directories: 1 },
+    '.gitignore': { files: 3, directories: 1 },
     'generated files (*.min.js, *.bundle.js, *.map)': { files: 3, directories: 0 },
     'no dependency text': { files: 1 },
     'no dependency imports (lexer)': { files: 1 },
@@ -119,4 +124,55 @@ it('parallel and sequential parsing preserve bindings, shadowing, counts and det
   expect(parallel).toEqual(serial);
   expect(counts.workers).toBe(2);
   expect(parallel.get('sample')).toMatchObject({ callSites: 12, references: 12 });
+});
+
+it.each([2, 3, 4])(
+  'warns only when Git rules exclude strictly more than half of source candidates (%s/4)',
+  async (excluded) => {
+    const cwd = fixture();
+    write(cwd, '.gitignore', 'ignored/\n');
+    for (let i = 0; i < 4; i++) write(cwd, `${i < excluded ? 'ignored' : 'app'}/file-${i}.js`);
+    // Built-ins and generated artifacts are not application source candidates.
+    for (let i = 0; i < 10; i++) {
+      write(cwd, `node_modules/fake/file-${i}.js`);
+      write(cwd, `app-${i}.min.js`);
+    }
+    const counts = stats();
+    await scanImports(cwd, ['sample'], ['.'], [], new Map(), counts);
+    expect(counts.candidateSourceFiles).toBe(4);
+    expect(counts.ignoredSourceFiles).toBe(excluded);
+    expect(counts.ignoredSourceRules).toEqual({ 'ignored/': excluded });
+    if (excluded > 2)
+      expect(counts.warnings).toEqual([
+        `Usage warning: .gitignore skipped ${excluded} of 4 candidate source files (${excluded * 25}%); rules: "ignored/" (${excluded}). Usage may be understated.`,
+      ]);
+    else expect(counts.warnings).toBeUndefined();
+  },
+);
+it('combines rules for the broad-ignore warning and honors nested negation', async () => {
+  const cwd = fixture();
+  write(cwd, '.gitignore', '*.js\n');
+  write(cwd, 'nested/.gitignore', '!keep.js\n*.ts\n');
+  write(cwd, 'one.js');
+  write(cwd, 'two.js');
+  write(cwd, 'nested/three.ts');
+  write(cwd, 'nested/keep.js');
+  const counts = stats();
+  const usage = await scanImports(cwd, ['sample'], ['.'], [], new Map(), counts);
+  expect(usage.get('sample')?.files).toEqual(['nested/keep.js']);
+  expect(counts.ignoredSourceRules).toEqual({ '*.js': 2, '*.ts': 1 });
+  expect(counts.warnings?.[0]).toContain('3 of 4 candidate source files (75%)');
+  expect(counts.warnings?.[0]).toContain('"*.js" (2), "*.ts" (1)');
+});
+it('does not warn when text/lexer gates skip most source files or the repository has no sources', async () => {
+  const cwd = fixture();
+  const empty = stats();
+  await scanImports(cwd, ['sample'], ['.'], [], new Map(), empty);
+  expect(empty.warnings).toBeUndefined();
+  for (let i = 0; i < 10; i++) write(cwd, `app-${i}.js`, 'const unrelated = 1;');
+  const counts = stats();
+  await scanImports(cwd, ['sample'], ['.'], [], new Map(), counts);
+  expect(counts.candidateSourceFiles).toBe(10);
+  expect(counts.ignoredSourceFiles).toBe(0);
+  expect(counts.warnings).toBeUndefined();
 });

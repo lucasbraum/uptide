@@ -151,9 +151,8 @@ function literalTokens(text: string): string {
   return values.join('\n');
 }
 /** Current glob maps and legacy v7-v9 linters maps. Ignore globs are never commands. */
-export function lintStaged(value: unknown): { commands: string[]; ignores: string[] } {
-  if (!value || typeof value !== 'object' || Array.isArray(value))
-    return { commands: [], ignores: [] };
+export function lintStaged(value: unknown): { commands: string[] } {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return { commands: [] };
   const data = value as Record<string, unknown>;
   const linters = data.linters && typeof data.linters === 'object' ? data.linters : data;
   return {
@@ -166,9 +165,6 @@ export function lintStaged(value: unknown): { commands: string[]; ignores: strin
             ? command.filter((v): v is string => typeof v === 'string')
             : [],
       ),
-    ignores: Array.isArray(data.ignore)
-      ? data.ignore.filter((v): v is string => typeof v === 'string')
-      : [],
   };
 }
 /** Literal exports only. Never import/execute repository JavaScript. */

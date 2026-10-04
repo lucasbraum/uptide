@@ -173,14 +173,25 @@ export function notCheckedLabel(report: ListReport): string {
 export function formatListTimings(report: ListReport, renderMs: number): string {
   const phases = report.timing.phases;
   const files = report.timing.files;
-  if (!phases || !files) return `render ${Math.max(0, renderMs).toFixed(1)} ms\n`;
+  if (!phases || !files)
+    return [
+      ...(report.scanWarnings ?? []),
+      `render ${Math.max(0, renderMs).toFixed(1)} ms`,
+      '',
+    ].join('\n');
   return [
     `manifest read  ${phases.manifestReadMs.toFixed(1)} ms · ${plural(files.manifests, 'package manifest')} · ${plural(files.installedManifests, 'installed manifest')}`,
     `registry       ${phases.registryMs.toFixed(1)} ms`,
     `source scan    ${phases.sourceScanMs.toFixed(1)} ms · ${plural(files.source, 'source file')} · ${plural(files.assets, 'asset file')}${files.parsed === undefined ? '' : ` · ${files.parsed} parsed · ${files.workers || 0} workers`}`,
     `config scan    ${phases.configScanMs.toFixed(1)} ms · ${plural(files.config, 'config file')}`,
     `render         ${Math.max(0, renderMs).toFixed(1)} ms`,
-    `files          ${files.visited} visited (pruned directory contents not enumerated)`,
+    `files          ${files.visited} visited (built-in excluded directories not enumerated)`,
+    ...(files.candidateSources === undefined
+      ? []
+      : [
+          `source scope   ${files.candidateSources} candidates · ${files.ignoredSources ?? 0} excluded by .gitignore`,
+        ]),
+    ...(report.scanWarnings ?? []),
     ...Object.entries(files.skipped ?? {})
       .sort(([a], [b]) => a.localeCompare(b))
       .map(
@@ -214,6 +225,17 @@ export function formatList(report: ListReport, opts: FormatListOptions = {}): st
     ].join('   '),
     '',
   );
+  // Warnings are prose, not table rows: wrap so the responsible rule is never clipped.
+  for (const warning of report.scanWarnings ?? []) {
+    let rest = warning;
+    while (rest.length > width) {
+      const space = rest.lastIndexOf(' ', width);
+      const end = space > 0 ? space : width;
+      lines.push(c.yellow(rest.slice(0, end)));
+      rest = rest.slice(end).trimStart();
+    }
+    lines.push(c.yellow(rest), '');
+  }
   const showWorkspaces = report.workspaces.some((w) => w !== '.');
   const cells = (p: ListedDependency): Cell[] => [
     { text: p.name, tone: 'bold' },

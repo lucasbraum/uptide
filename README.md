@@ -70,8 +70,8 @@ package.json tool settings (including keys matching dependency names), tool rc f
 installed bin names (including collisions), hook/task commands, Karma plugin mappings and auto-loading, stylesheet
 imports and HTML assets under node_modules. Expanded rows explain the evidence; “possibly
 unused” means no usage was found by Uptide's scan, so verify before removing. Legacy lint-staged
-`linters` maps and current flat glob maps both supply commands; `ignore` entries supply scan
-exclusions, never usage evidence.
+`linters` maps and current flat glob maps both supply commands. Their `ignore` entries are
+neither commands nor source-scan exclusions.
 
 Registry settings use environment overrides, project and user `.npmrc` files, scoped
 registries and host/path-scoped credentials. Discovery uses abbreviated metadata with up to
@@ -103,15 +103,22 @@ and optional HTML writing, excluding browser launch. With `--json`, verbose phas
 also included under `timing`; default JSON stays unchanged. This helps distinguish registry
 latency from repositories with many source/config files. Configs are read statically, never executed.
 
-The scan prunes `bower_components`, `vendor`, `node_modules`, build/output/cache directories,
-`*.min.js`, `*.bundle.js` and source maps. It respects nested `.gitignore`, `.eslintignore`,
-`.prettierignore`, package.json `standard.ignore`, and lint-staged `ignore` settings. Rules are
-relative to the directory declaring them, with glob/negation handling. A fast dependency-name
-text gate and lexer select candidates for full syntax parsing; bindings, shadowing, calls and
-references still use the syntax parser. Large batches (at least 32 candidates / 8 MB) use up to
-four CPU workers; smaller batches avoid worker startup overhead. Verbose output includes parsed
-file/worker counts and skipped counts per reason. Pruned directory contents are not enumerated,
-so those counts are directories, not estimated numbers of files.
+The scan skips only `node_modules`, `.git`, `coverage`, `dist`, `build`, `bower_components`,
+`vendor`, generated-file patterns (`*.min.js`, `*.bundle.js`, `*.map`), and root/nested `.gitignore`
+rules. Git patterns are relative to their declaring directory and support negation. Tool scopes
+(`.prettierignore`, `.eslintignore`, `.stylelintignore`, `standard.ignore`, lint-staged `ignore`)
+do not exclude application code: files a formatter or linter skips may still use dependencies.
+A dependency-name text gate and lexer select candidates for full syntax parsing; bindings,
+shadowing, calls and references still use the syntax parser. Large batches (at least 32
+candidates / 8 MB) use up to four CPU workers; smaller batches avoid worker startup overhead.
+
+If Git rules exclude **more than 50%** of candidate application JS/TS files, the summary,
+HTML and `--verbose` warn with the matching patterns and counts. JSON includes `scanWarnings`;
+a usage warning alone does not change the exit code. Candidates exclude built-in/generated
+artifacts, declaration files and tool configs, and are counted before dependency text/lexer
+filtering. Git-ignored subtrees get a filename-only audit without reading/parsing source;
+built-in excluded directories are never enumerated. Verbose output shows candidates, excluded
+sources, parsed files, workers and per-reason skip counts.
 
 `check` requires names (`uptide check zod stripe`). With no names it points to `uptide list`
 and exits 2 before doing work. It retains tiers and partial results per named package.

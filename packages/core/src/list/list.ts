@@ -64,6 +64,7 @@ export interface ListReport {
   workspaces: string[];
   packages: ListedDependency[];
   groups: ListGroup[];
+  scanWarnings?: string[];
   /** Packages whose latest version could not be checked; never counted as up to date. */
   unknown?: { name: string; currentVersions: string[]; workspaces: string[]; reason: string }[];
   /** Intentional skips, separate from incomplete discovery and network unknowns. */
@@ -92,6 +93,9 @@ export interface ListReport {
       source: number;
       config: number;
       assets: number;
+      candidateSources?: number;
+      ignoredSources?: number;
+      ignoredSourceRules?: Record<string, number>;
       parsed?: number;
       workers?: number;
       skipped?: ScanStats['skipped'];
@@ -460,6 +464,7 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
     workspaces,
     packages,
     groups,
+    ...(scanStats.warnings?.length ? { scanWarnings: scanStats.warnings } : {}),
     skipped: [...skipped.values()].sort(
       (a, b) => compareText(a.name, b.name) || compareText(a.source, b.source),
     ),
@@ -482,6 +487,9 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
               source: scanStats.sourceFiles,
               config: scanStats.configFiles,
               assets: scanStats.assetFiles,
+              candidateSources: scanStats.candidateSourceFiles,
+              ignoredSources: scanStats.ignoredSourceFiles,
+              ignoredSourceRules: scanStats.ignoredSourceRules,
               parsed: scanStats.parsedFiles,
               workers: scanStats.workers,
               skipped: scanStats.skipped,

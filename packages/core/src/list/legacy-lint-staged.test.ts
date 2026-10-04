@@ -80,9 +80,13 @@ for (const format of ['legacy', 'flat'] as const)
         expect(report.packages.find((p) => p.name === name)?.reasons).toContain(
           'lint-staged command',
         );
-      expect(report.packages.find((p) => p.name === 'pretty-quick')?.classification).toBe(
+      expect(report.packages.find((p) => p.name === 'pretty-quick')?.classification).toBe('used');
+      expect(report.packages.find((p) => p.name === 'pretty-quick')?.usage.files).toBe(1);
+      expect(report.timing.files?.skipped?.['lint-staged.ignore']).toBeUndefined();
+      rmSync(join(cwd, 'generated/use.js'));
+      const withoutUsage = await listDependencies({ cwd, fetcher });
+      expect(withoutUsage.packages.find((p) => p.name === 'pretty-quick')?.classification).toBe(
         'possibly-unused',
       );
-      expect(report.timing.files?.skipped?.['lint-staged.ignore']?.directories).toBe(1);
     });
   }

@@ -119,3 +119,44 @@ it.each([
       expect(formatList(report).split('\n')[2]).not.toMatch(/not checked \(/);
   },
 );
+
+it.each([{ flags: [] }, { flags: ['--verbose'] }, { flags: ['--json', '--verbose'] }])(
+  'warns about broad Git rules in summary/verbose without treating them as discovery failures (%j)',
+  async ({ flags }) => {
+    const cwd = mkdtempSync(join(tmpdir(), 'uptide-broad-ignore-'));
+    roots.push(cwd);
+    writeFileSync(
+      join(cwd, 'package.json'),
+      JSON.stringify({ name: 'broad-ignore', dependencies: { axios: '1.0.0' } }),
+    );
+    writeFileSync(join(cwd, 'package-lock.json'), '{}');
+    writeFileSync(join(cwd, '.gitignore'), 'hidden*.js\n');
+    for (const file of ['hidden1.js', 'hidden2.js', 'hidden3.js', 'app.js'])
+      writeFileSync(join(cwd, file), "import axios from 'axios'; axios.get('/synthetic');");
+    const engine = fakeEngine({
+      list: (options) =>
+        listDependencies({
+          ...options,
+          fetcher: { resolve: async () => '2.0.0', metadata: async () => ({}) },
+        }),
+    });
+    const io = memoryIo({ cwd });
+    expect(await run(['list', ...flags], io, engine)).toBe(0);
+    const warning =
+      'Usage warning: .gitignore skipped 3 of 4 candidate source files (75%); rules: "hidden*.js" (3). Usage may be understated.';
+    if (flags.includes('--json')) expect(JSON.parse(io.stdout()).scanWarnings).toEqual([warning]);
+    else expect(io.stdout().replaceAll('\n', ' ')).toContain(warning);
+    if (flags.includes('--verbose')) expect(io.stderr()).toContain(warning);
+    else expect(io.stderr()).not.toContain(warning);
+    const report = await engine.list?.({ cwd });
+    expect(report?.scanWarnings).toEqual([warning]);
+    if (!flags.length) expect(formatList(report as ListReport, { width: 60 })).toMatchSnapshot();
+    const html = renderListHtml(report as ListReport, {
+      version: '0.1.0',
+      date: '2026-10-04T22:00:00Z',
+    });
+    expect(html).toContain('Usage warning: .gitignore skipped 3 of 4 candidate source files (75%)');
+    expect(html).toContain('&quot;hidden*.js&quot; (3)');
+    expect(formatListTimings(report as ListReport, 0)).toContain(warning);
+  },
+);

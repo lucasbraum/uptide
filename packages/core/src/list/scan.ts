@@ -19,6 +19,10 @@ export interface ScanStats {
   assetFiles: number;
   parsedFiles?: number;
   workers?: number;
+  candidateSourceFiles?: number;
+  ignoredSourceFiles?: number;
+  ignoredSourceRules?: Record<string, number>;
+  warnings?: string[];
   skipped?: Record<string, { files: number; directories: number }>;
 }
 /** Syntax only: no project, type checker, module resolution, or execution. Counts direct
@@ -43,10 +47,14 @@ export async function scanImports(
     assetFiles: 0,
     parsedFiles: 0,
     workers: 0,
+    candidateSourceFiles: 0,
+    ignoredSourceFiles: 0,
+    ignoredSourceRules: {},
     skipped: {},
   };
   const result = new Map<string, ImportUsage>();
   const jobs: SourceJob[] = [];
+  const ignoredRules = new Map<string, number>();
   const skip = (reason: string, directory: boolean): void => {
     const skipped = counts.skipped as NonNullable<ScanStats['skipped']>;
     const count = skipped[reason] ?? { files: 0, directories: 0 };
@@ -59,6 +67,33 @@ export async function scanImports(
       ? specifier.split('/').slice(0, 2).join('/')
       : specifier.split('/')[0];
     return name && wanted.has(name) ? name : undefined;
+  };
+  // Candidate means application JS/TS outside built-in/generated exclusions. Count
+  // Git-ignored candidates by directory entries only: never read/parse their contents.
+  const isSource = (file: string): boolean =>
+    /\.[cm]?[jt]sx?$/.test(file) && !/\.d\.[cm]?ts$/.test(file) && !isConfig(file);
+  const candidate = (file: string, pattern?: string): void => {
+    if (!isSource(file)) return;
+    counts.candidateSourceFiles = (counts.candidateSourceFiles ?? 0) + 1;
+    if (pattern !== undefined) {
+      counts.ignoredSourceFiles = (counts.ignoredSourceFiles ?? 0) + 1;
+      ignoredRules.set(pattern, (ignoredRules.get(pattern) ?? 0) + 1);
+    }
+  };
+  const auditIgnored = (dir: string, pattern: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const directory = entry.isDirectory();
+      if (!directory) counts.visitedFiles++;
+      const builtIn = entry.isSymbolicLink() ? 'symbolic links' : defaultSkip(entry.name);
+      if (builtIn) {
+        skip(builtIn, directory);
+        continue;
+      }
+      const path = join(dir, entry.name);
+      skip('.gitignore', directory);
+      if (directory) auditIgnored(path, pattern);
+      else if (entry.isFile()) candidate(relative(root, path).replaceAll('\\', '/'), pattern);
+    }
   };
   const walk = (dir: string, inherited: IgnoreRule[] = []): void => {
     const entries = readdirSync(dir, { withFileTypes: true }).sort((a, b) =>
@@ -77,11 +112,16 @@ export async function scanImports(
       const path = join(dir, entry.name);
       const directory = entry.isDirectory();
       if (!directory) counts.visitedFiles++;
-      const reason = entry.isSymbolicLink()
-        ? 'symbolic links'
-        : (defaultSkip(entry.name) ?? ignoredBy(path, directory, rules));
+      const reason = entry.isSymbolicLink() ? 'symbolic links' : defaultSkip(entry.name);
       if (reason) {
         skip(reason, directory);
+        continue;
+      }
+      const pattern = ignoredBy(path, directory, rules);
+      if (pattern !== undefined) {
+        skip('.gitignore', directory);
+        if (directory) auditIgnored(path, pattern);
+        else if (entry.isFile()) candidate(relative(root, path).replaceAll('\\', '/'), pattern);
         continue;
       }
       if (directory) {
@@ -93,6 +133,7 @@ export async function scanImports(
         continue;
       }
       const file = relative(root, path).replaceAll('\\', '/');
+      candidate(file);
       if (isConfig(file)) {
         const started = performance.now();
         configs?.push(scanConfig(file, readFileSync(path, 'utf8'), names, evidence, tasks));
@@ -157,6 +198,18 @@ export async function scanImports(
     }
   };
   walk(resolve(root));
+  counts.ignoredSourceRules = Object.fromEntries(ignoredRules);
+  const ignored = counts.ignoredSourceFiles ?? 0;
+  const candidates = counts.candidateSourceFiles ?? 0;
+  if (ignored > candidates / 2) {
+    const rules = Object.entries(counts.ignoredSourceRules ?? {})
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([pattern, files]) => `${JSON.stringify(pattern)} (${files})`)
+      .join(', ');
+    counts.warnings = [
+      `Usage warning: .gitignore skipped ${ignored} of ${candidates} candidate source files (${Math.round((100 * ignored) / candidates)}%); rules: ${rules}. Usage may be understated.`,
+    ];
+  }
   counts.parsedFiles = jobs.length;
   const cpus = Math.max(1, Math.min(4, availableParallelism()));
   const workerCount =

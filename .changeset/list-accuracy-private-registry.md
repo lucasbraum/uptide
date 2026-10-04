@@ -25,6 +25,11 @@ phase timings and file counts, and preserve pnpm default/named catalog discovery
 
 Preserve independently used group members' classifications and reasons. Read legacy lint-staged
 linters maps alongside flat configs, keeping ignore globs separate from commands. Prune vendored,
-generated and repository-ignored sources, prefilter with text/lexical gates before full parsing,
+generated and Git-ignored sources, prefilter with text/lexical gates before full parsing,
 and distribute large syntax batches across CPU workers. Report per-reason skip counts in verbose
 output while retaining complete group membership in JSON and check commands.
+
+Keep tool-specific ignores out of source discovery: formatting/linting scopes do not imply
+unused code. Warn in the summary, HTML, JSON and verbose output when Git rules exclude more
+than half of candidate application sources, naming the responsible patterns. Count Git-ignored
+sources from filenames only; retain usage under blanket prettier/eslint/lint-staged ignores.
