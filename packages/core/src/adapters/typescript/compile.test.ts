@@ -244,6 +244,81 @@ describe('Signal B: a target dependency typed by @types', () => {
   });
 });
 
+describe("Signal B: a target's peer dependency", () => {
+  it("is the consumer's copy, as an install leaves it, even outside the peer range", async () => {
+    // hooks@2 asks for the peer i18n >= 2; the app has i18n 1 and upgrades hooks only. An
+    // install keeps i18n 1: compiling against a fetched i18n 2 would pit two copies of its
+    // types against each other and report errors no install produces.
+    const root = mkdtempSync(join(tmpdir(), 'uptide-peer-dep-'));
+    const write = (file: string, text: string) => {
+      mkdirSync(join(root, file, '..'), { recursive: true });
+      writeFileSync(join(root, file), text);
+    };
+    const pkgJson = (name: string, version: string, extra = {}) =>
+      JSON.stringify({ name, version, types: 'index.d.ts', ...extra });
+    const HOOKS = "import type { I18n } from 'i18n';\nexport declare function useI18n(): I18n;\n";
+    write('hooks-1/package.json', pkgJson('hooks', '1.0.0', { peerDependencies: { i18n: '>=1' } }));
+    write('hooks-1/index.d.ts', HOOKS);
+    write('hooks-2/package.json', pkgJson('hooks', '2.0.0', { peerDependencies: { i18n: '>=2' } }));
+    write('hooks-2/index.d.ts', HOOKS);
+    write('repo/node_modules/i18n/package.json', pkgJson('i18n', '1.4.0'));
+    write(
+      'repo/node_modules/i18n/index.d.ts',
+      'export interface I18n { language: string }\nexport declare function change(i: I18n): void;\n',
+    );
+    cpSync(join(root, 'hooks-1'), join(root, 'repo/node_modules/hooks'), { recursive: true });
+    write(
+      'repo/package.json',
+      JSON.stringify({ name: 'repo', dependencies: { hooks: '1.0.0', i18n: '1.4.0' } }),
+    );
+    write(
+      'repo/tsconfig.json',
+      JSON.stringify({
+        compilerOptions: {
+          module: 'ESNext',
+          moduleResolution: 'Bundler',
+          strict: true,
+          noEmit: true,
+          skipLibCheck: true,
+          types: [],
+        },
+        include: ['src'],
+      }),
+    );
+    write(
+      'repo/src/index.ts',
+      "import { useI18n } from 'hooks';\nimport { change } from 'i18n';\nchange(useI18n());\n",
+    );
+    const calls: string[] = [];
+    const fetcher: PackageFetcher = {
+      resolve: async (_name, requested) => requested,
+      versions: async (name) => {
+        calls.push(`versions ${name}`);
+        return ['1.4.0', '2.3.0'];
+      },
+      fetch: async (name, version) => {
+        calls.push(`fetch ${name}@${version}`);
+        throw new Error('the peer must not be fetched');
+      },
+    };
+    const signal = await compileAgainstTarget(
+      { dir: join(root, 'repo') },
+      'hooks',
+      join(root, 'hooks-2'),
+      {
+        fetcher,
+      },
+    );
+    expect(calls).toEqual([]);
+    expect(signal.linkedDependencies).toEqual([]);
+    expect(signal.unsatisfiedDependencies).toEqual([
+      'i18n@1.4.0 is outside the peer range >=2 of hooks; compiled against the installed i18n',
+    ]);
+    // One copy of the peer's types on both sides of the call: nothing to report.
+    expect(signal.diagnostics).toEqual([]);
+  });
+});
+
 describe('workspace dependencies compile from source', () => {
   const APP = join(ROOT, 'repos/workspace-consumer/packages/app');
 

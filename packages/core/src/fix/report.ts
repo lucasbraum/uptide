@@ -86,6 +86,8 @@ export function diagnosticTitle(code: number, findings: Finding[]): string {
     2345: 'An argument no longer has the expected type',
     2322: 'A value no longer has the expected type',
     2344: 'A type argument no longer satisfies its constraint',
+    // A resource limit, not a location: which expression reports it varies by compiler version.
+    2589: 'A type became too deep for the compiler to instantiate',
     2349: 'A value is no longer callable',
     2351: 'A value is no longer constructable',
     18046: 'A value became unknown',

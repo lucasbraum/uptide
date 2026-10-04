@@ -415,6 +415,23 @@ describe('tiers, the time budget and failures on the first screen', () => {
     const gap = formatCheck(report([partly]), { color: false });
     expect(gap).toContain('? no impact in 12 sites, 1 workspace not analyzed');
     expect(gap).not.toContain('✓ no impact');
+    // A peer range the repository does not meet is said under the package, first screen.
+    const peer = formatCheck(
+      report([
+        {
+          ...generic,
+          name: 'react-i18next',
+          target: '17.0.15',
+          notes: [
+            'dependency of react-i18next unsatisfied: i18next@22.5.1 is outside the peer range >= 26.2.0 of react-i18next; compiled against the installed i18next',
+          ],
+        },
+      ]),
+      { color: false },
+    );
+    expect(peer).toContain(
+      '  ⚠ peer: react-i18next 17.0.15 needs i18next >= 26.2.0 (installed: 22.5.1): upgrade i18next first',
+    );
     // A release group with nothing to upgrade has no row.
     expect(
       formatCheck(

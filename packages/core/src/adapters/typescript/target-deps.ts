@@ -90,6 +90,16 @@ export function declaredRange(dir: string, dep: string): string | undefined {
   return m?.dependencies?.[dep] ?? m?.peerDependencies?.[dep];
 }
 
+/**
+ * Whether `dep` is something the package at `dir` expects its consumer to provide: a peer
+ * dependency it does not also list as its own. An install gives it the consumer's copy,
+ * whatever range it asks for.
+ */
+export function isPeerOnly(dir: string, dep: string): boolean {
+  const m = readManifest(dir);
+  return m?.peerDependencies?.[dep] !== undefined && m.dependencies?.[dep] === undefined;
+}
+
 export function installedVersion(
   repo: LoadedRepo,
   dep: string,

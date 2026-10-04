@@ -5,6 +5,7 @@ import { dirname, join, relative } from 'node:path';
 import { ts } from 'ts-morph';
 import type { CompileOptions, RepoDir } from '../../domain/adapter.js';
 import type { CompileDiagnostic, CompileSignal } from '../../domain/usage.js';
+import { satisfies } from '../../fetch/range.js';
 import { findCause } from './cause.js';
 import { type LoadedRepo, loadedRepo, ownsFile } from './repo.js';
 import {
@@ -12,6 +13,7 @@ import {
   type DependencyLinks,
   declaredRange,
   installedVersion,
+  isPeerOnly,
   newLinks,
   satisfyWanted,
   type Wanted,
@@ -416,7 +418,17 @@ function overlayProgram(
         if (range !== undefined && !deps.decided.has(dep) && !deps.links.has(dep)) {
           const importer = overlayDirs.get(from) as string;
           const consumer = installedVersion(repo, dep);
-          if (!consumerCopySatisfies(importer, dep, range, consumer?.version)) {
+          if (consumer && isPeerOnly(from, dep)) {
+            // A peer is the consumer's to provide: upgrading the target leaves the consumer's
+            // copy where it is, so that is what the target is compiled against. Fetching the
+            // version the peer range asks for would compile against two copies of the peer,
+            // which no install has, and report errors that are not there.
+            deps.decided.add(dep);
+            if (!satisfies(consumer.version, range))
+              deps.unsatisfied.push(
+                `${dep}@${consumer.version} is outside the peer range ${range} of ${importer}; compiled against the installed ${dep}`,
+              );
+          } else if (!consumerCopySatisfies(importer, dep, range, consumer?.version)) {
             wanted.set(dep, { range, from: importer });
           }
         }

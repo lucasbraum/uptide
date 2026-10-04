@@ -207,7 +207,23 @@ function sectionLines(row: Row, colors: Colors): string[] {
   const acting = row.plan.filter((g) => g.severity !== 'deprecated');
   const deprecated = row.plan.filter((g) => g.severity === 'deprecated');
   const importers = importerNotes(row.p);
-  if (acting.length === 0 && deprecated.length === 0 && importers.length === 0) return [];
+  // A peer the target asks for and the repository does not have at that version: the usual
+  // root cause of what follows, and the first thing to fix.
+  const peers = row.p.notes.flatMap((note) => {
+    const m = /: (\S+)@(\S+) is outside the peer range (.+?) of (\S+);/.exec(note);
+    return m
+      ? [
+          `${m[4]} ${row.p.target} needs ${m[1]} ${m[3]} (installed: ${m[2]}): upgrade ${m[1]} first`,
+        ]
+      : [];
+  });
+  if (
+    acting.length === 0 &&
+    deprecated.length === 0 &&
+    importers.length === 0 &&
+    peers.length === 0
+  )
+    return [];
   const scope = (g: PlanGroup): string => {
     if (g.fixes !== g.sites)
       return `${plural(g.fixes, 'fix', 'fixes')}, ${plural(g.sites, 'error')}`;
@@ -247,6 +263,7 @@ function sectionLines(row: Row, colors: Colors): string[] {
   // An importer the manifest does not show, or one the analysis could not reach: the reader
   // decides whether the sites above are all of them.
   for (const note of importers) lines.push(`  ${colors.yellow('⚠')} ${note}`);
+  for (const note of peers) lines.push(`  ${colors.yellow('⚠')} peer: ${note}`);
   return lines;
 }
 
