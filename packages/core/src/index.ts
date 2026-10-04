@@ -123,5 +123,16 @@ export type { Fixer, FixReport, FixRequest, FixResponse } from './fix/types.js';
 export { sdkApiVersion, stripeConcerns, stripePack } from './packs/stripe/index.js';
 export type { MigrationPack, MigrationRule } from './packs/types.js';
 export { zodPack } from './packs/zod/index.js';
+export { type PlanServices, upgradePlan } from './plan/gather.js';
+export {
+  type Effort,
+  effortOf,
+  type PeerConstraint,
+  type PeerLookup,
+  type PlannedPackage,
+  planUpgrades,
+  type UpgradePlan,
+  type UpgradeStep,
+} from './plan/plan.js';
 export { diffRuntime, probeRuntime } from './runtime/runtime.js';
 export { UPTIDE_COMMAND, uptideCommand, uptideVersionInfo, version } from './version.js';

@@ -21,7 +21,9 @@ import {
 import { formatHuman } from './format.js';
 import { type CheckHeader, formatCheck, repoLine } from './format-check.js';
 import { formatFixSummary } from './format-fix.js';
+import { formatPlan } from './format-plan.js';
 import { writeMigrationHtml } from './html/migration.js';
+import { writePlanHtml } from './html/plan.js';
 import { openHtml, writeHtml } from './html/write.js';
 import { type Io, type Ui, type UiFlags, uiOf } from './io.js';
 import { PRIVACY } from './privacy.js';
@@ -175,6 +177,50 @@ export async function run(
   };
   const emit = (value: unknown): void => io.out(`${JSON.stringify(value, null, 2)}\n`);
 
+  /** What `check` and `plan` look at: the named dependencies, or every one, within a budget. */
+  const scopeOf = (
+    flags: { only?: string; maxTime?: string; target?: string[] },
+    command: string,
+  ): { only: string[] | undefined; targets: Record<string, string>; maxTime: number } => {
+    const requested = list(flags.only);
+    const everything = requested?.length === 1 && requested[0] === 'all';
+    const only = everything ? undefined : requested;
+    const targets = parseTargets(flags.target, only);
+    // Everything, within a minute; a dependency asked for by name gets the time it needs.
+    const maxTime = flags.maxTime !== undefined ? Number(flags.maxTime) : only ? 0 : 60;
+    if (!Number.isFinite(maxTime) || maxTime < 0)
+      throw new CliError(`--max-time ${flags.maxTime}: expected seconds, 0 for no limit`, {
+        next: `uptide ${command} --max-time 300`,
+      });
+    return { only, targets, maxTime };
+  };
+
+  /** Before any analysis: what was asked for exists and the repository is installed. */
+  const requireDependencies = (
+    repo: Repo,
+    only: string[] | undefined,
+    progress: Progress,
+  ): Promise<unknown> =>
+    progress.phase(
+      'Dependencies',
+      async () => {
+        const deps = await locateDependencies(
+          repo,
+          engine,
+          only ?? (await declaredDependencies(repo, engine)),
+        );
+        if (only) {
+          // Asked for by name and absent is an error, not an empty answer.
+          const absent = deps.filter((d) => d.workspaces.length === 0).map((d) => d.name);
+          if (absent.length > 0) throw notADependency(repo, absent);
+          requireInstalled(repo, deps);
+        } else requireNodeModules(repo, deps);
+        return deps;
+      },
+      (deps) =>
+        only ? deps.map((d) => `${d.name} ${d.installed}`).join(', ') : `${deps.length} declared`,
+    );
+
   const program = new Command()
     .name('uptide')
     .description(
@@ -291,16 +337,7 @@ ${EXIT_CODES(
             if (flags.open && !flags.html) throw new CliError('--open requires --html');
             const started = io.now();
             const quiet = !flags.verbose;
-            const requested = list(flags.only);
-            const everything = requested?.length === 1 && requested[0] === 'all';
-            const only = everything ? undefined : requested;
-            const targets = parseTargets(flags.target, only);
-            // Everything, within a minute; a dependency asked for by name gets the time it needs.
-            const maxTime = flags.maxTime !== undefined ? Number(flags.maxTime) : only ? 0 : 60;
-            if (!Number.isFinite(maxTime) || maxTime < 0)
-              throw new CliError(`--max-time ${flags.maxTime}: expected seconds, 0 for no limit`, {
-                next: 'uptide check --max-time 300',
-              });
+            const { only, targets, maxTime } = scopeOf(flags, 'check');
             const repo = await progress.phase(
               'Repository',
               () => detectRepo(cwd, engine.workspaces),
@@ -348,27 +385,7 @@ ${EXIT_CODES(
             };
             // Without a terminal there is no live line: say what started, then how long it took.
             if (quiet && !ui.interactive) io.err(`uptide check · ${repoLine(headerOf(repo, 0))}\n`);
-            await progress.phase(
-              'Dependencies',
-              async () => {
-                const deps = await locateDependencies(
-                  repo,
-                  engine,
-                  only ?? (await declaredDependencies(repo, engine)),
-                );
-                if (only) {
-                  // Asked for by name and absent is an error, not an empty answer.
-                  const absent = deps.filter((d) => d.workspaces.length === 0).map((d) => d.name);
-                  if (absent.length > 0) throw notADependency(repo, absent);
-                  requireInstalled(repo, deps);
-                } else requireNodeModules(repo, deps);
-                return deps;
-              },
-              (deps) =>
-                only
-                  ? deps.map((d) => `${d.name} ${d.installed}`).join(', ')
-                  : `${deps.length} declared`,
-            );
+            await requireDependencies(repo, only, progress);
             const report = await progress.phase(
               only
                 ? `Analysis of ${only.join(', ')}`
@@ -426,6 +443,110 @@ ${EXIT_CODES(
             // lists the others and says which failed, and the code says "incomplete".
             if (report.summary.breaking > 0) return EXIT.breaking;
             return report.packages.some((p) => isFailure(p)) ? EXIT.error : EXIT.ok;
+          },
+          { quiet: !flags.verbose },
+        ),
+    );
+
+  shared(
+    program
+      .command('plan')
+      .description('The order to upgrade your dependencies in, with the effort each one takes')
+      .option(
+        '--only <packages>',
+        'comma-separated dependencies to plan (default: every direct dependency that is behind)',
+      )
+      .option(
+        '--max-time <seconds>',
+        'stop starting new dependencies after this long; 0 for no limit (default: 60, or no limit with --only)',
+      )
+      .option('--html [path]', 'write the plan as a self-contained HTML page')
+      .option('--verbose', 'one progress line per analysis phase, with timings'),
+  )
+    .addHelpText(
+      'after',
+      `
+What it does:
+  Runs check, then orders the upgrades: what touches nothing in your code first (bumped
+  together), then from the least work to the most. Peer ranges between your dependencies
+  decide what has to come first or move together; a range nothing satisfies is named as
+  blocked. Effort is an estimate from the findings, not a promise.
+
+Examples:
+  $ uptide plan
+  $ uptide plan --only react,react-dom,next
+  $ uptide plan --json --ci > plan.json
+${EXIT_CODES('a plan was made', 'not used', ';\n     or a dependency failed to analyze (the plan still orders the others)')}`,
+    )
+    .action(
+      (
+        flags: Shared & {
+          only?: string;
+          maxTime?: string;
+          html?: string | true;
+          verbose?: boolean;
+        },
+      ) =>
+        act(
+          flags,
+          async ({ ui, progress, cwd }) => {
+            const started = io.now();
+            const { only, targets, maxTime } = scopeOf(flags, 'plan');
+            const repo = await progress.phase(
+              'Repository',
+              () => detectRepo(cwd, engine.workspaces),
+              describeRepo,
+            );
+            if (!flags.verbose && !ui.interactive)
+              io.err(`uptide plan · ${repoLine(headerOf(repo, 0))}\n`);
+            await requireDependencies(repo, only, progress);
+            if (!engine.plan) throw new CliError('this build cannot plan upgrades');
+            const plan = engine.plan;
+            const result = await progress.phase(
+              only ? `Plan for ${only.join(', ')}` : 'Plan for every dependency that is behind',
+              async () => {
+                const planned = await plan(
+                  {
+                    cwd: repo.root,
+                    targets,
+                    only,
+                    compile: true,
+                    runtime: true,
+                    workspaceConcurrency: 2,
+                    ...(maxTime > 0 ? { maxTimeMs: maxTime * 1000 } : {}),
+                  },
+                  progress.event,
+                ).catch((err: unknown) => {
+                  const message = err instanceof Error ? err.message : String(err);
+                  throw isNetworkError(err) ? noNetwork(message) : err;
+                });
+                const offline = networkFailure(planned.report);
+                if (offline) throw offline;
+                return planned;
+              },
+              (r) => `${r.plan.steps.length} steps`,
+            );
+            const ms = io.now() - started;
+            if (!flags.verbose && !ui.interactive) io.err(`done in ${elapsed(ms)}\n`);
+            const fixable = FIX_MANAGERS.includes(repo.manager);
+            const planOptions = {
+              header: headerOf(repo, ms),
+              invocation: INVOCATION,
+              fixable,
+              ...(flags.cwd ? { cwd: flags.cwd } : {}),
+            };
+            if (flags.json) emit(result.plan);
+            else io.out(formatPlan(result.plan, { color: ui.color, ...planOptions }));
+            if (flags.html) {
+              const path = writePlanHtml(
+                result.plan,
+                { ...planOptions, version: VERSION, date: new Date(io.now()).toISOString() },
+                flags.html,
+                io.cwd,
+              );
+              io.err(`HTML plan: ${path}\n`);
+            }
+            return result.report.packages.some((p) => isFailure(p)) ? EXIT.error : EXIT.ok;
           },
           { quiet: !flags.verbose },
         ),
