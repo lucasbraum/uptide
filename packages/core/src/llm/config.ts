@@ -35,14 +35,25 @@ function readConfig(cwd: string): { provider?: string; model?: string } {
     const path = join(dir, 'uptide.config.json');
     if (existsSync(path)) {
       let value: unknown;
+      let keyFound = false;
       try {
         if (statSync(path).size > 4096) throw new Error();
-        value = JSON.parse(readFileSync(path, 'utf8'));
+        const raw = readFileSync(path, 'utf8');
+        // Inspect every JSON string, including overwritten duplicate fields and escaped keys.
+        // JSON.parse alone would discard an earlier credential with the same field name.
+        keyFound = [...raw.matchAll(/"(?:\\.|[^"\\])*"/g)].some((match) =>
+          keyLike(JSON.parse(match[0])),
+        );
+        value = JSON.parse(raw);
       } catch {
         throw new Error(
           'uptide.config.json must be a small valid JSON object containing only provider and model. Keys belong only in environment variables.',
         );
       }
+      if (keyFound)
+        throw new Error(
+          'uptide.config.json contains a key-like setting. Remove credentials from the file; use environment variables only.',
+        );
       if (!value || typeof value !== 'object' || Array.isArray(value))
         throw new Error(
           'uptide.config.json must contain only provider and model; API keys belong only in environment variables.',

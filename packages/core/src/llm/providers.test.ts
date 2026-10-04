@@ -259,3 +259,16 @@ it('stops when returned token usage breaks the reservation contract', async () =
   expect(result.diff).toBe('');
   expect(result.outputTokens).toBe(9000);
 });
+
+it('rejects credentials hidden in duplicate JSON fields before parsing can discard them', () => {
+  const dir = mkdtempSync(join(root, 'duplicate-config-'));
+  for (const raw of [
+    '{"model":"sk-PRIVATE_CREDENTIAL","model":"valid-model"}',
+    '{"model":"\\u0073k-PRIVATE_CREDENTIAL","model":"valid-model"}',
+  ]) {
+    writeFileSync(join(dir, 'uptide.config.json'), raw);
+    expect(() => selectLlm(dir, { provider: 'openai', model: 'override' }, {})).toThrow(
+      'key-like setting',
+    );
+  }
+});
