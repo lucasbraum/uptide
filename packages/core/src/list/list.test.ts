@@ -107,11 +107,25 @@ it('deduplicates names across workspaces, skips internal names and keeps distinc
 const nestRoot = new URL('../../../../fixtures/repos/nest-discovery/', import.meta.url);
 const nestMetadata = JSON.parse(readFileSync(new URL('registry.json', nestRoot), 'utf8')) as Record<
   string,
-  { latest: string; peerDependencies?: Record<string, string>; bin?: Record<string, string> }
+  {
+    latest: string;
+    peerDependencies?: Record<string, string>;
+    targetPeerDependencies?: Record<string, string>;
+    bin?: Record<string, string>;
+  }
 >;
 const nestFetcher = {
   resolve: async (name: string) => nestMetadata[name]?.latest ?? '1.0.0',
-  metadata: async (name: string) => nestMetadata[name] ?? {},
+  metadata: async (name: string, version: string) => {
+    const m = nestMetadata[name];
+    return {
+      ...m,
+      peerDependencies:
+        version === m?.latest
+          ? (m.targetPeerDependencies ?? m.peerDependencies)
+          : m?.peerDependencies,
+    };
+  },
 };
 it('discovers a synthetic single-package pnpm Nest API, including tooling and peers of current packages', async () => {
   const result = await listDependencies({ cwd: fileURLToPath(nestRoot), fetcher: nestFetcher });
@@ -142,7 +156,6 @@ it('discovers a synthetic single-package pnpm Nest API, including tooling and pe
     'script-runner',
     'cleanup-tool',
     'runtime-peer',
-    'reflect-metadata',
   ];
   expect(
     result.packages
@@ -161,7 +174,29 @@ it('discovers a synthetic single-package pnpm Nest API, including tooling and pe
     result.groups
       .find((g) => g.members.some((p) => p.name === '@nestjs/core'))
       ?.members.map((p) => p.name),
-  ).toEqual(['@nestjs/common', '@nestjs/core', '@nestjs/platform-express']);
+  ).toEqual([
+    '@nestjs/common',
+    '@nestjs/core',
+    '@nestjs/platform-express',
+    '@nestjs/platform-fastify',
+    '@nestjs/swagger',
+    '@fastify/static',
+    'nodemailer',
+    'reflect-metadata',
+  ]);
+  const runtimeGroup = result.groups.find((g) => g.id === 'nestjs');
+  expect(runtimeGroup?.name).toBe('@nestjs/*');
+  expect(result.groups.map((g) => g.id)).toContain('nestjs-cli');
+  expect(new Set(result.groups.map((g) => g.id)).size).toBe(result.groups.length);
+  expect(result.packages.find((p) => p.name === '@fastify/static')).toMatchObject({
+    classification: 'peer',
+    peerOf: ['@nestjs/platform-fastify'],
+  });
+  expect(result.packages.find((p) => p.name === 'nodemailer')).toMatchObject({
+    classification: 'peer',
+    peerOf: ['@nestjs/core'],
+  });
+  expect(result.groups.every((g) => !g.name.includes(' + '))).toBe(true);
   expect(result.packages.every((p) => p.usage.fileList === undefined)).toBe(true);
   const detailed = await listDependencies({
     cwd: fileURLToPath(nestRoot),
@@ -271,7 +306,7 @@ it('groups lockstep scopes and required peer upgrades, without merging unrelated
           : {},
     },
   });
-  expect(result.groups.map((g) => g.name).sort()).toEqual(['@suite/*', 'view + view-dom']);
+  expect(result.groups.map((g) => g.name).sort()).toEqual(['@suite/*', 'view-dom']);
 });
 
 it('recognizes package entry scripts and bin paths without confusing similarly named packages', async () => {

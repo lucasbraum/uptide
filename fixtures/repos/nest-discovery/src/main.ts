@@ -3,6 +3,8 @@
 import { Controller, Module, UnusedDecorator } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import { FastifyAdapter } from '@nestjs/platform-fastify';
+import { SwaggerModule } from '@nestjs/swagger';
 import cookie from 'cookie-plugin';
 import { serve } from 'current-runtime';
 
@@ -12,4 +14,6 @@ class ExampleController {}
 class ExampleModule {}
 const app = await NestFactory.create<NestExpressApplication>(ExampleModule);
 app.register(cookie);
+new FastifyAdapter();
+SwaggerModule.createDocument(app, {});
 serve();

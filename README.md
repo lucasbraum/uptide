@@ -57,9 +57,11 @@ Next
 ```
 
 `list` reads manifests, lockfiles, source imports and registry metadata. Groups come first,
-with a command to check their members together. Each row gives current → latest, upgrade
+with a command such as `uptide check --group nestjs` to check their members together.
+External peers are members labeled by the package that requires them. Each row gives current → latest, upgrade
 kind and major gap, verified/generic tier, importing files, calls, references and top symbols.
-Workspace columns appear only in workspaces. Minor/patch upgrades, tooling and possibly
+Workspace columns appear only in workspaces. Top symbols require `--details`; terminal
+columns fit the available width, and only verified packages carry a tier tag. Minor/patch upgrades, tooling and possibly
 unused packages are collapsed; `--all` expands them. Tools used by scripts/configs, runtime
 types and required peers are classified separately from possibly unused packages.
 `--json` gives every row. `--html [--open]` creates a report styled like check, with copyable

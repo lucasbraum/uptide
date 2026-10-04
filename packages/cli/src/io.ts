@@ -8,6 +8,7 @@ export interface Io {
   cwd: string;
   /** stdout is a terminal: color is on unless something turns it off. */
   outTty: boolean;
+  columns?: number;
   /** stderr is a terminal: progress may redraw one line. */
   errTty: boolean;
   now(): number;
@@ -22,6 +23,7 @@ export function processIo(): Io {
     env: process.env,
     cwd: process.cwd(),
     outTty: process.stdout.isTTY === true,
+    columns: process.stdout.columns,
     errTty: process.stderr.isTTY === true,
     now: () => Date.now(),
     inTty: process.stdin.isTTY === true,

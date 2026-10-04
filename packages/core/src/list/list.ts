@@ -25,7 +25,8 @@ export interface ListedDependency {
   change: 'major' | 'minor' | 'patch';
   tier: Tier;
   majorGap: number;
-  classification: 'used' | 'tooling' | 'possibly-unused';
+  classification: 'used' | 'tooling' | 'possibly-unused' | 'peer';
+  peerOf?: string[];
   reasons: string[];
   workspaces: string[];
   usage: {
@@ -38,6 +39,7 @@ export interface ListedDependency {
   };
 }
 export interface ListGroup {
+  id: string;
   name: string;
   members: ListedDependency[];
 }
@@ -246,11 +248,12 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
   failures.sort(
     (a, b) => compareText(a.name, b.name) || compareText(a.workspace ?? '', b.workspace ?? ''),
   );
+  const groups = dependencyGroups(packages, metadata, targets);
   return {
     repo: opts.cwd,
     workspaces,
     packages,
-    groups: dependencyGroups(packages, metadata, targets),
+    groups,
     failures,
     timing: { totalMs: Date.now() - start },
   };

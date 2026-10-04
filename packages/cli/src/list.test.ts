@@ -57,12 +57,12 @@ const report: ListReport = {
 };
 it('collapses minor/patch rows, separates unused packages and suggests the top imported package', () => {
   const text = formatList(report);
-  expect(text).toContain('1 minor/patch upgrades (minor)');
+  expect(text).toContain('+ 1 minor/patch · --all');
   expect(text).not.toContain('minor  1.0.0 → 1.1.0');
-  expect(text).toContain('Tooling · 1 package (tool) · --all to expand');
+  expect(text).toContain('TOOLING  1 package, used by scripts and config · --all');
   expect(text).not.toContain('consider removing');
-  expect(text.trim().split('\n').at(-1)).toBe('Next: npx uptide check zod');
-  expect(formatList(report, { all: true })).toContain('minor  1.0.0 → 1.1.0');
+  expect(text.trim().split('\n').at(-1)).toBe('Next  uptide check zod');
+  expect(formatList(report, { all: true })).toMatch(/minor +1.0.0 → 1.1.0/);
 });
 it('lists without node_modules and never calls check; JSON retains every entry', async () => {
   const cwd = tempRepo({ 'package.json': '{"name":"shop"}', 'package-lock.json': '{}' });
@@ -110,20 +110,33 @@ it('prints singular usage, references, major gaps, groups and workspace columns 
   };
   const second = { ...first, name: '@nestjs/core' };
   grouped.packages.push(second);
-  grouped.groups = [{ name: '@nestjs/*', members: [first, second] }];
+  grouped.groups = [{ id: 'nestjs', name: '@nestjs/*', members: [first, second] }];
   // JSON reports must render the same as the original objects (no identity dependence).
   const text = formatList(JSON.parse(JSON.stringify(grouped)));
-  expect(text).toContain('@nestjs/* · 2 packages · check together');
-  expect(text.match(/@nestjs\/common {2}/g)).toHaveLength(1);
-  expect(text).toContain('major ×2 · verified · 1 file, referenced');
+  expect(text).toMatch(/@nestjs\/\* +2 packages/);
+  expect(text.match(/@nestjs\/common +10/g)).toHaveLength(1);
+  expect(text).toMatch(/major ×2 +1 file +1 ref +verified/);
   expect(text).not.toContain('0 call sites');
   expect(text).not.toContain('notUsed');
   expect(text).not.toContain('src/main.ts');
   expect(text).not.toMatch(/ · \.(?:\n|$)/);
-  expect(text.trim().split('\n').at(-1)).toBe('Next: npx uptide check @nestjs/common @nestjs/core');
-  expect(formatList(grouped, { all: true })).toContain('1 file, 1 call site');
-  expect(formatList(grouped, { details: true })).toContain('files: src/main.ts');
+  expect(text.trim().split('\n').at(-1)).toBe('Next  uptide check --group nestjs');
+  expect(formatList(grouped, { all: true })).toMatch(/1 file +1 call/);
+  expect(formatList(grouped, { details: true })).toContain('src/main.ts');
   grouped.workspaces = ['.', 'packages/api'];
   first.workspaces = ['packages/api'];
-  expect(formatList(grouped)).toContain(' · packages/api');
+  expect(formatList(grouped)).toContain('packages/api');
+});
+
+it('keeps tooling-group peers in their collapsed group instead of dropping them', () => {
+  const result = structuredClone(report);
+  const tool = result.packages.find((p) => p.name === 'tool');
+  if (!tool) throw new Error('missing tool');
+  const peer = { ...tool, name: 'tool-peer', classification: 'peer' as const, peerOf: ['tool'] };
+  result.packages.push(peer);
+  result.groups = [{ id: 'tool', name: 'tool', members: [tool, peer] }];
+  const text = formatList(result, { all: true });
+  expect(text).toContain('tool-peer');
+  expect(text).toContain('peer of tool');
+  expect(text).toContain('uptide check --group tool');
 });

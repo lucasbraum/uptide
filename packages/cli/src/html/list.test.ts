@@ -18,7 +18,12 @@ vi.mock('./write.js', async (original) => ({
 const root = fileURLToPath(new URL('../../../../fixtures/repos/nest-discovery/', import.meta.url));
 const registry = JSON.parse(readFileSync(join(root, 'registry.json'), 'utf8')) as Record<
   string,
-  { latest: string; peerDependencies?: Record<string, string>; bin?: Record<string, string> }
+  {
+    latest: string;
+    peerDependencies?: Record<string, string>;
+    targetPeerDependencies?: Record<string, string>;
+    bin?: Record<string, string>;
+  }
 >;
 const discover = (details = false) =>
   listDependencies({
@@ -26,7 +31,16 @@ const discover = (details = false) =>
     details,
     fetcher: {
       resolve: async (name) => registry[name]?.latest ?? '1.0.0',
-      metadata: async (name) => registry[name] ?? {},
+      metadata: async (name, version) => {
+        const m = registry[name];
+        return {
+          ...m,
+          peerDependencies:
+            version === m?.latest
+              ? (m.targetPeerDependencies ?? m.peerDependencies)
+              : m?.peerDependencies,
+        };
+      },
     },
   });
 const options = {
@@ -51,20 +65,23 @@ it('renders the Nest report with shared check styling, groups first, copy comman
   expect(html).toContain(`<script>${js}</script>`);
   expect(html).toContain(`script-src 'sha256-${createHash('sha256').update(js).digest('base64')}'`);
   expect(html).toContain('pnpm');
-  expect(html).toContain('28 major · 0 minor · 0 patch');
+  expect(html).toContain('<strong>32</strong><span class="label">Major</span>');
   expect(html).toContain('Generated Oct 4, 2026');
   expect(html).toContain(`Uptide CLI ${VERSION}`);
-  expect(html.indexOf('<h2>@nestjs/*</h2>')).toBeLessThan(html.indexOf('<h2>Packages</h2>'));
-  expect(html.match(/<h3>@nestjs\/common<\/h3>/g)).toHaveLength(1);
-  expect(html).toContain('10.4.0 → 12.0.0 · major ×2 · generic');
-  expect(html).toContain('1 file, referenced · 1 reference');
-  expect(html).toContain('Top symbols: default (1)');
-  expect(html).toContain(
-    '<code>npx uptide check @nestjs/common @nestjs/core @nestjs/platform-express</code>',
+  expect(html.indexOf('<h2>@nestjs/*</h2>')).toBeLessThan(html.indexOf('02 / Packages'));
+  expect(html.match(/class="pkg-name">@nestjs\/common</g)).toHaveLength(1);
+  expect(html).toContain('10.4.0 → 12.0.0</div><div class="gap">major ×2');
+  expect(html).toContain('1 file · 1 reference');
+  expect(html).toContain('peer of @nestjs/platform-fastify');
+  expect(html).not.toContain('referenced ·');
+  expect(html).not.toContain('Top symbols:');
+  expect(html).toContain('<code>uptide check --group nestjs</code>');
+  expect(html).toMatch(/<details class="notes"><summary>03 \/ Tooling/);
+  expect(html).toMatch(/<details class="notes"><summary>04 \/ Possibly unused/);
+  expect(html.match(/<code>uptide check --group nestjs<\/code>/g)).toHaveLength(1);
+  expect(html.match(/data-copy hidden/g)?.length).toBe(
+    report.packages.length - report.groups.reduce((n, g) => n + g.members.length - 1, 0),
   );
-  expect(html).toMatch(/<details class="notes"><summary>Tooling/);
-  expect(html).toMatch(/<details class="notes"><summary>Possibly unused/);
-  expect(html.match(/data-copy hidden/g)?.length).toBeGreaterThanOrEqual(report.packages.length);
   expect(html).not.toContain('consider removing');
   expect(html).not.toContain('UnusedDecorator');
   expect(html).not.toContain('src/main.ts');
@@ -108,7 +125,7 @@ it.each([
     );
     expect(code).toBe(0);
     expect(list).toHaveBeenCalledWith({ cwd: root.replace(/\/$/, ''), details: true });
-    expect(JSON.parse(io.stdout()).packages.length).toBe(28);
+    expect(JSON.parse(io.stdout()).packages.length).toBe(32);
     const path = io.stderr().match(/HTML report: (.*)\n/)?.[1];
     expect(path).toBeTruthy();
     if (!path) throw new Error('no report');

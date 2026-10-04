@@ -55,17 +55,64 @@ export function dependencyGroups(
     group.push(p);
     groups.set(key, group);
   }
-  return [...groups.values()]
+  const result = [...groups.values()]
     .filter((members) => new Set(members.map((p) => p.name)).size > 1)
     .map((members) => {
-      members.sort((a, b) => a.name.localeCompare(b.name) || a.current.localeCompare(b.current));
-      const scope = members[0]?.name.startsWith('@') ? members[0].name.split('/')[0] : undefined;
-      return {
-        name:
-          scope && members.every((p) => p.name.startsWith(`${scope}/`))
-            ? `${scope}/*`
-            : [...new Set(members.map((p) => p.name))].join(' + '),
-        members,
-      };
+      const scopeOf = (name: string): string | undefined =>
+        name.startsWith('@') ? name.split('/')[0] : undefined;
+      const peersOf = (name: string): string[] => [
+        ...new Set(
+          [...(metadata.get(name) ?? []), targets.get(name) ?? {}].flatMap((m) =>
+            Object.keys(m.peerDependencies ?? {}),
+          ),
+        ),
+      ];
+      // Prefer the framework's source-used scope, then the package requiring the peers.
+      const leaders = [...members].sort((a, b) => {
+        const rank = (p: ListedDependency): number => {
+          const scope = scopeOf(p.name);
+          return (
+            (scope
+              ? members.filter((m) => scopeOf(m.name) === scope && m.classification === 'used')
+                  .length * 100
+              : 0) +
+            peersOf(p.name).filter((peer) => members.some((m) => m.name === peer)).length * 10 +
+            Number(p.classification === 'used')
+          );
+        };
+        return rank(b) - rank(a) || a.name.localeCompare(b.name);
+      });
+      const lead = leaders[0] as ListedDependency;
+      const scope = scopeOf(lead.name);
+      const name = scope ? `${scope}/*` : lead.name;
+      for (const p of members) {
+        if (p.name === lead.name || (scope && scopeOf(p.name) === scope)) continue;
+        const peerOf = members
+          .filter((m) => peersOf(m.name).includes(p.name))
+          .map((m) => m.name)
+          .sort();
+        if (peerOf.length) {
+          p.peerOf = peerOf;
+          p.classification = 'peer';
+        }
+      }
+      members.sort(
+        (a, b) =>
+          Number(!!a.peerOf) - Number(!!b.peerOf) ||
+          a.name.localeCompare(b.name) ||
+          a.current.localeCompare(b.current),
+      );
+      return { id: scope ? scope.slice(1) : lead.name, name, members };
     });
+  // Distinct runtime/tooling release lines in one scope need distinct, repeatable selectors.
+  for (const group of result) {
+    if (result.filter((other) => other.id === group.id).length > 1) {
+      const same = result.filter((other) => other.id === group.id);
+      const primary =
+        same.find((other) => other.members.some((p) => p.classification === 'used')) ?? same[0];
+      for (const other of same)
+        if (other !== primary) other.id = `${other.id}-${other.members[0]?.name.split('/').at(-1)}`;
+    }
+  }
+  return result;
 }
