@@ -193,6 +193,17 @@ describe('planPackage', () => {
     expect(planPackage(pkg([rejected], { name: 'avatars' }))[0]?.title).toBe(
       'createAvatar is no longer exported',
     );
+    // A removal the compiler does not see as a missing name is titled by what it does see.
+    const deep = finding(
+      { package: 'i18n-hooks', path: 'DefaultNamespace', kind: 'removed' },
+      {
+        compileCode: 2589,
+        compileError: 'Type instantiation is excessively deep and possibly infinite.',
+      },
+    );
+    expect(planPackage(pkg([deep], { name: 'i18n-hooks' }))[0]?.title).toBe(
+      'A type became too deep for the compiler to instantiate',
+    );
     // What nothing confirmed is nobody's to migrate unasked.
     const unconfirmed = planPackage(
       pkg([{ ...removed, severity: 'unverified' }], { name: 'sharp' }),

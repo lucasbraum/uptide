@@ -161,7 +161,11 @@ function titleOf(rule: string, sites: Planned[]): string {
   // The diff names the symbol whose declaration moved; when the compiler rejected every site,
   // its message says what actually broke there, which is what the reader needs.
   const compiled = sites.every((s) => s.finding.usage.compileCode !== undefined);
-  if (compiled && !['removed', 'renamed', 'moved', 'module-format', 'deprecated'].includes(c.kind))
+  // "X removed" stands when the compiler agrees something is missing; when it complains about
+  // anything else at the site, its complaint is the title.
+  const missing = [2305, 2339, 2551, 2614, 2694, 2724].includes(first.usage.compileCode ?? 0);
+  const structural = ['removed', 'renamed', 'moved'].includes(c.kind) && missing;
+  if (compiled && !structural && !['module-format', 'deprecated'].includes(c.kind))
     return diagnosticTitle(
       first.usage.compileCode as number,
       sites.map((s) => s.finding),

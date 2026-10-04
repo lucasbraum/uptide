@@ -1679,6 +1679,13 @@ async function checkGroup(
     // agent, needs to choose a replacement. Without a pack nothing else says it.
     if (tier === 'generic')
       for (const f of findings) {
+        // A resource limit of the compiler, not a property of one expression: the upgrade
+        // makes the types too deep, and where that is reported varies between compilers.
+        if (f.severity === 'breaking' && [2589, 2590].includes(f.usage.compileCode ?? 0))
+          f.details = [
+            ...(f.details ?? []),
+            'the compiler reaches its type-instantiation limit after the upgrade; which expression reports it depends on the compiler version, so yours may name another site',
+          ];
         if (f.severity !== 'breaking' || ![2305, 2614, 2724].includes(f.usage.compileCode ?? 0))
           continue;
         const diff = diffs.get(f.usage.package ?? f.change.package) ?? [...diffs.values()][0];
