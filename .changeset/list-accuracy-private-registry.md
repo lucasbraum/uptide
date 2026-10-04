@@ -1,5 +1,4 @@
 ---
-"@uptide/core": patch
 "uptide": patch
 ---
 

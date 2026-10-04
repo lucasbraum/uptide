@@ -1,5 +1,4 @@
 ---
-"@uptide/core": minor
 "uptide": minor
 ---
 

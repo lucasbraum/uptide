@@ -6,8 +6,12 @@ name: Release (next)
 on:
   workflow_dispatch:
     inputs:
+      version:
+        description: Committed version to publish under next
+        type: string
+        required: true
       dry_run:
-        description: Build, test, version and pack, but do not publish
+        description: Build, test and pack, but do not publish
         type: boolean
         default: false
 
@@ -15,8 +19,7 @@ concurrency:
   group: release
   cancel-in-progress: false
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   publish-next:
@@ -29,10 +32,18 @@ jobs:
       # Set the write-only key only after the privacy/90-day setup in docs/telemetry.md.
       UPTIDE_TELEMETRY_BUILD_KEY: ${{ secrets.UPTIDE_TELEMETRY_BUILD_KEY }}
       UPTIDE_TELEMETRY_BUILD_HOST: https://eu.i.posthog.com
+      VERSION: ${{ inputs.version }}
       # The one flag for provenance: 'true' only when the repository is public.
       UPTIDE_PROVENANCE: ${{ github.event.repository.visibility == 'public' }}
     steps:
+      - name: A next release comes from main
+        if: ${{ github.ref != 'refs/heads/main' }}
+        run: |
+          echo "::error::next is published only from main."
+          exit 1
       - uses: actions/checkout@v4
+      - name: The version matches the committed CLI manifest
+        run: node scripts/check-release-version.mjs
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -42,25 +53,11 @@ jobs:
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: pnpm lint
       - run: pnpm build
+        env:
+          UPTIDE_BUILD_CLEAN: '1'
       - run: pnpm test
       - name: Smoke-test the tarball that is about to be published
         run: pnpm smoke 22
-      - name: Snapshot version (x.y.z-next.<timestamp>)
-        run: |
-          before=$(node -p "require('./packages/cli/package.json').version")
-          pnpm changeset version --snapshot next
-          after=$(node -p "require('./packages/cli/package.json').version")
-          if [ "$before" = "$after" ]; then
-            echo "::error::No pending changeset for uptide: nothing to release. Run 'pnpm changeset' first."
-            exit 1
-          fi
-          echo "Publishing uptide@$after"
-      # The version bump above is the only change in the tree: the published build is a clean
-      # build of the commit being released, and is stamped so.
-      - name: Rebuild with the snapshot version
-        run: pnpm build
-        env:
-          UPTIDE_BUILD_CLEAN: '1'
       - name: The published build must be stamped clean
         run: node scripts/check-build-stamp.mjs
       # Only the CLI is published: the engine is bundled into it. `changeset publish` is
@@ -74,3 +71,23 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: ${{ env.UPTIDE_PROVENANCE }}
+
+  github-release:
+    needs: publish-next
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      VERSION: ${{ inputs.version }}
+      RELEASE_COMMIT: ${{ github.sha }}
+    steps:
+      # gh creates the missing tag at the published SHA, never the moving main tip.
+      - name: Tag the published commit and create its GitHub Release
+        run: >-
+          gh release create "v$VERSION"
+          --target "$RELEASE_COMMIT"
+          --title "v$VERSION"
+          --generate-notes --prerelease --latest=false

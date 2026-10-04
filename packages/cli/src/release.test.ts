@@ -1,4 +1,7 @@
-import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const read = (path: string): string =>
@@ -31,7 +34,24 @@ describe('release pipeline', () => {
     );
     expect(workflow).toMatch(/NPM_CONFIG_PROVENANCE: \$\{\{ env\.UPTIDE_PROVENANCE \}\}/);
     expect(workflow).not.toMatch(/NPM_CONFIG_PROVENANCE: '?(true|false)/);
-    expect(workflow).toContain('pnpm changeset version --snapshot next');
+    expect(workflow).not.toContain('pnpm changeset version');
+  });
+
+  it('allows next only from main before checkout or publishing', () => {
+    const guard = workflow.slice(workflow.indexOf('steps:'), workflow.indexOf('actions/checkout'));
+    expect(guard).toContain("github.ref != 'refs/heads/main'");
+    expect(guard).toContain('exit 1');
+  });
+
+  it('uses GitHub PR links when generating the changelog', () => {
+    const config = JSON.parse(read('.changeset/config.json'));
+    expect(config.changelog).toEqual([
+      '@changesets/changelog-github',
+      { repo: 'uptide-dev/uptide' },
+    ]);
+    expect(JSON.parse(read('package.json')).devDependencies).toHaveProperty(
+      '@changesets/changelog-github',
+    );
   });
 
   it('tests the tarball before publishing it', () => {
@@ -46,7 +66,9 @@ describe('release pipeline', () => {
     const cli = JSON.parse(read('packages/cli/package.json'));
     // Provenance is the workflows' flag: a manifest setting would override it either way.
     expect(cli.publishConfig).toEqual({ access: 'public' });
-    expect(cli.repository.url).toBe('git+https://github.com/lucasbraum/uptide.git');
+    expect(cli.repository.url).toBe('git+https://github.com/uptide-dev/uptide.git');
+    expect(cli.homepage).toBe('https://github.com/uptide-dev/uptide#readme');
+    expect(cli.bugs).toBe('https://github.com/uptide-dev/uptide/issues');
     // Nothing publishes from a laptop: the root script only points at the workflow.
     expect(JSON.parse(read('package.json')).scripts.release).not.toMatch(
       /\b(changeset|npm|pnpm)\b.*\bpublish\b/,
@@ -54,11 +76,14 @@ describe('release pipeline', () => {
   });
 
   describe('latest', () => {
-    it('runs only by hand, defaults to a dry run of 0.3.0', () => {
+    it('runs only by hand, requires a version and defaults to a dry run', () => {
       const triggers = latest.slice(latest.indexOf('\non:'), latest.indexOf('\nconcurrency:'));
       expect(triggers).toContain('workflow_dispatch:');
       expect(triggers).not.toMatch(/\n {2}(push|pull_request|schedule|release):/);
-      expect(triggers).toMatch(/version:[\s\S]*?default: 0\.3\.0/);
+      expect(triggers).toMatch(/version:[\s\S]*?required: true/);
+      expect(
+        triggers.slice(triggers.indexOf('version:'), triggers.indexOf('dry_run:')),
+      ).not.toContain('default:');
       expect(triggers).toMatch(/dry_run:[\s\S]*?default: true/);
     });
 
@@ -88,3 +113,68 @@ describe('release pipeline', () => {
     });
   });
 });
+
+for (const [channel, text] of [
+  ['latest', latest],
+  ['next', workflow],
+] as const) {
+  it(`${channel} creates a release at the published SHA only after a successful real publish`, () => {
+    const jobs = text.split('  github-release:');
+    expect(jobs).toHaveLength(2);
+    const publish = jobs[0];
+    const release = jobs[1];
+    expect(publish).toContain('permissions: {}');
+    expect(publish).toMatch(/permissions:\n {6}contents: read\n[\s\S]*?id-token: write/);
+    expect(publish).not.toContain('contents: write');
+    expect(release).toContain(`needs: publish-${channel}`);
+    expect(release).toMatch(/if: \$\{\{ !inputs\.dry_run \}\}/);
+    expect(release).toContain('permissions:\n      contents: write');
+    expect(release).not.toContain('id-token:');
+    expect(release).toMatch(/RELEASE_COMMIT: \$\{\{ github\.sha \}\}/);
+    expect(release).toContain('gh release create "v$VERSION"');
+    expect(release).toContain('--target "$RELEASE_COMMIT"');
+    expect(release).toContain('--generate-notes');
+    if (channel === 'next') expect(release).toContain('--prerelease --latest=false');
+    else expect(release).not.toContain('--prerelease');
+  });
+
+  it(`${channel} checks the committed version before install or build, without rewriting it`, () => {
+    const guard = text.indexOf('run: node scripts/check-release-version.mjs');
+    expect(guard).toBeGreaterThan(text.indexOf('uses: actions/checkout@v4'));
+    expect(guard).toBeLessThan(text.indexOf('uses: pnpm/action-setup@v4'));
+    expect(text).toMatch(/VERSION: \$\{\{ inputs\.version \}\}/);
+    expect(text).toMatch(/version:[\s\S]*?required: true/);
+    expect(text).not.toMatch(/npm pkg set|changeset version/);
+  });
+}
+
+it.each(['0.4.0', '0.4.0-next.20261004'])(
+  'requires the typed version to match the checked-out manifest (%s)',
+  (version) => {
+    const root = mkdtempSync(join(tmpdir(), 'uptide-release-version-'));
+    try {
+      mkdirSync(join(root, 'scripts'));
+      mkdirSync(join(root, 'packages/cli'), { recursive: true });
+      const manifest = join(root, 'packages/cli/package.json');
+      const contents = JSON.stringify({ name: 'uptide', version });
+      writeFileSync(manifest, contents);
+      const script = join(root, 'scripts/check-release-version.mjs');
+      writeFileSync(script, read('scripts/check-release-version.mjs'));
+      for (const input of [version, '0.1.0', '']) {
+        const result = spawnSync(process.execPath, [script], {
+          cwd: tmpdir(),
+          env: { ...process.env, VERSION: input },
+          encoding: 'utf8',
+        });
+        expect(result.status).toBe(input === version ? 0 : 1);
+        if (input !== version) {
+          expect(result.stderr).toContain(`packages/cli/package.json (${version})`);
+          expect(result.stderr).toContain('Merge the version PR first');
+        }
+        expect(readFileSync(manifest, 'utf8')).toBe(contents);
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);

@@ -1,6 +1,6 @@
 {
   "name": "uptide",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Uptide finds what a dependency upgrade breaks in your code, migrates it, and proves it with your compiler and tests.",
   "license": "MIT",
   "type": "module",
@@ -15,11 +15,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/lucasbraum/uptide.git",
+    "url": "git+https://github.com/uptide-dev/uptide.git",
     "directory": "packages/cli"
   },
-  "homepage": "https://github.com/lucasbraum/uptide#readme",
-  "bugs": "https://github.com/lucasbraum/uptide/issues",
+  "homepage": "https://github.com/uptide-dev/uptide#readme",
+  "bugs": "https://github.com/uptide-dev/uptide/issues",
   "keywords": [
     "zod",
     "stripe",

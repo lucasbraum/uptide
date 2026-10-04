@@ -49,17 +49,18 @@ describe('published package', () => {
 });
 
 it.skipIf(!existsSync(bin))(
-  'uses the installed CLI version in --version and HTML even after post-build versioning',
+  'embeds the build-time manifest version in --version, HTML and telemetry',
   () => {
     const root = mkdtempSync(join(tmpdir(), 'uptide-installed-version-'));
     try {
       cpSync(`${fileURLToPath(new URL('..', import.meta.url))}dist`, join(root, 'dist'), {
         recursive: true,
       });
-      const version = '0.9.8-next.20261004';
+      const version = manifest.version;
+      const changedAfterBuild = '0.9.8-next.20261004';
       writeFileSync(
         join(root, 'package.json'),
-        JSON.stringify({ name: 'uptide', version, type: 'module' }),
+        JSON.stringify({ name: 'uptide', version: changedAfterBuild, type: 'module' }),
       );
       const consumer = join(root, 'consumer');
       mkdirSync(consumer);
@@ -71,12 +72,22 @@ it.skipIf(!existsSync(bin))(
       ).toBe(version);
       execFileSync(process.execPath, [installed, 'list', '--html', 'report.html', '--ci'], {
         cwd: consumer,
-        env: { ...process.env, UPTIDE_TELEMETRY: '0' },
+        env: {
+          ...process.env,
+          XDG_CONFIG_HOME: join(root, 'config'),
+          UPTIDE_TELEMETRY: '1',
+          // Save the local event without contacting a telemetry service.
+          UPTIDE_TELEMETRY_HOST: 'http://disabled.invalid',
+        },
         stdio: 'pipe',
       });
       expect(readFileSync(join(consumer, 'report.html'), 'utf8')).toContain(
         `Uptide CLI ${version}`,
       );
+      const event = JSON.parse(
+        readFileSync(join(root, 'config/uptide/telemetry-last.json'), 'utf8'),
+      );
+      expect(event.properties.version).toBe(version);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
