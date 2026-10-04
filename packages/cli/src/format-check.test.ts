@@ -384,6 +384,30 @@ describe('tiers, the time budget and failures on the first screen', () => {
         '  ✗ pg 8.11.0: could not fetch pg@9.0.0: HTTP 503',
       ].join('\n'),
     );
+    // The same failure in many dependencies is one line.
+    const oom = (name: string) => ({
+      ...failed,
+      name,
+      skipReason: 'ANALYSIS_FAILED' as const,
+      notes: [
+        `analysis failed: out of memory in apps/web (check it alone with --only ${name}, or raise UPTIDE_WORKER_HEAP_MB)`,
+      ],
+    });
+    expect(
+      formatCheck(report([generic, oom('react'), oom('next'), oom('vite')]), { color: false }),
+    ).toContain(
+      '  ✗ 3 failed: analysis failed: out of memory in apps/web (check one alone with --only, or raise UPTIDE_WORKER_HEAP_MB): react, next, vite',
+    );
+    // A release group with nothing to upgrade has no row.
+    expect(
+      formatCheck(
+        report([
+          generic,
+          pkg({ name: '@radix-ui/*', installed: '1.2.20', target: '1.2.20', tier: 'generic' }),
+        ]),
+        { color: false },
+      ),
+    ).not.toContain('@radix-ui');
     // Neither gets a row: they have no verdict.
     expect(out).not.toMatch(/^react +5/m);
     expect(out).not.toMatch(/^pg +8/m);

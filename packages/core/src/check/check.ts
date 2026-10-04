@@ -1,4 +1,5 @@
 import { readFileSync, realpathSync } from 'node:fs';
+import { totalmem } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { typescriptAdapter } from '../adapters/typescript/index.js';
 import { createFsSurfaceCache } from '../cache/fs-surface-cache.js';
@@ -222,7 +223,11 @@ export async function check(opts: CheckOptions): Promise<CheckResult> {
           ...notImported(job.workspace, name, declared[name] as string),
           status: 'skipped' as const,
           skipReason: errorCode(err),
-          notes: [`analysis failed: ${(err as Error).message ?? String(err)}`],
+          notes: [
+            /memory/i.test(String((err as Error).message))
+              ? `analysis failed: out of memory in ${job.workspace} (check it alone with --only ${name}, or raise UPTIDE_WORKER_HEAP_MB)`
+              : `analysis failed: ${(err as Error).message ?? String(err)}`,
+          ],
         }));
     });
   const results =
@@ -502,6 +507,18 @@ export function mergeAcrossWorkspaces(
   return [...result, ...orphans];
 }
 
+/**
+ * What one workspace worker may use: a type-checked program of a large workspace takes
+ * gigabytes, and the analysis holds two (installed and target). 4 GB at least; more when the
+ * machine has it to spare for every worker at once, up to 8 GB. `UPTIDE_WORKER_HEAP_MB` sets it.
+ */
+export function workerHeapMb(workers: number, totalBytes = totalmem(), env = process.env): number {
+  const asked = Number(env.UPTIDE_WORKER_HEAP_MB);
+  if (Number.isFinite(asked) && asked >= 512) return Math.floor(asked);
+  const share = Math.floor(totalBytes / 1024 / 1024 / (Math.max(1, workers) + 1));
+  return Math.min(8192, Math.max(4096, share));
+}
+
 /** A worker thread checks one workspace with the default adapter, fetcher and cache. */
 async function runInWorker(
   job: WorkspaceJob,
@@ -516,7 +533,7 @@ async function runInWorker(
     const worker = new Worker(url, {
       workerData: job,
       execArgv: fromSource ? ['--import', 'tsx'] : [],
-      resourceLimits: { maxOldGenerationSizeMb: 4096 },
+      resourceLimits: { maxOldGenerationSizeMb: workerHeapMb(job.opts.workspaceConcurrency ?? 2) },
     });
     worker.on('message', (message) => {
       if (message.type === 'error') reject(new UptideError(message.code, message.message));
@@ -634,12 +651,13 @@ async function checkWorkspace(ctx: Ctx, job: WorkspaceJob): Promise<PackageRepor
     );
     const groupOf = new Map(groups.flatMap((g) => g.map((m) => [m, g] as const)));
     const done = new Set<string>();
-    // The analysis is CPU-bound on one thread: six at once finish together, late. Under a
-    // budget two at a time finish in rank order, so what the deadline cuts is the tail of
-    // the ranking and not six half-done dependencies.
+    // The analysis is CPU-bound on one thread: six at once finish together, late, and each
+    // holds a type-checked program of the whole workspace. Under a budget one at a time
+    // finishes in rank order, so what the deadline cuts is the tail of the ranking, and the
+    // memory in use is one target program, not six.
     const reports = await mapWithLimit(
       entries,
-      opts.concurrency ?? (opts.deadline !== undefined ? 2 : 6),
+      opts.concurrency ?? (opts.deadline !== undefined ? 1 : 6),
       async ([name, installedVersion]): Promise<PackageReport[]> => {
         if (done.has(name)) return [];
         // Nothing to upgrade in a linked workspace package.

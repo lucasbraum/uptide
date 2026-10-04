@@ -15,6 +15,7 @@ import {
   typescriptAdapter,
   UptideError,
   updatePrBody,
+  workerHeapMb,
 } from '@uptide/core';
 import {
   type CheckRequest,
@@ -69,7 +70,8 @@ async function offThread<T>(job: Job, onProgress?: ProgressListener): Promise<T>
   return new Promise<T>((resolvePromise, reject) => {
     const worker = new Worker(new URL('./engine-worker.js', here), {
       workerData: job,
-      resourceLimits: { maxOldGenerationSizeMb: 4096 },
+      // The job thread holds the programs of a single-package repository itself.
+      resourceLimits: { maxOldGenerationSizeMb: workerHeapMb(1) },
     });
     let settled = false;
     worker.on(

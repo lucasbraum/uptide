@@ -121,6 +121,8 @@ export interface Row {
 function rowOf(p: PackageReport, multi: boolean, colors: Colors): Row | undefined {
   if (['not-imported', 'workspace', 'private'].includes(p.status)) return undefined;
   if (p.notes.includes('up to date')) return undefined;
+  // A release group whose members are all current: nothing to upgrade, nothing to say.
+  if (p.installed === p.target && p.findings.length === 0 && p.status === 'safe') return undefined;
   // Out of time or failed: listed once, under "Not analyzed", with how to include them.
   if (p.skipReason === 'TIME_BUDGET' || isFailure(p)) return undefined;
   // Without a pack, what nothing confirmed is for --details: the first screen acts on evidence.
@@ -271,10 +273,24 @@ function notAnalyzed(report: CheckReport, opts: FormatCheckOptions, colors: Colo
       ),
     );
   }
-  for (const p of failed)
+  // One line per cause: twenty dependencies lost to the same failure are one fact.
+  const reasonOf = (p: PackageReport): string =>
+    (p.notes[0] ?? 'analysis failed')
+      .split('\n')[0]
+      ?.replace(/ \(check it alone with --only \S+,/, ' (check one alone with --only,') ?? '';
+  const byReason = new Map<string, PackageReport[]>();
+  for (const p of failed) byReason.set(reasonOf(p), [...(byReason.get(reasonOf(p)) ?? []), p]);
+  for (const [reason, group] of byReason) {
+    const only = group[0] as PackageReport;
     lines.push(
-      `  ${colors.red('✗')} ${p.name} ${p.installed}: ${(p.notes[0] ?? 'analysis failed').split('\n')[0]}`,
+      group.length === 1
+        ? `  ${colors.red('✗')} ${only.name} ${only.installed}: ${(only.notes[0] ?? 'analysis failed').split('\n')[0]}`
+        : `  ${colors.red('✗')} ${group.length} failed: ${reason}: ${group
+            .slice(0, 6)
+            .map((p) => p.name)
+            .join(', ')}${group.length > 6 ? `, and ${group.length - 6} more` : ''}`,
     );
+  }
   return lines;
 }
 

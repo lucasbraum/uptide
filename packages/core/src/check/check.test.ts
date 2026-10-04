@@ -8,7 +8,14 @@ import type { ProgressEvent } from '../domain/progress.js';
 import type { Finding, PackageReport } from '../domain/report.js';
 import type { ApiSurface } from '../domain/surface.js';
 import { UptideError } from '../errors.js';
-import { check, mergeAcrossWorkspaces, sitesOf, statusOf, summarize } from './check.js';
+import {
+  check,
+  mergeAcrossWorkspaces,
+  sitesOf,
+  statusOf,
+  summarize,
+  workerHeapMb,
+} from './check.js';
 
 const ROOT = resolve(import.meta.dirname, '../../../../fixtures');
 const CONSUMER = join(ROOT, 'repos/synthetic-consumer');
@@ -892,4 +899,13 @@ describe('a time budget and one failing dependency', () => {
     });
     expect(result.summary).toMatchObject({ failed: 1, skippedForTime: 0 });
   });
+});
+
+it('sizes a worker heap to the machine: 4 GB at least, 8 GB at most, or what the user says', () => {
+  const GB = 1024 ** 3;
+  expect(workerHeapMb(2, 8 * GB, {})).toBe(4096);
+  expect(workerHeapMb(2, 18 * GB, {})).toBe(6144);
+  expect(workerHeapMb(1, 64 * GB, {})).toBe(8192);
+  expect(workerHeapMb(2, 18 * GB, { UPTIDE_WORKER_HEAP_MB: '12000' })).toBe(12000);
+  expect(workerHeapMb(2, 18 * GB, { UPTIDE_WORKER_HEAP_MB: 'lots' })).toBe(6144);
 });
