@@ -456,8 +456,9 @@ ${EXIT_CODES(
               const discovery = await progress.phase('Group discovery', () =>
                 discoverGroup({ cwd: repo.root }),
               );
-              const selector = flags.group.replace(/^@/, '').replace(/\/\*$/, '');
-              const group = discovery.groups.find((g) => g.id === selector);
+              const group = discovery.groups.find(
+                (g) => g.id === flags.group || g.name === flags.group,
+              );
               if (!group)
                 throw new CliError(
                   `unknown group '${flags.group}'${discovery.groups.length ? `; available: ${discovery.groups.map((g) => g.id).join(', ')}` : ''}`,

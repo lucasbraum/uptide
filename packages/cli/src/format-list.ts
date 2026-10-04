@@ -32,13 +32,13 @@ export function listUsage(p: ListedDependency): string {
 }
 export function groupVersions(group: ListGroup): string {
   const main = group.members.filter((p) => !p.peerOf);
-  const range = (key: 'current' | 'latest'): string => {
-    const majors = [...new Set(main.map((p) => Number(p[key].split('.')[0])))].sort(
+  const range = (): string => {
+    const majors = [...new Set(main.map((p) => Number(p.latest.split('.')[0])))].sort(
       (a, b) => a - b,
     );
     return majors.length > 1 ? `${majors[0]}–${majors.at(-1)}.x` : `${majors[0]}.x`;
   };
-  return `${range('current')} → ${range('latest')}`;
+  return `→ ${range()}`;
 }
 export const listSymbols = (p: ListedDependency): string =>
   p.usage.topSymbols
@@ -103,7 +103,7 @@ export function formatList(report: ListReport, opts: FormatListOptions = {}): st
       ...(report.packages.some((p) => p.change === 'patch')
         ? [stat(report.packages.filter((p) => p.change === 'patch').length, 'patch')]
         : []),
-      stat(report.groups.length, 'groups'),
+      stat(groups.length, groups.length === 1 ? 'group' : 'groups'),
       stat(tooling.length, 'tooling'),
     ].join('   '),
     '',
@@ -111,7 +111,7 @@ export function formatList(report: ListReport, opts: FormatListOptions = {}): st
   const showWorkspaces = report.workspaces.some((w) => w !== '.');
   const cells = (p: ListedDependency): Cell[] => [
     { text: p.name, tone: 'bold' },
-    { text: `${p.current} → ${p.latest}` },
+    { text: `${p.current} → ${p.latest}`, alignAt: '→' },
     { text: listChange(p), tone: p.change === 'major' ? 'yellow' : 'dim' },
     {
       text: p.peerOf ? `peer of ${p.peerOf.join(', ')}` : plural(p.usage.files, 'file'),

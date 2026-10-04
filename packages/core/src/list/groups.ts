@@ -84,7 +84,6 @@ export function dependencyGroups(
       });
       const lead = leaders[0] as ListedDependency;
       const scope = scopeOf(lead.name);
-      const name = scope ? `${scope}/*` : lead.name;
       for (const p of members) {
         if (p.name === lead.name || (scope && scopeOf(p.name) === scope)) continue;
         const peerOf = members
@@ -102,17 +101,49 @@ export function dependencyGroups(
           a.name.localeCompare(b.name) ||
           a.current.localeCompare(b.current),
       );
-      return { id: scope ? scope.slice(1) : lead.name, name, members };
+      const lockstepSize = Math.max(
+        0,
+        ...members
+          .filter((p) => scopeOf(p.name) === scope)
+          .map((p) => {
+            const cohort = lockstep.get(`${scope}:${p.current}:${p.latest}`) ?? [];
+            return new Set(
+              cohort
+                .filter((other) => other.workspaces.some((w) => p.workspaces.includes(w)))
+                .map((other) => other.name),
+            ).size;
+          }),
+      );
+      return { lead: lead.name, scope, lockstepSize, members };
     });
-  // Distinct runtime/tooling release lines in one scope need distinct, repeatable selectors.
-  for (const group of result) {
-    if (result.filter((other) => other.id === group.id).length > 1) {
-      const same = result.filter((other) => other.id === group.id);
-      const primary =
-        same.find((other) => other.members.some((p) => p.classification === 'used')) ?? same[0];
-      for (const other of same)
-        if (other !== primary) other.id = `${other.id}-${other.members[0]?.name.split('/').at(-1)}`;
-    }
+  // A scope label belongs to its primary lockstep release set, not every scoped lead.
+  // Independent tooling/peer groups keep their lead's full package name as the selector.
+  const scopeSets = new Map<string, (typeof result)[number]>();
+  for (const group of [...result].sort(
+    (a, b) =>
+      b.members.filter((p) => p.classification === 'used').length -
+        a.members.filter((p) => p.classification === 'used').length ||
+      b.lockstepSize - a.lockstepSize ||
+      a.lead.localeCompare(b.lead),
+  )) {
+    if (group.scope && group.lockstepSize > 1 && !scopeSets.has(group.scope))
+      scopeSets.set(group.scope, group);
   }
-  return result;
+  const named = result.map((group) => {
+    const scope = group.scope && scopeSets.get(group.scope) === group ? group.scope : undefined;
+    return {
+      id: scope ? scope.slice(1) : group.lead,
+      name: scope ? `${scope}/*` : group.lead,
+      members: group.members,
+    };
+  });
+  // A real unscoped package may share the scope shorthand; retain both exact titles.
+  for (const group of named) {
+    if (
+      named.some((other) => other !== group && other.id === group.id) &&
+      group.name.endsWith('/*')
+    )
+      group.id = group.name;
+  }
+  return named;
 }

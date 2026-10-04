@@ -12,10 +12,25 @@ export interface Cell {
   text: string;
   tone?: Tone;
   span?: 'rest';
+  alignAt?: string;
 }
 /** Measure plain text before styling. Narrow terminals sacrifice trailing columns before wrapping. */
 export function alignedRows(rows: Cell[][], width: number, color: boolean, indent = 0): string[] {
   const colors = pc.createColors(color);
+  rows = rows.map((row) =>
+    row.map((cell, column) => {
+      const marker = cell.alignAt;
+      if (!marker || !cell.text.includes(marker)) return cell;
+      const before = cell.text.indexOf(marker);
+      const widest = Math.max(
+        ...rows.map((r) => {
+          const other = r[column];
+          return other && other.alignAt === marker ? Math.max(0, other.text.indexOf(marker)) : 0;
+        }),
+      );
+      return { ...cell, text: ' '.repeat(widest - before) + cell.text };
+    }),
+  );
   const lengths = Array.from({ length: Math.max(0, ...rows.map((r) => r.length)) }, (_, i) =>
     Math.max(0, ...rows.map((r) => textWidth(r[i]?.span ? '' : (r[i]?.text ?? '')))),
   );

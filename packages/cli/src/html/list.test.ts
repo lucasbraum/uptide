@@ -67,6 +67,24 @@ it('renders the Nest report with shared check styling, groups first, copy comman
   expect(html).toContain('pnpm');
   expect(html).toContain('<strong>32</strong><span class="label">Major</span>');
   expect(html).toContain('Generated Oct 4, 2026');
+  expect(html).toContain('<strong>1</strong><span class="label">Groups</span>');
+  expect(html.match(/<h2>@nestjs\/\*<\/h2>/g)).toHaveLength(1);
+  expect(html).toContain('<h2>@nestjs/cli</h2>');
+  expect(html).toContain('<span>→ 12.x</span>');
+  expect(html).not.toContain('package-command');
+  expect(html).toContain(
+    'title="uptide check cookie-plugin" aria-label="uptide check cookie-plugin"',
+  );
+  const standalone =
+    html.match(/<article class="member-grid has-command">[\s\S]*?<\/article>/g) ?? [];
+  expect(standalone.length).toBe(
+    report.packages.length - report.groups.reduce((n, g) => n + g.members.length, 0),
+  );
+  expect(
+    standalone.every(
+      (row) => row.includes('class="copy copy-icon"') && !row.includes('class="term command"'),
+    ),
+  ).toBe(true);
   expect(html).toContain(`Uptide CLI ${VERSION}`);
   expect(html.indexOf('<h2>@nestjs/*</h2>')).toBeLessThan(html.indexOf('02 / Packages'));
   expect(html.match(/class="pkg-name">@nestjs\/common</g)).toHaveLength(1);

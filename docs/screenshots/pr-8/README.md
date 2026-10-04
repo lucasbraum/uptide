@@ -13,3 +13,5 @@ in both `--version` and the generated report.
 | --- | --- | --- | --- |
 | NestJS list | [Light](list-light.png) | [Dark](list-dark.png) | [Mobile](list-mobile.png) |
 | Storefront check | [Light](check-light.png) | [Dark](check-dark.png) | [Mobile](check-mobile.png) |
+
+[Expanded tooling](list-tooling.png) shows the lead-package group title and compact row copy actions.

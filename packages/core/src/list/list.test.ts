@@ -186,7 +186,7 @@ it('discovers a synthetic single-package pnpm Nest API, including tooling and pe
   ]);
   const runtimeGroup = result.groups.find((g) => g.id === 'nestjs');
   expect(runtimeGroup?.name).toBe('@nestjs/*');
-  expect(result.groups.map((g) => g.id)).toContain('nestjs-cli');
+  expect(result.groups.map((g) => g.id)).toContain('@nestjs/cli');
   expect(new Set(result.groups.map((g) => g.id)).size).toBe(result.groups.length);
   expect(result.packages.find((p) => p.name === '@fastify/static')).toMatchObject({
     classification: 'peer',

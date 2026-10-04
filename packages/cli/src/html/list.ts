@@ -14,6 +14,7 @@ import {
 import { escapeHtml as e } from './escape.js';
 import {
   reportCommand,
+  reportCopyButton,
   reportDocument,
   reportHeader,
   reportStats,
@@ -29,12 +30,11 @@ export interface ListHtmlOptions extends FormatListOptions {
 export function renderListHtml(report: ListReport, opts: ListHtmlOptions): string {
   const { groups, used, tooling, unused } = listSections(report);
   const commands = { ...opts, cwd: opts.details ? opts.cwd : undefined };
-  const row = (p: ListedDependency): string =>
-    `<article class="member-grid"><div class="pkg-name">${e(p.name)}${p.tier === 'verified' ? '<span class="verified">verified</span>' : ''}</div><div class="versions">${e(p.current)} → ${e(p.latest)}</div><div class="gap">${e(listChange(p))}</div><div class="usage${p.peerOf ? ' muted' : ''}">${p.peerOf ? `peer of ${e(p.peerOf.join(', '))}` : e(listUsage(p))}</div>${opts.details && listSymbols(p) ? `<div class="details-line">Top symbols: ${e(listSymbols(p))}</div>` : ''}${opts.details && p.usage.fileList?.length ? `<details class="details-line"><summary>Files</summary><ul>${p.usage.fileList.map((file) => `<li>${e(file)}</li>`).join('')}</ul></details>` : ''}</article>`;
+  const row = (p: ListedDependency, command?: string): string =>
+    `<article class="member-grid${command ? ' has-command' : ''}"><div class="pkg-name">${e(p.name)}${p.tier === 'verified' ? '<span class="verified">verified</span>' : ''}</div><div class="versions">${e(p.current)} → ${e(p.latest)}</div><div class="gap">${e(listChange(p))}</div><div class="usage${p.peerOf ? ' muted' : ''}">${p.peerOf ? `peer of ${e(p.peerOf.join(', '))}` : e(listUsage(p))}</div>${command ? reportCopyButton(command) : ''}${opts.details && listSymbols(p) ? `<div class="details-line">Top symbols: ${e(listSymbols(p))}</div>` : ''}${opts.details && p.usage.fileList?.length ? `<details class="details-line"><summary>Files</summary><ul>${p.usage.fileList.map((file) => `<li>${e(file)}</li>`).join('')}</ul></details>` : ''}</article>`;
   const group = (g: ListGroup): string =>
-    `<section class="package"><header><h2>${e(g.name)}</h2><div class="meta"><span>${g.members.length} packages</span><span>${e(groupVersions(g))}</span></div>${reportCommand(groupCommand(g, commands))}</header>${g.members.map(row).join('')}</section>`;
-  const standalone = (p: ListedDependency): string =>
-    `${row(p)}<div class="package-command">${reportCommand(listCommand([p], commands))}</div>`;
+    `<section class="package"><header><h2>${e(g.name)}</h2><div class="meta"><span>${g.members.length} packages</span><span>${e(groupVersions(g))}</span></div>${reportCommand(groupCommand(g, commands))}</header>${g.members.map((p) => row(p)).join('')}</section>`;
+  const standalone = (p: ListedDependency): string => row(p, listCommand([p], commands));
   const collapsed = (label: string, packages: ListedDependency[]): string =>
     packages.length
       ? `<details class="notes"><summary>${label} / ${packages.length} package${packages.length === 1 ? '' : 's'}</summary>${listBlocks(
@@ -58,7 +58,7 @@ export function renderListHtml(report: ListReport, opts: ListHtmlOptions): strin
           tone: 'warn',
         },
         { label: 'Minor', value: report.packages.filter((p) => p.change === 'minor').length },
-        { label: 'Groups', value: report.groups.length },
+        { label: 'Groups', value: groups.length },
         { label: 'Tooling', value: tooling.length },
       ],
     )}

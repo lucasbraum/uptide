@@ -422,7 +422,7 @@ export function formatCheck(report: CheckReport, opts: FormatCheckOptions = {}):
       ...alignedRows(
         shown.map((row) => [
           { text: row.name, tone: 'bold' as const },
-          { text: row.versions },
+          { text: row.versions, alignAt: '→' },
           {
             text: move(row),
             tone: row.bump.startsWith('major') ? ('yellow' as const) : ('dim' as const),

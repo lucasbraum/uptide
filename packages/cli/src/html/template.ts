@@ -40,5 +40,8 @@ export function reportStats(
 }
 export const reportCommand = (command: string): string =>
   `<div class="term command"><code>${escapeHtml(command)}</code><button type="button" class="copy" data-copy hidden aria-label="Copy command">Copy</button></div>`;
+/** Standalone packages keep their command in a compact, accessible row action. */
+export const reportCopyButton = (command: string): string =>
+  `<div class="copy-cell"><code class="copy-source" hidden>${escapeHtml(command)}</code><button type="button" class="copy copy-icon" data-copy hidden title="${escapeHtml(command)}" aria-label="${escapeHtml(command)}"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="7" y="7" width="10" height="10" stroke="currentColor" stroke-width="1.5"/><path d="M13 7V3H3v10h4" stroke="currentColor" stroke-width="1.5"/></svg><span class="sr-only" data-copy-status role="status"></span></button></div>`;
 export const sectionLabel = (number: string, label: string, subtitle = ''): string =>
   `<div class="section-label"><h2>${number} / ${escapeHtml(label)}</h2>${subtitle ? `<p>${escapeHtml(subtitle)}</p>` : ''}</div>`;
