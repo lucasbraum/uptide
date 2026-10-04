@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import type { CheckReport, Finding } from '../domain/report.js';
+import { genericPack } from '../packs/generic.js';
 import { git } from './process.js';
 import { prBody } from './report.js';
 import { type FixServices, fix } from './run.js';
@@ -164,6 +165,13 @@ describe('fix for a dependency without a pack', () => {
     expect(seen[0]?.guide).toContain('Migrate this call site of paint from 1.0.0 to 2.0.0');
     expect(seen[0]?.guide).toContain('After: (color: { name: string }) => void');
     expect(seen[0]?.guide).toContain('Never cast, never suppress a diagnostic');
+    // What check learned about the target travels with the finding into the guide.
+    expect(
+      genericPack('paint').guide({
+        ...(seen[0]?.finding as Finding),
+        details: ['paint 2.0.0 exports: fill, stroke'],
+      }),
+    ).toContain('paint 2.0.0 exports: fill, stroke');
     const body = prBody(result);
     expect(body).toContain(
       '> No migration pack covers `paint`. Every edit here was written by the agent and kept only because the compiler error at that site went away and no new one appeared: review each change carefully.',

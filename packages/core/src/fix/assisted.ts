@@ -9,6 +9,9 @@ import { siteKey } from './report.js';
 import type { AssistedAttempt, FixDiagnostic, Fixer, FixReport, FixSite } from './types.js';
 import { newDiagnostics } from './verify.js';
 
+/** Lines of using statements shown with an import site. */
+const IMPORT_USE_LINES = 160;
+
 export function enclosingContext(
   source: string,
   line: number,
@@ -54,6 +57,31 @@ export function enclosingContext(
     );
   };
   if (container) add(container);
+  // An import that no longer exists is fixed where the name is used, not on the import
+  // line: the statements that use what this import brings in are part of the site.
+  if (container && Node.isImportDeclaration(container)) {
+    const names = new Set(
+      [
+        container.getDefaultImport(),
+        container.getNamespaceImport(),
+        ...container.getNamedImports().map((n) => n.getAliasNode() ?? n.getNameNode()),
+      ]
+        .filter((n) => n !== undefined)
+        .map((n) => n.getText()),
+    );
+    let lines = 0;
+    for (const statement of file.getStatements()) {
+      if (Node.isImportDeclaration(statement)) continue;
+      const uses = statement
+        .getDescendantsOfKind(SyntaxKind.Identifier)
+        .some((id) => names.has(id.getText()));
+      if (!uses) continue;
+      lines += statement.getEndLineNumber() - statement.getStartLineNumber() + 1;
+      // Enough to see how the name is used; a whole large module is not the site.
+      if (lines > IMPORT_USE_LINES) break;
+      add(statement);
+    }
+  }
   // Imported dependency types and their declaration sites explain downstream generic errors.
   for (const imp of file.getImportDeclarations())
     if (['zod', 'stripe', ...modules].includes(imp.getModuleSpecifierValue())) add(imp);

@@ -30,6 +30,8 @@ export function genericPack(name: string): MigrationPack {
         f.change.before ? `Before: ${f.change.before}` : '',
         f.change.after ? `After: ${f.change.after}` : '',
         f.change.replacement ? `Likely replacement: ${f.change.replacement}` : '',
+        // What check knows about the target: its exports, when an import went missing.
+        ...(f.details ?? []),
         'Patch ONLY the reported site, with the smallest edit that makes it compile against the target and keeps what the code does. Never cast, never suppress a diagnostic, never delete the call, never change values, messages or control flow that the upgrade does not require. If the site cannot be migrated safely from what is shown, say so instead of guessing.',
       ]
         .filter(Boolean)

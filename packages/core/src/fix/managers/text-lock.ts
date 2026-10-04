@@ -1,5 +1,5 @@
 import { UptideError } from '../../errors.js';
-import type { LockGraph, LockRecord } from './lock-guard.js';
+import { type LockGraph, type LockRecord, withoutTarget } from './lock-guard.js';
 
 interface Block {
   key: string;
@@ -160,7 +160,20 @@ export function yarnGraph(text: string, target: string): LockGraph {
   return { records, metadata };
 }
 
-export function pnpmGraph(text: string, target: string): LockGraph {
+/**
+ * pnpm names a package that has the target as a peer after the target's version:
+ * `plugin@1.2.0(target@3.0.0)`, in snapshot keys and wherever an importer or a dependent
+ * points at it. Upgrading the target renames every one of them, and nothing about those
+ * packages changed: the suffix is the target's version as its dependents see it. It is
+ * compared without the version, so a renamed dependent is the same entry.
+ */
+function withoutTargetPeerVersion(text: string, target: string): string {
+  const name = target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return text.replace(new RegExp(`\\(${name}@[^()]+\\)`, 'g'), `(${target}@*)`);
+}
+
+export function pnpmGraph(raw: string, target: string): LockGraph {
+  const text = withoutTargetPeerVersion(raw, target);
   const records = new Map<string, LockRecord>();
   const metadata: string[] = [];
   let section = '',
@@ -182,10 +195,13 @@ export function pnpmGraph(text: string, target: string): LockGraph {
     }
     for (const b of blocks(lines.slice(1), 2)) {
       const key = unquote(b.key).replace(/^\//, '');
+      const name = packageName(key);
+      const data = parsedEntry(b.lines, 4);
       records.set(`${section}:${key}`, {
-        name: packageName(key),
+        name,
         dependencies: [],
-        data: parsedEntry(b.lines, 4),
+        // A dependent's pointer at the target moves with the target; the rest of it may not.
+        data: name === target ? data : withoutTarget(data, target),
       });
       if (section === 'snapshots') {
         const r = records.get(`${section}:${key}`) as LockRecord;

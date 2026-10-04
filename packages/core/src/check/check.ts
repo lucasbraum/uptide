@@ -1675,6 +1675,26 @@ async function checkGroup(
           });
     findings.length = 0;
     findings.push(...confirmed);
+    // An import the target no longer has: what it exports instead is what a person, or the
+    // agent, needs to choose a replacement. Without a pack nothing else says it.
+    if (tier === 'generic')
+      for (const f of findings) {
+        if (f.severity !== 'breaking' || ![2305, 2614, 2724].includes(f.usage.compileCode ?? 0))
+          continue;
+        const diff = diffs.get(f.usage.package ?? f.change.package) ?? [...diffs.values()][0];
+        const exported = [
+          ...new Set(
+            (diff?.surfaceB.symbols ?? [])
+              .map((sym) => sym.path)
+              .filter((path) => !/[.#[(]/.test(path)),
+          ),
+        ].sort();
+        if (exported.length > 0)
+          f.details = [
+            ...(f.details ?? []),
+            `${f.change.package} ${f.change.to} exports: ${exported.slice(0, 60).join(', ')}${exported.length > 60 ? `, and ${exported.length - 60} more` : ''}`,
+          ];
+      }
     const unanalyzedCount = prepared.reduce((n, p) => n + p.scan.unanalyzed.length, 0);
     let status = statusOf(findings, usages.length, unanalyzedCount);
     // Nothing to diff and nothing found: the honest status is "no types", with the reason in the notes.
