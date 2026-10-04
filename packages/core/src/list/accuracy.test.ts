@@ -243,3 +243,20 @@ it('recognizes a cz-customizable configuration without executing it', async () =
     reasons: ['referenced by configuration'],
   });
 });
+
+it('recognizes installed bin aliases inside hook scripts', async () => {
+  const cwd = fixture('installed-bins');
+  const pkg = JSON.parse(readFileSync(join(cwd, 'package.json'), 'utf8'));
+  delete pkg.scripts.commit;
+  writeFileSync(join(cwd, 'package.json'), JSON.stringify(pkg));
+  mkdirSync(join(cwd, '.husky'));
+  writeFileSync(join(cwd, '.husky/prepare-commit-msg'), '#!/bin/sh\nnpx cz\n');
+  const report = await listDependencies({
+    cwd,
+    fetcher: { resolve: async () => '2.0.0', metadata: async () => ({}) },
+  });
+  expect(report.packages.find((p) => p.name === 'commitizen')).toMatchObject({
+    classification: 'tooling',
+    reasons: ['referenced by configuration'],
+  });
+});

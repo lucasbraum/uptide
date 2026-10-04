@@ -70,7 +70,8 @@ export function toolingReasons(
     scripts.includes(`node_modules/${name}/`)
   )
     reasons.push('used by package scripts');
-  if (referencesPackage(configs, name)) reasons.push('referenced by configuration');
+  if (referencesPackage(configs, name) || bins.some((bin) => mentions(configs, bin)))
+    reasons.push('referenced by configuration');
   for (const manifest of manifests) {
     for (const [field, consumers] of Object.entries(CONFIG_FIELDS)) {
       const value =
