@@ -244,6 +244,7 @@ Uptide 0.1.0 · claude-sonnet-4-6 · 2.6k/0.6k tokens · $0.02 · 1 min
 
 Uptide commit: \`f46ec30ae488b48796ee03752b0e4b94f0a73fc7\` (working-tree changes)
 Branch: \`uptide/zod-4.6.5\`
+Tier: verified (a migration pack covers this upgrade)
 Verified at: 2026-10-04T00:39:23.575Z
 Verified commit: \`4d7932a03feb1b3b9a10d8cdbecf3e09bafb112e\`
 

@@ -182,6 +182,17 @@ describe('planPackage', () => {
       title: 'sharp.cache removed',
       by: { rule: 0, agent: 1, manual: 0 },
     });
+    // When the compiler rejected every site, the title is what it said, not the diff's symbol.
+    const rejected = finding(
+      { package: 'avatars', path: 'Style', kind: 'type' },
+      {
+        compileCode: 2305,
+        compileError: "Module '\"avatars\"' has no exported member 'createAvatar'.",
+      },
+    );
+    expect(planPackage(pkg([rejected], { name: 'avatars' }))[0]?.title).toBe(
+      'createAvatar is no longer exported',
+    );
     // What nothing confirmed is nobody's to migrate unasked.
     const unconfirmed = planPackage(
       pkg([{ ...removed, severity: 'unverified' }], { name: 'sharp' }),

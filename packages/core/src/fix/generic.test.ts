@@ -180,6 +180,9 @@ describe('fix for a dependency without a pack', () => {
       '| **Risk** | Medium: no migration pack for paint: agent edits verified by the compiler only |',
     );
     expect(body).not.toMatch(/billing|webhook|Stripe/);
+    expect(body).toContain(
+      'Tier: generic (no migration pack: agent edits verified by the compiler)',
+    );
   }, 20000);
 
   it('refuses plainly without an agent, before anything changes', async () => {

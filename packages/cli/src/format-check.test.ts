@@ -432,6 +432,18 @@ describe('tiers, the time budget and failures on the first screen', () => {
     expect(peer).toContain(
       '  ⚠ peer: react-i18next 17.0.15 needs i18next >= 26.2.0 (installed: 22.5.1): upgrade i18next first',
     );
+    // Dozens of distinct changes in one package: the largest are listed, the rest counted.
+    const many = pkg({
+      name: 'compiler',
+      tier: 'generic',
+      status: 'breaking',
+      findings: Array.from({ length: 12 }, (_, i) =>
+        removed('src/a.ts', i + 1, { change: undefined } as never),
+      ).map((f, i) => ({ ...f, change: { ...f.change, package: 'compiler', path: `api.fn${i}` } })),
+    });
+    const capped = formatCheck(report([many]), { color: false });
+    expect(capped.match(/^ {2}✗ api\.fn\d+ removed/gm)).toHaveLength(7);
+    expect(capped).toContain('  … 5 more changes, 5 sites (--details)');
     // A release group with nothing to upgrade has no row.
     expect(
       formatCheck(

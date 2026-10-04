@@ -753,6 +753,11 @@ export function renderMigration(
       '',
       `Uptide commit: \`${report.uptideCommit ?? 'not retained'}\`${report.uptideDirty ? ' (working-tree changes)' : ''}`,
       `Branch: \`${report.branch}\``,
+      ...(report.tier
+        ? [
+            `Tier: ${report.tier} (${report.tier === 'verified' ? 'a migration pack covers this upgrade' : 'no migration pack: agent edits verified by the compiler'})`,
+          ]
+        : []),
       ...(report.verifiedAt
         ? [
             `Verified at: ${report.verifiedAt}${report.verificationTimingMs === undefined ? '' : ` · ${(report.verificationTimingMs / 1000).toFixed(2)}s`}`,
