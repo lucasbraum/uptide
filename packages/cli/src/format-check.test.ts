@@ -398,6 +398,23 @@ describe('tiers, the time budget and failures on the first screen', () => {
     ).toContain(
       '  ✗ 3 failed: analysis failed: out of memory in apps/web (check one alone with --only, or raise UPTIDE_WORKER_HEAP_MB): react, next, vite',
     );
+    // Analyzed in one workspace, not in another that imports it: never "no impact".
+    const partly = pkg({
+      name: 'zod',
+      tier: 'verified',
+      importers: [
+        { workspace: '.', declared: true, analyzed: true },
+        {
+          workspace: 'apps/web',
+          declared: false,
+          analyzed: false,
+          reason: 'time budget reached before this workspace',
+        },
+      ],
+    });
+    const gap = formatCheck(report([partly]), { color: false });
+    expect(gap).toContain('? no impact in 12 sites, 1 workspace not analyzed');
+    expect(gap).not.toContain('✓ no impact');
     // A release group with nothing to upgrade has no row.
     expect(
       formatCheck(

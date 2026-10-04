@@ -137,6 +137,7 @@ function rowOf(p: PackageReport, multi: boolean, colors: Colors): Row | undefine
     multi && p.workspace !== '*' && p.workspace !== '.' ? colors.dim(` (${p.workspace})`) : '';
   const members = p.members ? ` (${plural(p.members.length, 'package')})` : '';
   const unanalyzed = p.unanalyzed.length;
+  const gaps = (p.importers ?? []).filter((i) => !i.analyzed).length;
   let verdict: string;
   let by = '';
   if (p.status === 'no-types' || p.status === 'skipped') {
@@ -162,6 +163,9 @@ function rowOf(p: PackageReport, multi: boolean, colors: Colors): Row | undefine
     verdict = `${colors.magenta('?')} ${unanalyzed} of ${plural(p.callSitesChecked + unanalyzed, 'site')} not analyzed`;
   } else if (unanalyzed > 0) {
     verdict = `${colors.green('✓')} no impact in ${plural(p.callSitesChecked, 'site')}, ${unanalyzed} not analyzed${aside}`;
+  } else if (gaps > 0) {
+    // A workspace that imports it was not analyzed: "no impact" would claim more than is known.
+    verdict = `${colors.magenta('?')} no impact in ${plural(p.callSitesChecked, 'site')}, ${plural(gaps, 'workspace')} not analyzed${aside}`;
   } else if (unconfirmed > 0) {
     verdict = `${colors.green('✓')} nothing confirmed ${colors.dim(`(${plural(p.callSitesChecked, 'call site')})`)}${aside}`;
   } else {
@@ -175,7 +179,8 @@ function rowOf(p: PackageReport, multi: boolean, colors: Colors): Row | undefine
     verdict,
     by,
     plan,
-    quiet: plan.length === 0 && !['no-types', 'skipped', 'unknown'].includes(p.status),
+    quiet:
+      plan.length === 0 && gaps === 0 && !['no-types', 'skipped', 'unknown'].includes(p.status),
   };
 }
 

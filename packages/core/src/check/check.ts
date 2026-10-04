@@ -195,11 +195,19 @@ export async function check(opts: CheckOptions): Promise<CheckResult> {
       : {}),
   };
   // Heaviest workspaces first, so the last worker is not left alone with the largest one.
+  // Under a budget, the workspaces that import the most of what is behind come first: a
+  // workspace started after the deadline is not analyzed at all.
+  const behindNames = new Set(plainOpts.behind ?? []);
+  const stake = (workspace: string): number =>
+    opts.maxTimeMs
+      ? (importedByWorkspace[workspace] ?? []).filter((name) => behindNames.has(name)).length
+      : 0;
   const jobs: WorkspaceJob[] = [...workspaces]
     .sort(
       (a, b) =>
+        stake(b) - stake(a) ||
         Object.keys(installedByWorkspace[b] ?? {}).length -
-        Object.keys(installedByWorkspace[a] ?? {}).length,
+          Object.keys(installedByWorkspace[a] ?? {}).length,
     )
     .map((workspace) => ({
       cwd: opts.cwd,
@@ -577,6 +585,30 @@ async function checkWorkspace(ctx: Ctx, job: WorkspaceJob): Promise<PackageRepor
   const opts: CheckOptions = { ...ctx.opts, ...job.opts };
   const { workspace, workspaces, installedByWorkspace, importedByWorkspace } = job;
   const packages: PackageReport[] = [];
+  // Out of time before this workspace started: loading its program alone can take longer than
+  // the budget. What it imports and is behind is reported as left out, from the manifests
+  // and a text scan, without loading anything.
+  if (opts.deadline !== undefined && Date.now() > opts.deadline) {
+    const declared = installedByWorkspace[workspace] ?? {};
+    const imported = new Set(importedByWorkspace[workspace] ?? []);
+    const late = (name: string, version: string, undeclared: boolean): PackageReport => ({
+      ...notImported(workspace, name, version),
+      status: 'skipped',
+      skipReason: 'TIME_BUDGET',
+      notes: ['time budget reached before this workspace'],
+      ...(undeclared ? { undeclared: {} } : {}),
+    });
+    for (const name of opts.behind ?? []) {
+      if (opts.only && !opts.only.includes(name)) continue;
+      const version = declared[name];
+      if (version !== undefined && /^(link|workspace|file):/.test(version)) continue;
+      if (version !== undefined && (opts.allDeps || imported.has(name)))
+        packages.push(late(name, version, false));
+      else if (version === undefined && imported.has(name))
+        packages.push(late(name, 'unresolved', true));
+    }
+    return packages;
+  }
   {
     const dir = resolve(opts.cwd, workspace);
     const repo: RepoDir = { dir };
