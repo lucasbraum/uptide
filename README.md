@@ -1,10 +1,10 @@
 # Uptide
 
-**Renovate updates the version. We update the code.**
+**Migrations you can merge.**
 
-Uptide tells you which of your lines a dependency upgrade breaks, then migrates them on a
-branch it has verified with your own compiler and tests. TypeScript repositories; verified
-migrations for **zod 3 → 4** and **stripe** today.
+Uptide finds what a dependency upgrade breaks in your code, migrates it, and proves it with
+your compiler and tests. TypeScript repositories; verified migrations for **zod 3 → 4** and
+**stripe** today.
 
 ## Quickstart (30 seconds)
 

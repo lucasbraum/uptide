@@ -171,7 +171,7 @@ export async function run(
   const program = new Command()
     .name('uptide')
     .description(
-      'Renovate updates the version. We update the code.\n\nWith no command: where zod and stripe stand in this repository.',
+      'Migrations you can merge.\n\nWith no command: where zod and stripe stand in this repository.',
     )
     .version(VERSION)
     .exitOverride()

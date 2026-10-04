@@ -1,7 +1,7 @@
 {
   "name": "uptide",
   "version": "0.1.0",
-  "description": "Renovate updates the version. We update the code. Checks what a zod or stripe upgrade breaks in your TypeScript repo and migrates it on a verified branch.",
+  "description": "Uptide finds what a dependency upgrade breaks in your code, migrates it, and proves it with your compiler and tests.",
   "license": "MIT",
   "type": "module",
   "bin": {
