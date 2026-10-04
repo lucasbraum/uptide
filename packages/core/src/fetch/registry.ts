@@ -16,6 +16,7 @@ export interface ResolvedVersion {
   version: string;
   tarball: string;
   peerDependencies?: Record<string, string>;
+  bin?: string | Record<string, string>;
   /** SRI string (`sha512-…`) when the registry provides one. */
   integrity?: string;
   /** Hex sha1, older registries only. */
@@ -24,6 +25,7 @@ export interface ResolvedVersion {
 
 interface Manifest {
   peerDependencies?: Record<string, string>;
+  bin?: string | Record<string, string>;
   version?: string;
   dist?: { tarball?: string; integrity?: string; shasum?: string };
 }
@@ -135,6 +137,7 @@ function toResolved(name: string, manifest: Manifest | undefined): ResolvedVersi
     tarball: manifest.dist.tarball,
     peerDependencies: manifest.peerDependencies ?? {},
   };
+  if (manifest.bin) resolved.bin = manifest.bin;
   if (manifest.dist.integrity) resolved.integrity = manifest.dist.integrity;
   if (manifest.dist.shasum) resolved.shasum = manifest.dist.shasum;
   return resolved;

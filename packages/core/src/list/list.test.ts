@@ -1,6 +1,7 @@
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, expect, it, vi } from 'vitest';
 import { listDependencies } from './list.js';
 import { scanImports } from './scan.js';
@@ -49,11 +50,7 @@ it('discovers without installation, resolves metadata once per name and retains 
     usage: {
       files: 1,
       callSites: 1,
-      topSymbols: [
-        { name: 'z.string', count: 1 },
-        { name: 'ZodType', count: 0 },
-        { name: 'z', count: 0 },
-      ],
+      topSymbols: [{ name: 'z.string', count: 1 }],
     },
   });
   expect(result.packages[1]?.usage.files).toBe(0);
@@ -105,4 +102,197 @@ it('deduplicates names across workspaces, skips internal names and keeps distinc
   expect(result.failures).toEqual([]);
   expect(result.packages.map((p) => p.current)).toEqual(['3.24.0', '3.25.76']);
   expect(result.packages[0]?.usage.workspaces).toEqual(['.', 'packages/a']);
+});
+
+const nestRoot = new URL('../../../../fixtures/repos/nest-discovery/', import.meta.url);
+const nestMetadata = JSON.parse(readFileSync(new URL('registry.json', nestRoot), 'utf8')) as Record<
+  string,
+  { latest: string; peerDependencies?: Record<string, string>; bin?: Record<string, string> }
+>;
+const nestFetcher = {
+  resolve: async (name: string) => nestMetadata[name]?.latest ?? '1.0.0',
+  metadata: async (name: string) => nestMetadata[name] ?? {},
+};
+it('discovers a synthetic single-package pnpm Nest API, including tooling and peers of current packages', async () => {
+  const result = await listDependencies({ cwd: fileURLToPath(nestRoot), fetcher: nestFetcher });
+  expect(result.failures).toEqual([]);
+  expect(result.workspaces).toEqual(['.']);
+  expect(
+    result.packages.filter((p) => p.classification === 'possibly-unused').map((p) => p.name),
+  ).toEqual(['@types/unrelated', 'orphan']);
+  const tools = [
+    '@nestjs/cli',
+    '@nestjs/schematics',
+    'eslint',
+    'eslint-plugin-example',
+    'prettier',
+    'prettier-plugin-example',
+    'jest',
+    'ts-jest',
+    'typescript',
+    'webpack',
+    'ts-loader',
+    '@types/node',
+    '@types/cookie-plugin',
+    '@types/nestjs__common',
+    '@example/tsconfig',
+    'example-jest-preset',
+    'example-lint-rules',
+    'example-prettier-plugin',
+    'script-runner',
+    'cleanup-tool',
+    'runtime-peer',
+    'reflect-metadata',
+  ];
+  expect(
+    result.packages
+      .filter((p) => p.classification === 'tooling')
+      .map((p) => p.name)
+      .sort(),
+  ).toEqual(tools.sort());
+  expect(result.packages.find((p) => p.name === 'cookie-plugin')).toMatchObject({
+    classification: 'used',
+    usage: { files: 1, callSites: 0, references: 1, topSymbols: [{ name: 'default', count: 1 }] },
+  });
+  const nest = result.packages.find((p) => p.name === '@nestjs/common');
+  expect(nest).toMatchObject({ majorGap: 2, current: '10.4.0', latest: '12.0.0' });
+  expect(nest?.usage.topSymbols).not.toContainEqual({ name: 'UnusedDecorator', count: 0 });
+  expect(
+    result.groups
+      .find((g) => g.members.some((p) => p.name === '@nestjs/core'))
+      ?.members.map((p) => p.name),
+  ).toEqual(['@nestjs/common', '@nestjs/core', '@nestjs/platform-express']);
+  expect(result.packages.every((p) => p.usage.fileList === undefined)).toBe(true);
+  const detailed = await listDependencies({
+    cwd: fileURLToPath(nestRoot),
+    fetcher: nestFetcher,
+    details: true,
+  });
+  expect(detailed.packages.find((p) => p.name === 'cookie-plugin')?.usage.fileList).toEqual([
+    'src/main.ts',
+  ]);
+  const selected = await listDependencies({
+    cwd: fileURLToPath(nestRoot),
+    fetcher: nestFetcher,
+    only: ['runtime-peer'],
+  });
+  expect(selected.packages[0]?.classification).toBe('tooling');
+});
+
+it('uses installed bin and peer metadata without registry metadata or executing configuration', async () => {
+  const cwd = fixture();
+  writeFileSync(
+    join(cwd, 'package.json'),
+    JSON.stringify({
+      scripts: { clean: 'clean-output' },
+      dependencies: { tool: '1.0.0', runtime: '1.0.0', peer: '1.0.0', lookalike: '1.0.0' },
+    }),
+  );
+  writeFileSync(join(cwd, 'index.ts'), "import 'runtime';");
+  for (const [name, extra] of Object.entries({
+    tool: { bin: { 'clean-output': 'cli.js' } },
+    runtime: { peerDependencies: { peer: '^1' } },
+  })) {
+    mkdirSync(join(cwd, 'node_modules', name), { recursive: true });
+    writeFileSync(
+      join(cwd, 'node_modules', name, 'package.json'),
+      JSON.stringify({ name, version: '1.0.0', ...extra }),
+    );
+  }
+  writeFileSync(
+    join(cwd, 'custom.config.js'),
+    "throw new Error('must never execute'); // lookalike-other",
+  );
+  const metadata = vi.fn(async () => ({}));
+  const result = await listDependencies({
+    cwd,
+    fetcher: { resolve: async () => '2.0.0', metadata },
+  });
+  expect(result.packages.find((p) => p.name === 'tool')?.classification).toBe('tooling');
+  expect(result.packages.find((p) => p.name === 'peer')?.classification).toBe('tooling');
+  expect(result.packages.find((p) => p.name === 'lookalike')?.classification).toBe(
+    'possibly-unused',
+  );
+  expect(metadata).not.toHaveBeenCalledWith('tool', '1.0.0');
+  expect(metadata).not.toHaveBeenCalledWith('runtime', '1.0.0');
+});
+
+it('counts value references once, excluding declarations and member names', () => {
+  const cwd = fixture();
+  writeFileSync(
+    join(cwd, 'index.tsx'),
+    `import plugin from 'tool';
+import * as api from 'other';
+app.register(plugin); const options = { plugin }; const callback = api.run;
+api.run(); const unrelated = { plugin: 1 }; unrelated.plugin;
+`,
+  );
+  const scan = scanImports(cwd, ['tool', 'other'], ['.']);
+  expect(scan.get('tool')).toMatchObject({ references: 2, callSites: 0, symbols: { default: 2 } });
+  expect(scan.get('other')).toMatchObject({ references: 1, callSites: 1, symbols: { run: 2 } });
+});
+
+it('does not count shadowed bindings as imported calls or references', () => {
+  const cwd = fixture();
+  writeFileSync(
+    join(cwd, 'index.tsx'),
+    `import plugin from 'tool';
+import * as components from 'other';
+function unrelated(plugin: () => void) { plugin(); app.register(plugin); }
+{ const plugin = () => {}; plugin(); }
+app.register(plugin);
+<components.Widget></components.Widget>;
+`,
+  );
+  const scan = scanImports(cwd, ['tool', 'other'], ['.']);
+  expect(scan.get('tool')).toMatchObject({ references: 1, callSites: 0 });
+  expect(scan.get('other')).toMatchObject({ references: 0, callSites: 1 });
+});
+
+it('groups lockstep scopes and required peer upgrades, without merging unrelated scoped packages', async () => {
+  const cwd = fixture();
+  const names = ['@suite/a', '@suite/b', '@independent/a', '@independent/b', 'view', 'view-dom'];
+  writeFileSync(
+    join(cwd, 'package.json'),
+    JSON.stringify({
+      dependencies: Object.fromEntries(
+        names.map((n) => [n, n === '@independent/b' ? '3.0.0' : '1.0.0']),
+      ),
+    }),
+  );
+  writeFileSync(join(cwd, 'index.tsx'), "import '@suite/a'; import 'view-dom';");
+  const result = await listDependencies({
+    cwd,
+    fetcher: {
+      resolve: async (name) => (name === '@independent/b' ? '4.0.0' : '2.0.0'),
+      metadata: async (name, version) =>
+        name === 'view-dom'
+          ? { peerDependencies: { view: version === '2.0.0' ? '^2.0.0' : '^1.0.0' } }
+          : {},
+    },
+  });
+  expect(result.groups.map((g) => g.name).sort()).toEqual(['@suite/*', 'view + view-dom']);
+});
+
+it('recognizes package entry scripts and bin paths without confusing similarly named packages', async () => {
+  const cwd = fixture();
+  writeFileSync(
+    join(cwd, 'package.json'),
+    JSON.stringify({
+      scripts: { prepare: 'node ./node_modules/setup-tool/bin/run.js && ./node_modules/.bin/tidy' },
+      devDependencies: { 'setup-tool': '1.0.0', cleaner: '1.0.0', setup: '1.0.0' },
+    }),
+  );
+  const result = await listDependencies({
+    cwd,
+    fetcher: {
+      resolve: async () => '2.0.0',
+      metadata: async (name) => (name === 'cleaner' ? { bin: { tidy: 'run.js' } } : {}),
+    },
+  });
+  expect(result.packages.filter((p) => p.classification === 'tooling').map((p) => p.name)).toEqual([
+    'cleaner',
+    'setup-tool',
+  ]);
+  expect(result.packages.find((p) => p.name === 'setup')?.classification).toBe('possibly-unused');
 });

@@ -12,17 +12,26 @@ export function writeHtml(
   path: string | true,
   cwd: string,
 ): string {
-  const slug =
-    (opts.header?.repo ?? basename(opts.root)).replace(/[^a-zA-Z0-9_-]+/g, '-').slice(0, 80) ||
-    'repo';
-  const target =
-    typeof path === 'string'
-      ? resolve(cwd, path)
-      : join(tmpdir(), 'uptide', `${slug}-${Date.now()}.html`);
   const html = renderHtml(report, {
     ...opts,
     readExcerpt: opts.readExcerpt ?? excerptReader(opts.root),
   });
+  return writeReportHtml(html, opts.header?.repo ?? basename(opts.root), '', path, cwd);
+}
+
+/** All discovery/check reports live together in the OS temp uptide directory by default. */
+export function writeReportHtml(
+  html: string,
+  repo: string,
+  kind: string,
+  path: string | true,
+  cwd: string,
+): string {
+  const slug = repo.replace(/[^a-zA-Z0-9_-]+/g, '-').slice(0, 80) || 'repo';
+  const target =
+    typeof path === 'string'
+      ? resolve(cwd, path)
+      : join(tmpdir(), 'uptide', `${slug}${kind ? `-${kind}` : ''}-${Date.now()}.html`);
   mkdirSync(dirname(target), { recursive: true });
   writeFileSync(target, html, { mode: 0o600, flag: typeof path === 'string' ? 'w' : 'wx' });
   return target;

@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import {
   type CheckReport,
   isFailure,
@@ -8,16 +7,14 @@ import {
 } from '@uptide/core';
 import { byLine, checkRows, type FormatCheckOptions, nextCommands } from '../format-check.js';
 import { elapsed } from '../progress.js';
-import { css, js } from './assets.js';
 import { groupReason, groupsForHtml, notesOf, stripeNote, verdict } from './content.js';
+import { escapeHtml } from './escape.js';
 import { localFile, type ReadExcerpt } from './excerpts.js';
+import { reportDocument } from './template.js';
+
+export { escapeHtml } from './escape.js';
 
 export const MAX_HTML_BYTES = 300_000;
-export const escapeHtml = (value: unknown): string =>
-  String(value).replace(
-    /[&<>"']/g,
-    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] ?? c,
-  );
 const short = (s: string, limit = 1200) =>
   s.length > limit ? `${s.slice(0, limit)}… [truncated]` : s;
 export interface HtmlOptions extends FormatCheckOptions {
@@ -151,21 +148,21 @@ export function renderHtml(report: CheckReport, opts: HtmlOptions): string {
     const legend = rows.some((r) => r.p.tier === 'generic')
       ? `<p class="muted">${e(TIER_LEGEND)}</p>`
       : '';
-    const scriptHash = createHash('sha256').update(js).digest('base64');
-    return `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'sha256-${scriptHash}'; connect-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><title>Uptide check · ${e(opts.header?.repo ?? report.repo)}</title><style>${css}</style></head>
-<body><main><header><div class="brand">UPTIDE / CHECK</div><h1>${e(opts.header?.repo ?? report.repo)}</h1><div class="meta"><span>${e(opts.header?.manager ?? 'Package manager unavailable')}</span><span>${report.workspaces.length} ${report.workspaces.length === 1 ? 'workspace' : 'workspaces'} analyzed</span><time datetime="${e(opts.date)}">${e(new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short', timeZone: opts.timeZone }).format(new Date(opts.date)))}</time><span>Uptide CLI ${e(opts.version)}</span><span>${elapsed(opts.header?.ms ?? 0)}</span></div><p class="muted">${e(verdict(rows))}</p>${legend}</header>
+    return reportDocument(
+      `Uptide check · ${opts.header?.repo ?? report.repo}`,
+      `<header><div class="brand">UPTIDE / CHECK</div><h1>${e(opts.header?.repo ?? report.repo)}</h1><div class="meta"><span>${e(opts.header?.manager ?? 'Package manager unavailable')}</span><span>${report.workspaces.length} ${report.workspaces.length === 1 ? 'workspace' : 'workspaces'} analyzed</span><time datetime="${e(opts.date)}">${e(new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short', timeZone: opts.timeZone }).format(new Date(opts.date)))}</time><span>Uptide CLI ${e(opts.version)}</span><span>${elapsed(opts.header?.ms ?? 0)}</span></div><p class="muted">${e(verdict(rows))}</p>${legend}</header>
 <div class="filters" hidden role="search" aria-label="Filter findings">${['All', 'Breaking', 'Deprecated', 'Unverified'].map((s) => `<button type="button" data-filter="${s.toLowerCase()}" aria-pressed="${s === 'All'}">${s}</button>`).join('')}<input id="search" type="search" aria-label="Search file paths and change rules" placeholder="Search files or rules…"></div>
 <section aria-label="Dependency summary" class="summary">${summary || '<p class="more safe">✓ Nothing to upgrade. No findings in the analyzed scope.</p>'}</section><p id="empty-filter" class="notice" hidden>No findings match these filters.</p>
 ${compact ? '<p class="notice">Compact report: excerpts and additional sites omitted to stay under 300 KB. Use uptide check &lt;package&gt; --details for the full report.</p>' : ''}${dependencies}${missing}
 <details class="notes"><summary>Analysis notes · ${notes.length} notes</summary><ul>${
-      notes
-        .slice(0, compact ? 30 : 300)
-        .map((n) => `<li>${e(n)}</li>`)
-        .join('') || '<li>No analysis gaps reported.</li>'
-    }${notes.length > (compact ? 30 : 300) ? '<li>Additional notes omitted; see JSON output.</li>' : ''}</ul></details>
+        notes
+          .slice(0, compact ? 30 : 300)
+          .map((n) => `<li>${e(n)}</li>`)
+          .join('') || '<li>No analysis gaps reported.</li>'
+      }${notes.length > (compact ? 30 : 300) ? '<li>Additional notes omitted; see JSON output.</li>' : ''}</ul></details>
 <section class="next"><h2>Next</h2>${commands.map(([cmd, why]) => `<p class="muted">${e(why)}</p><div class="command"><code>${escapeHtml(cmd)}</code><button type="button" data-copy hidden aria-label="Copy command">Copy</button></div>`).join('')}</section>
-<footer>Local report · No network requests · Contains source excerpts from reported sites only. Review before sharing.</footer></main><script>${js}</script></body></html>`;
+<footer>Local report · No network requests · Contains source excerpts from reported sites only. Review before sharing.</footer>`,
+    );
   }
   let html = render(145_000, 50, 1000, false);
   if (Buffer.byteLength(html) >= MAX_HTML_BYTES) html = render(0, 10, 80, true);

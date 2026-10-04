@@ -157,12 +157,12 @@ export function createNpmFetcher(opts: NpmFetcherOptions = {}): PackageFetcher {
   return {
     metadata: (name, version) =>
       remembered(
-        [...packagePathSegments(name), `peers-${version}`],
+        [...packagePathSegments(name), `metadata-${version}`],
         EXACT_VERSION.test(version),
-        async () => ({
-          peerDependencies:
-            (await resolveVersion(name, version, config, fetchFn)).peerDependencies ?? {},
-        }),
+        async () => {
+          const manifest = await resolveVersion(name, version, config, fetchFn);
+          return { peerDependencies: manifest.peerDependencies ?? {}, bin: manifest.bin };
+        },
       ),
     async resolve(name, requested) {
       return (await resolved(name, requested)).version;

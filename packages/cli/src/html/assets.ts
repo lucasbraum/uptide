@@ -8,7 +8,7 @@ export const css = `
 `;
 export const js = `
 (()=>{
-const controls=document.querySelector('.filters'); controls.hidden=false;
+const controls=document.querySelector('.filters'); if(controls){controls.hidden=false;
 let active='all'; const search=document.querySelector('#search');
 function filter(){const q=search.value.toLowerCase(); let count=0;
  document.querySelectorAll('.package').forEach(p=>{let shown=0;const groups=p.querySelectorAll('.group');
@@ -18,7 +18,7 @@ function filter(){const q=search.value.toLowerCase(); let count=0;
  const row=document.querySelector('[data-package="'+p.id+'"]');if(row)row.hidden=p.hidden;if(!p.hidden)count++;
  });document.querySelector('#empty-filter').hidden=count>0;
 }
-controls.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{active=b.dataset.filter;controls.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));filter();}));search.addEventListener('input',filter);
+controls.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{active=b.dataset.filter;controls.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));filter();}));search.addEventListener('input',filter);}
 document.querySelectorAll('[data-copy]').forEach(b=>{b.hidden=false;b.addEventListener('click',async()=>{const text=b.parentElement.querySelector('code').textContent;try{await navigator.clipboard.writeText(text);b.textContent='Copied';}catch{const range=document.createRange();range.selectNodeContents(b.parentElement.querySelector('code'));const s=getSelection();s.removeAllRanges();s.addRange(range);b.textContent='Selected — copy manually';}});});
 document.querySelectorAll('.compiler a').forEach(a=>a.addEventListener('click',()=>{const target=document.querySelector(a.getAttribute('href'));for(let p=target;p;p=p.parentElement){if(p.tagName==='DETAILS')p.open=true;}}));
 let opened=[];addEventListener('beforeprint',()=>{opened=[...document.querySelectorAll('details:not([open])')];opened.forEach(d=>d.open=true);});addEventListener('afterprint',()=>opened.forEach(d=>d.open=false));

@@ -243,7 +243,7 @@ describe('removePackageDir', () => {
   });
 });
 
-it('reads and caches peer metadata without tarballs, including caches from older builds', async () => {
+it('reads and caches peer/bin metadata without tarballs, including caches from older builds', async () => {
   const cacheDir = mkdtempSync(join(tmpdir(), 'uptide-peers-'));
   const fetchFn = vi.fn(
     async () =>
@@ -252,6 +252,7 @@ it('reads and caches peer metadata without tarballs, including caches from older
           name: 'demo',
           version: '1.0.0',
           peerDependencies: { react: '^19' },
+          bin: { 'demo-cli': 'cli.js' },
           dist: { tarball: 'https://reg.test/demo.tgz' },
         }),
       ),
@@ -262,9 +263,15 @@ it('reads and caches peer metadata without tarballs, including caches from older
   const oldEntry = JSON.parse(readFileSync(oldPath, 'utf8'));
   delete oldEntry.value.peerDependencies;
   writeFileSync(oldPath, JSON.stringify(oldEntry));
-  expect(await fetcher.metadata?.('demo', '1.0.0')).toEqual({ peerDependencies: { react: '^19' } });
+  expect(await fetcher.metadata?.('demo', '1.0.0')).toEqual({
+    peerDependencies: { react: '^19' },
+    bin: { 'demo-cli': 'cli.js' },
+  });
   const calls = fetchFn.mock.calls.length;
-  expect(await fetcher.metadata?.('demo', '1.0.0')).toEqual({ peerDependencies: { react: '^19' } });
+  expect(await fetcher.metadata?.('demo', '1.0.0')).toEqual({
+    peerDependencies: { react: '^19' },
+    bin: { 'demo-cli': 'cli.js' },
+  });
   expect(fetchFn.mock.calls).toHaveLength(calls);
   expect(existsSync(tarballCachePath(cacheDir, 'demo', '1.0.0'))).toBe(false);
 });

@@ -7,18 +7,35 @@ cannot show.
 
 Fast discovery with no compile, install, tarball downloads or execution of repository code.
 Requires a lockfile (exact manifest versions also work once the repository is detected).
-Shows every outdated direct dependency, its current and latest version, major/minor/patch,
-verified/generic tier, import-file count, direct call/new/JSX count, top symbols and workspaces.
-Majors first, then importing files and call sites, with name/version tie breakers.
+Shows every outdated direct dependency, current → latest, major/minor/patch (including
+`major ×2` for 10 → 12), verified/generic tier, importing files, calls and references,
+and nonzero top symbols. Workspace columns appear only in workspace repositories.
+Groups come first: scoped packages with matching current/latest versions and packages
+coupled by peer requirements have one group and a command checking all members.
+Other rows put majors first, then importing files and call sites.
 
-- `--all`: expand minor/patch rows, collapsed by default.
-- `--json`: every row and per-package discovery failure, in deterministic order.
+- `--all`: expand minor/patch rows, tooling and possibly unused packages.
+- `--json`: every row, group, classification reason and discovery failure.
+- `--html [path]`: write a local HTML report with check's template, styling and copy buttons.
+  By default it lives beside check reports in the OS temporary `uptide` directory; its path
+  is printed to stderr. Nothing is generated without this flag. JSON stdout stays pure.
+- `--open`: with `--html`, open the page in an interactive terminal (never in CI or a pipe).
+- `--details`: include source file lists. HTML includes no source code, file paths, or
+  workspace paths by default; commands without `--details` should be run from the named repo.
 - `--cwd <dir>`, `--ci`, `--no-color`: shared options.
 
-Unused means no static source import was found. Script tools, config plugins and type
-packages may still be needed. Syntax scanning includes imports, re-exports, require,
-import-equals, literal dynamic imports and JS/TS/JSX/TSX; it does not resolve indirect aliases
-or reflection. Counts are repository-wide when several workspaces lock different versions.
+Tooling is separate and collapsed: script commands and package bins, known build/config
+tools, packages referenced in configuration, types for used runtime packages (and Node),
+and peers of used packages. Only the remaining packages without source imports are
+“possibly unused.” Configuration is read as data, never executed; local installed metadata
+is preferred for bins and peers, with registry metadata as a fallback.
+
+Syntax scanning includes imports, re-exports, require, import-equals, literal dynamic
+imports and JS/TS/JSX/TSX. Calls/new/JSX and non-call references are separate counts;
+passing a binding as a value, such as `app.register(cookie)`, counts as a reference.
+Indirect aliases and reflection are not followed. Counts are repository-wide when several
+workspaces lock different versions. HTML shows all upgrade rows, with tooling and
+possibly unused packages in collapsed sections, and a copyable check command per row.
 Internal workspace dependencies and local/git/URL specifiers are excluded from registry queries.
 
 ## `uptide check <package...>`

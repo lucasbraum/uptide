@@ -1,0 +1,98 @@
+lockfileVersion: '9.0'
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+importers:
+  .:
+    dependencies:
+      '@nestjs/common':
+        specifier: ^10.4.0
+        version: 10.4.0
+      '@nestjs/core':
+        specifier: ^10.4.0
+        version: 10.4.0
+      '@nestjs/platform-express':
+        specifier: ^10.3.0
+        version: 10.3.0
+      'cookie-plugin':
+        specifier: ^1.0.0
+        version: 1.0.0
+      'current-runtime':
+        specifier: ^1.0.0
+        version: 1.0.0
+      'runtime-peer':
+        specifier: ^1.0.0
+        version: 1.0.0
+      'reflect-metadata':
+        specifier: ^0.1.0
+        version: 0.1.0
+      'rxjs':
+        specifier: ^7.0.0
+        version: 7.0.0
+      'orphan':
+        specifier: ^1.0.0
+        version: 1.0.0
+    devDependencies:
+      '@nestjs/cli':
+        specifier: ^10.0.0
+        version: 10.0.0
+      '@nestjs/schematics':
+        specifier: ^10.0.0
+        version: 10.0.0
+      'eslint':
+        specifier: ^8.0.0
+        version: 8.0.0
+      'eslint-plugin-example':
+        specifier: ^1.0.0
+        version: 1.0.0
+      'prettier':
+        specifier: ^2.0.0
+        version: 2.0.0
+      'prettier-plugin-example':
+        specifier: ^1.0.0
+        version: 1.0.0
+      'jest':
+        specifier: ^29.0.0
+        version: 29.0.0
+      'ts-jest':
+        specifier: ^29.0.0
+        version: 29.0.0
+      'typescript':
+        specifier: ^5.0.0
+        version: 5.0.0
+      'webpack':
+        specifier: ^5.0.0
+        version: 5.0.0
+      'ts-loader':
+        specifier: ^9.0.0
+        version: 9.0.0
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.0.0
+      '@types/cookie-plugin':
+        specifier: ^1.0.0
+        version: 1.0.0
+      '@types/unrelated':
+        specifier: ^1.0.0
+        version: 1.0.0
+      '@types/nestjs__common':
+        specifier: ^1.0.0
+        version: 1.0.0
+      '@example/tsconfig':
+        specifier: ^1.0.0
+        version: 1.0.0
+      'example-jest-preset':
+        specifier: ^1.0.0
+        version: 1.0.0
+      'example-lint-rules':
+        specifier: ^1.0.0
+        version: 1.0.0
+      'example-prettier-plugin':
+        specifier: ^1.0.0
+        version: 1.0.0
+      'script-runner':
+        specifier: ^1.0.0
+        version: 1.0.0
+      'cleanup-tool':
+        specifier: ^1.0.0
+        version: 1.0.0

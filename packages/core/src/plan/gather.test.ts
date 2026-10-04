@@ -11,6 +11,7 @@ it('plans discovery with unknown effort, never fetches tarballs, and consumes on
     writeFileSync(join(cwd, 'package.json'), '{}');
     const discovery: ListReport = {
       repo: cwd,
+      groups: [],
       workspaces: ['.'],
       packages: [
         {
@@ -19,8 +20,11 @@ it('plans discovery with unknown effort, never fetches tarballs, and consumes on
           latest: '4.6.5',
           change: 'major',
           tier: 'verified',
+          classification: 'used',
+          majorGap: 1,
+          reasons: [],
           workspaces: ['.'],
-          usage: { files: 2, callSites: 8, topSymbols: [], workspaces: ['.'] },
+          usage: { references: 0, files: 2, callSites: 8, topSymbols: [], workspaces: ['.'] },
         },
       ],
       failures: [],

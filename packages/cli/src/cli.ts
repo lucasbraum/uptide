@@ -31,6 +31,7 @@ import { type CheckHeader, formatCheck, repoLine } from './format-check.js';
 import { formatFixSummary } from './format-fix.js';
 import { formatList } from './format-list.js';
 import { formatPlan } from './format-plan.js';
+import { writeListHtml } from './html/list.js';
 import { writeMigrationHtml } from './html/migration.js';
 import { writePlanHtml } from './html/plan.js';
 import { openHtml, writeHtml } from './html/write.js';
@@ -297,32 +298,67 @@ ${PRIVACY}`,
     program
       .command('list')
       .description('Discover outdated dependencies without compiling or installing')
-      .option('--all', 'expand minor and patch upgrades'),
+      .option('--all', 'expand minor/patch upgrades, tooling and possibly unused packages')
+      .option('--html [path]', 'write a self-contained HTML report (default: OS temp directory)')
+      .option('--open', 'open the HTML report in a browser (requires --html)')
+      .option('--details', 'include source file lists in the report'),
   )
     .addHelpText(
       'after',
-      `\nExamples:\n  $ uptide list\n  $ uptide list --all --json\n\nNo compilation, install or tarball downloads; registry metadata only.\nUsage counts direct calls/new/JSX through imported bindings. Unused tools may still\nbe needed by scripts/configuration. Majors first, then importing files and call sites.\n${EXIT_CODES('discovery complete', 'not used', '; incomplete discovery retains successful rows')}`,
+      `\nExamples:\n  $ uptide list\n  $ uptide list --all --json\n\nNo compilation, install or tarball downloads; registry metadata only.\nUsage counts calls/new/JSX and references through imported bindings. Tooling and\npossibly unused packages are collapsed; use --all to expand. Majors first, then importing files and call sites.\n${EXIT_CODES('discovery complete', 'not used', '; incomplete discovery retains successful rows')}`,
     )
-    .action((flags: Shared & { all?: boolean }) =>
-      act(flags, async ({ cwd, progress }) => {
-        const started = io.now();
-        const repo = await detectRepo(cwd, engine.workspaces);
-        if (!engine.list) throw new CliError('this build cannot list dependencies');
-        const discover = engine.list;
-        const report = await progress.phase('Discovery', () => discover({ cwd: repo.root }));
-        telemetry?.record(() => listMetrics(report));
-        if (flags.json) emit(report);
-        else
-          io.out(
-            formatList(report, {
-              all: flags.all,
-              header: headerOf(repo, io.now() - started),
-              invocation: INVOCATION,
-              cwd: flags.cwd,
-            }),
+    .action(
+      (
+        flags: Shared & { all?: boolean; html?: string | true; open?: boolean; details?: boolean },
+      ) =>
+        act(flags, async ({ cwd, progress, ui }) => {
+          if (flags.open && !flags.html) throw new CliError('--open requires --html');
+          const started = io.now();
+          const repo = await detectRepo(cwd, engine.workspaces);
+          if (!engine.list) throw new CliError('this build cannot list dependencies');
+          const discover = engine.list;
+          const report = await progress.phase('Discovery', () =>
+            discover({ cwd: repo.root, details: flags.details }),
           );
-        return report.failures.length ? EXIT.error : EXIT.ok;
-      }),
+          telemetry?.record(() => listMetrics(report));
+          if (flags.json) emit(report);
+          else
+            io.out(
+              formatList(report, {
+                all: flags.all,
+                details: flags.details,
+                header: headerOf(repo, io.now() - started),
+                invocation: INVOCATION,
+                cwd: flags.cwd,
+              }),
+            );
+          if (flags.html) {
+            const path = writeListHtml(
+              report,
+              {
+                version: VERSION,
+                date: new Date().toISOString(),
+                header: headerOf(repo, io.now() - started),
+                invocation: HTML_INVOCATION,
+                details: flags.details,
+                cwd: resolve(io.cwd) === resolve(repo.root) ? undefined : repo.root,
+              },
+              flags.html,
+              io.cwd,
+            );
+            io.err(`HTML report: ${path}\n`);
+            if (flags.open && ui.interactive && io.outTty) {
+              try {
+                await openHtml(path);
+              } catch (error) {
+                io.err(
+                  `Could not open browser: ${error instanceof Error ? error.message : String(error)}. Open the report manually.\n`,
+                );
+              }
+            }
+          }
+          return report.failures.length ? EXIT.error : EXIT.ok;
+        }),
     );
 
   shared(

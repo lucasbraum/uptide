@@ -1,0 +1,110 @@
+{
+  "@nestjs/common": {
+    "latest": "12.0.0",
+    "peerDependencies": {
+      "@nestjs/core": "^10.0.0",
+      "reflect-metadata": "^0.1.0",
+      "rxjs": "^7.0.0"
+    }
+  },
+  "@nestjs/core": {
+    "latest": "12.0.0",
+    "peerDependencies": {
+      "@nestjs/common": "^10.0.0"
+    }
+  },
+  "@nestjs/platform-express": {
+    "latest": "12.0.0",
+    "peerDependencies": {
+      "@nestjs/common": "^10.0.0",
+      "@nestjs/core": "^10.0.0"
+    }
+  },
+  "cookie-plugin": {
+    "latest": "2.0.0"
+  },
+  "current-runtime": {
+    "latest": "1.0.0",
+    "peerDependencies": {
+      "runtime-peer": "^1.0.0"
+    }
+  },
+  "runtime-peer": {
+    "latest": "2.0.0"
+  },
+  "reflect-metadata": {
+    "latest": "1.0.0"
+  },
+  "rxjs": {
+    "latest": "7.0.0"
+  },
+  "orphan": {
+    "latest": "2.0.0"
+  },
+  "@nestjs/cli": {
+    "latest": "12.0.0"
+  },
+  "@nestjs/schematics": {
+    "latest": "12.0.0"
+  },
+  "eslint": {
+    "latest": "9.0.0"
+  },
+  "eslint-plugin-example": {
+    "latest": "2.0.0"
+  },
+  "prettier": {
+    "latest": "3.0.0"
+  },
+  "prettier-plugin-example": {
+    "latest": "2.0.0"
+  },
+  "jest": {
+    "latest": "30.0.0"
+  },
+  "ts-jest": {
+    "latest": "30.0.0"
+  },
+  "typescript": {
+    "latest": "6.0.0"
+  },
+  "webpack": {
+    "latest": "6.0.0"
+  },
+  "ts-loader": {
+    "latest": "10.0.0"
+  },
+  "@types/node": {
+    "latest": "21.0.0"
+  },
+  "@types/cookie-plugin": {
+    "latest": "2.0.0"
+  },
+  "@types/unrelated": {
+    "latest": "2.0.0"
+  },
+  "@types/nestjs__common": {
+    "latest": "2.0.0"
+  },
+  "@example/tsconfig": {
+    "latest": "2.0.0"
+  },
+  "example-jest-preset": {
+    "latest": "2.0.0"
+  },
+  "example-lint-rules": {
+    "latest": "2.0.0"
+  },
+  "example-prettier-plugin": {
+    "latest": "2.0.0"
+  },
+  "script-runner": {
+    "latest": "2.0.0"
+  },
+  "cleanup-tool": {
+    "latest": "2.0.0",
+    "bin": {
+      "tidy-output": "cli.js"
+    }
+  }
+}
