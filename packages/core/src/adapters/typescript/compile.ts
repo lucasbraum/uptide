@@ -5,6 +5,7 @@ import { dirname, join, relative } from 'node:path';
 import { ts } from 'ts-morph';
 import type { CompileOptions, RepoDir } from '../../domain/adapter.js';
 import type { CompileDiagnostic, CompileSignal } from '../../domain/usage.js';
+import { satisfies } from '../../fetch/range.js';
 import { findCause } from './cause.js';
 import { type LoadedRepo, loadedRepo, ownsFile } from './repo.js';
 import {
@@ -12,6 +13,7 @@ import {
   type DependencyLinks,
   declaredRange,
   installedVersion,
+  isPeerOnly,
   newLinks,
   satisfyWanted,
   type Wanted,
@@ -58,6 +60,23 @@ function messageOf(d: ts.Diagnostic): string {
   return ts.flattenDiagnosticMessageText(d.messageText, '\n');
 }
 
+/**
+ * The compiler names a module by the file it resolved: the cache or node_modules path on this
+ * machine. A report says which package and file, not where this machine keeps it:
+ * `"typescript@7.0.2/lib/version"` instead of `"/home/me/.cache/uptide/extracted/typescript/7.0.2/lib/version"`.
+ */
+export function readableMessage(message: string): string {
+  return message
+    .replace(
+      /(?:[A-Za-z]:)?[\\/][^\s"'()]*[\\/]extracted[\\/]((?:@[^\\/"'\s]+[\\/])?[^\\/"'\s]+)[\\/](\d+\.\d+\.\d+[^\\/"'\s]*)[\\/]/g,
+      (_all, name: string, version: string) => `${name.replace('\\', '/')}@${version}/`,
+    )
+    .replace(
+      /(?:[A-Za-z]:)?[\\/][^\s"'()]*[\\/]node_modules[\\/]((?:@[^\\/"'\s]+[\\/])?[^\\/"'\s]+)[\\/]/g,
+      (_all, name: string) => `${name.replace('\\', '/')}/`,
+    );
+}
+
 /** Identity of a diagnostic across the two checks: where, which, and what it says. */
 function keyOf(d: ts.Diagnostic, repoDir: string): string {
   const file = relative(repoDir, d.file?.fileName ?? '');
@@ -75,7 +94,7 @@ function toDiagnostic(d: ts.Diagnostic, file: ts.SourceFile, repoDir: string): C
     endLine: to.line + 1,
     endColumn: to.character + 1,
     code: d.code,
-    message: messageOf(d),
+    message: readableMessage(messageOf(d)),
     snippet: (file.text.split('\n')[from.line] ?? '').trim(),
   };
 }
@@ -399,9 +418,31 @@ function overlayProgram(
         if (range !== undefined && !deps.decided.has(dep) && !deps.links.has(dep)) {
           const importer = overlayDirs.get(from) as string;
           const consumer = installedVersion(repo, dep);
-          if (!consumerCopySatisfies(importer, dep, range, consumer?.version)) {
+          if (consumer && isPeerOnly(from, dep)) {
+            // A peer is the consumer's to provide: upgrading the target leaves the consumer's
+            // copy where it is, so that is what the target is compiled against. Fetching the
+            // version the peer range asks for would compile against two copies of the peer,
+            // which no install has, and report errors that are not there.
+            deps.decided.add(dep);
+            if (!satisfies(consumer.version, range))
+              deps.unsatisfied.push(
+                `${dep}@${consumer.version} is outside the peer range ${range} of ${importer}; compiled against the installed ${dep}`,
+              );
+          } else if (!consumerCopySatisfies(importer, dep, range, consumer?.version)) {
             wanted.set(dep, { range, from: importer });
           }
+        }
+        // An untyped dependency is typed by the @types package the importer declares next to
+        // it (vitest 5: `chai` and `@types/chai`). Nothing imports `@types/x` by name, so it
+        // is wanted with `x`: without it the import is `any` and the ambient namespace it
+        // declares (`Chai`) is missing, which shows up as errors at the consumer's call sites.
+        const typesDep = `@types/${dep.startsWith('@') ? dep.slice(1).replace('/', '__') : dep}`;
+        const typesRange = declaredRange(from, typesDep);
+        if (typesRange !== undefined && !deps.decided.has(typesDep) && !deps.links.has(typesDep)) {
+          const importer = overlayDirs.get(from) as string;
+          const consumer = installedVersion(repo, typesDep);
+          if (!consumerCopySatisfies(importer, typesDep, typesRange, consumer?.version))
+            wanted.set(typesDep, { range: typesRange, from: importer });
         }
       }
       const direct = ts.resolveModuleName(

@@ -112,4 +112,48 @@ describe('alias entries (@isaacs/cliui style) survive a manager re-quoting them'
     expect(diff.added).toEqual(['packages:zod@4.6.5', 'snapshots:zod@4.6.5']);
     expect(diff.removed).toEqual(['packages:zod@3.25.76', 'snapshots:zod@3.25.76']);
   });
+
+  it('pnpm: dependents renamed after the target as their peer are the same entries', () => {
+    const lock = (core: string): string =>
+      [
+        "lockfileVersion: '9.0'",
+        'importers:',
+        '  .:',
+        '    dependencies:',
+        "      '@art/collection':",
+        '        specifier: ^9.4.3',
+        `        version: 9.4.3(@art/core@${core})`,
+        "      '@art/core':",
+        `        specifier: ^${core}`,
+        `        version: ${core}`,
+        'packages:',
+        "  '@art/collection@9.4.3':",
+        '    resolution: {integrity: sha512-collection}',
+        `  '@art/core@${core}':`,
+        `    resolution: {integrity: sha512-core-${core}}`,
+        'snapshots:',
+        `  '@art/collection@9.4.3(@art/core@${core})':`,
+        '    dependencies:',
+        `      '@art/core': ${core}`,
+        `  '@art/core@${core}': {}`,
+        '',
+      ].join('\n');
+    const diff = assertLockScope(
+      pnpmGraph(lock('9.4.3'), '@art/core'),
+      pnpmGraph(lock('10.7.0'), '@art/core'),
+      '@art/core',
+    );
+    // Only the target itself moved; its dependent kept its entry under a new name.
+    expect(diff.added).toEqual(['packages:@art/core@10.7.0', 'snapshots:@art/core@10.7.0']);
+    expect(diff.removed).toEqual(['packages:@art/core@9.4.3', 'snapshots:@art/core@9.4.3']);
+    // A dependent that really changed is still caught.
+    const tampered = lock('10.7.0').replace('sha512-collection', 'sha512-other');
+    expect(() =>
+      assertLockScope(
+        pnpmGraph(lock('9.4.3'), '@art/core'),
+        pnpmGraph(tampered, '@art/core'),
+        '@art/core',
+      ),
+    ).toThrow('outside @art/core');
+  });
 });

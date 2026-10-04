@@ -125,6 +125,8 @@ const report: CheckReport = {
     notImported: 0,
     partiallyAnalyzed: 0,
     autoFixable: 2,
+    skippedForTime: 0,
+    failed: 0,
   },
 };
 

@@ -1,14 +1,14 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`formatCheck, the first screen > gives each kind of verdict one row, and no row to what needs no decision 1`] = `
-"sharp   0.33.0 → 0.35.0   minor                   ✗ 2 breaking in 2 files    2 manual
+"sharp   0.33.0 → 0.35.0   minor                   ✗ 2 breaking in 2 files    2 by agent
 twilio  5.0.1 → 5.3.0     minor · latest on npm   ✓ no impact (12 call sites)
 lodash  5.0.1 → 5.3.0     minor · latest on npm   – not analyzed: types in @types/lodash
 joi     5.0.1 → 5.3.0     minor · latest on npm   ✓ no impact in 12 sites, 2 not analyzed
 pg      5.0.1 → 5.3.0     minor · latest on npm   ? 1 of 1 site not analyzed
 
 sharp
-  ✗ sharp.cache removed   2 sites   manual
+  ✗ sharp.cache removed   2 sites   by agent
 
 Next
   npx uptide check --details    every site and reason
@@ -18,8 +18,11 @@ Next
 exports[`formatCheck, the first screen > summarizes a real workspace: a row per dependency, a line per rule, the next commands 1`] = `
 "uptide check · storefront (pnpm, 2 packages) · 25s
 
-zod                    3.25.76 → 4.6.5    major · latest on npm   ✗ 28 breaking in 7 files    24 by rule · 4 by agent
-stripe (packages/api)  14.25.0 → 23.0.0   major · latest on npm   ✗ 4 breaking in 3 files     1 by rule · 3 by agent
+zod                    3.25.76 → 4.6.5    major · latest on npm   verified   ✗ 28 breaking in 7 files    24 by rule · 4 by agent
+stripe (packages/api)  14.25.0 → 23.0.0   major · latest on npm   verified   ✗ 4 breaking in 3 files     1 by rule · 3 by agent
+vitest                 3.2.4 → 5.0.3      major · latest on npm   generic    ✓ no impact (9 call sites)
+
+verified: migration pack · generic: no pack, breaking only if the compiler or the runtime probe confirms it
 
 zod
   ✗ New error API (required_error → error)   24 sites          by rule
@@ -36,6 +39,7 @@ stripe
 Next
   npx uptide@next fix --only zod       migrate on a new branch, verify, no push
   npx uptide@next fix --only stripe    migrate on a new branch, verify, no push
+  npx uptide@next plan                 the order to upgrade in, with the effort
   npx uptide@next check --details      every site and reason
 "
 `;

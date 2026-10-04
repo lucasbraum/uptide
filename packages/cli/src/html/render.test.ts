@@ -68,6 +68,10 @@ describe('HTML report', () => {
       html.match(/1 type error that already existed before the upgrade was ignored\./g),
     ).toHaveLength(1);
     expect(html).toContain('npx uptide');
+    // The tier of every dependency, and the difference in one line.
+    expect(html).toContain('3.25.76 → 4.6.5 · major · verified');
+    expect(html).toContain('3.2.4 → 5.0.3 · major · generic');
+    expect(html.match(/verified: migration pack · generic: no pack/g)).toHaveLength(1);
     expect(html).toContain('Oct 2, 2026');
     expect(html).toContain('5:00 AM PDT');
     expect(html).toContain('Uptide CLI 0.1.0');
@@ -75,7 +79,8 @@ describe('HTML report', () => {
     expect(html).toContain('Use the `z.treeifyError(err)` function instead.');
     expect(html).not.toContain('migrate the listed calls when convenient');
     expect(html).toContain('1 API change since 2023-10-16 affects your code');
-    const compiler = report.packages[0]?.findings[0]?.usage.compileError;
+    const compiler = report.packages.flatMap((p) => p.findings).find((f) => f.usage.compileError)
+      ?.usage.compileError;
     expect(compiler).toBeTruthy();
     const escaped = String(compiler)
       .replaceAll('&', '&amp;')

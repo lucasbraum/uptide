@@ -39,7 +39,8 @@
           "severity": "breaking",
           "confidence": 1,
           "fixability": "manual",
-          "reason": "removed"
+          "reason": "removed",
+          "evidence": "compiler"
         },
         {
           "change": {
@@ -70,7 +71,8 @@
           "severity": "breaking",
           "confidence": 1,
           "fixability": "manual",
-          "reason": "removed"
+          "reason": "removed",
+          "evidence": "compiler"
         },
         {
           "change": {
@@ -402,7 +404,8 @@
           "severity": "breaking",
           "confidence": 1,
           "fixability": "unknown",
-          "reason": "compile error not attributed to a known API change"
+          "reason": "compile error not attributed to a known API change",
+          "evidence": "compiler"
         },
         {
           "change": {
@@ -432,7 +435,8 @@
           "severity": "breaking",
           "confidence": 1,
           "fixability": "unknown",
-          "reason": "compile error not attributed to a known API change"
+          "reason": "compile error not attributed to a known API change",
+          "evidence": "compiler"
         }
       ],
       "callSitesChecked": 20,
@@ -440,12 +444,13 @@
       "status": "breaking",
       "notes": [],
       "timing": {
-        "fetchMs": 2245,
-        "diffMs": 1119,
-        "usagesMs": 2299,
-        "compileMs": 918,
-        "runtimeMs": 3
+        "fetchMs": 648,
+        "diffMs": 3192,
+        "usagesMs": 1580,
+        "compileMs": 674,
+        "runtimeMs": 1
       },
+      "tier": "verified",
       "compile": {
         "baselineErrors": 0,
         "unresolvedInTarget": [],
@@ -557,10 +562,12 @@
     "breaking": 32,
     "deprecated": 15,
     "unverified": 0,
-    "unaffected": 0,
-    "notImported": 0,
+    "unaffected": 1,
+    "notImported": 1,
     "partiallyAnalyzed": 0,
-    "autoFixable": 38
+    "autoFixable": 38,
+    "skippedForTime": 0,
+    "failed": 0
   },
-  "timing": { "totalMs": 9423 }
+  "timing": { "totalMs": 10536 }
 }

@@ -1,4 +1,5 @@
 import { readFileSync, realpathSync } from 'node:fs';
+import { totalmem } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { typescriptAdapter } from '../adapters/typescript/index.js';
 import { createFsSurfaceCache } from '../cache/fs-surface-cache.js';
@@ -36,7 +37,7 @@ import { diffRuntime, probeRuntime } from '../runtime/runtime.js';
 import { requireFindUsages } from './capabilities.js';
 import { arbitrateUnchecked } from './file-kind.js';
 import { groupName, releaseGroups } from './groups.js';
-import { importedByText } from './importers.js';
+import { importedByText, importFileCounts } from './importers.js';
 import { match } from './match.js';
 import { mergeSignals } from './merge.js';
 import {
@@ -48,7 +49,9 @@ import {
   shipsTypes,
 } from './module-format.js';
 import { mapWithLimit } from './pool.js';
+import { isBehind, rankCandidates } from './rank.js';
 import { runtimeChangeFindings } from './runtime-changes.js';
+import { confirmGeneric, evidenceOf, tierOf } from './tier.js';
 import { unattributedFindings } from './unattributed.js';
 import { compareVersions, majorsBehind, parseVersion } from './version.js';
 
@@ -87,6 +90,22 @@ export interface CheckOptions {
   workspaceConcurrency?: number;
   /** Attach the migration plan (`PackageReport.plan`). Default true; `fix` plans by doing. */
   plan?: boolean;
+  /**
+   * Time budget for the whole check. Dependencies are analyzed in order of likely impact
+   * (see `rank.ts`); once the budget is spent no new one is started, and those left are
+   * reported as skipped (`TIME_BUDGET`). What is already running gets half the budget again
+   * to finish (the most likely to hurt started first, and is worth its answer), then is
+   * abandoned at its next phase.
+   */
+  maxTimeMs?: number;
+  /** Set by `check` for its workspace jobs: the analysis order. */
+  order?: string[];
+  /** Set by `check` for its workspace jobs: when no new dependency may start (epoch ms). */
+  deadline?: number;
+  /** Set by `check`: when a dependency still being analyzed is abandoned (epoch ms). */
+  hardDeadline?: number;
+  /** Set by `check` for its workspace jobs: the dependencies with something to analyze. */
+  behind?: string[];
 }
 
 /** What a worker needs to check one workspace; everything is plain data. */
@@ -139,13 +158,56 @@ export async function check(opts: CheckOptions): Promise<CheckResult> {
   const importedByWorkspace: Record<string, string[]> = {};
   for (const workspace of workspaces)
     importedByWorkspace[workspace] = importedByText(opts.cwd, workspace, candidates, workspaces);
-  const { adapter: _a, fetcher: _f, cache: _c, onProgress: _p, ...plainOpts } = opts;
+  // Most likely to hurt first: the order every workspace follows, and what the time budget cuts.
+  const linked = (version: string | undefined): boolean =>
+    version !== undefined && /^(link|workspace|file):/.test(version);
+  const versionOf = (name: string): string | undefined =>
+    Object.values(installedByWorkspace)
+      .map((deps) => deps[name])
+      .find((version) => version !== undefined && !linked(version));
+  const rankable = candidates.filter(
+    (name) =>
+      !name.startsWith('@types/') &&
+      versionOf(name) !== undefined &&
+      (opts.allDeps || Object.values(importedByWorkspace).some((names) => names.includes(name))),
+  );
+  const sites = importFileCounts(opts.cwd, rankable);
+  const ranked = rankCandidates(
+    await mapWithLimit(rankable, 8, async (name) => {
+      const latest =
+        opts.targets?.[name] ?? (await ctx.fetcher.resolve(name, 'latest').catch(() => undefined));
+      return {
+        name,
+        installed: versionOf(name) as string,
+        ...(latest !== undefined ? { latest } : {}),
+        importSites: sites.get(name) ?? 0,
+      };
+    }),
+  );
+  const { adapter: _a, fetcher: _f, cache: _c, onProgress: _p, ...givenOpts } = opts;
+  const plainOpts: WorkspaceJob['opts'] = {
+    ...givenOpts,
+    order: ranked.map((c) => c.name),
+    // A registry that did not answer is not "up to date": the package is still attempted.
+    behind: ranked.filter((c) => c.latest === undefined || isBehind(c)).map((c) => c.name),
+    ...(opts.maxTimeMs
+      ? { deadline: started + opts.maxTimeMs, hardDeadline: started + opts.maxTimeMs * 1.5 }
+      : {}),
+  };
   // Heaviest workspaces first, so the last worker is not left alone with the largest one.
+  // Under a budget, the workspaces that import the most of what is behind come first: a
+  // workspace started after the deadline is not analyzed at all.
+  const behindNames = new Set(plainOpts.behind ?? []);
+  const stake = (workspace: string): number =>
+    opts.maxTimeMs
+      ? (importedByWorkspace[workspace] ?? []).filter((name) => behindNames.has(name)).length
+      : 0;
   const jobs: WorkspaceJob[] = [...workspaces]
     .sort(
       (a, b) =>
+        stake(b) - stake(a) ||
         Object.keys(installedByWorkspace[b] ?? {}).length -
-        Object.keys(installedByWorkspace[a] ?? {}).length,
+          Object.keys(installedByWorkspace[a] ?? {}).length,
     )
     .map((workspace) => ({
       cwd: opts.cwd,
@@ -158,10 +220,36 @@ export async function check(opts: CheckOptions): Promise<CheckResult> {
   const injected =
     opts.adapter !== undefined || opts.fetcher !== undefined || opts.cache !== undefined;
   const workers = injected ? 1 : Math.max(1, opts.workspaceConcurrency ?? 2);
+  // A workspace whose analysis dies (out of memory, a crash in a worker) costs that
+  // workspace's answers, never the others': its dependencies are reported as failed.
+  const guarded = (run: (job: WorkspaceJob) => Promise<PackageReport[]>) => (job: WorkspaceJob) =>
+    run(job).catch((err: unknown): PackageReport[] => {
+      const declared = installedByWorkspace[job.workspace] ?? {};
+      return (plainOpts.behind ?? [])
+        .filter((name) => declared[name] !== undefined && !linked(declared[name]))
+        .map((name) => ({
+          ...notImported(job.workspace, name, declared[name] as string),
+          status: 'skipped' as const,
+          skipReason: errorCode(err),
+          notes: [
+            /memory/i.test(String((err as Error).message))
+              ? `analysis failed: out of memory in ${job.workspace} (check it alone with --only ${name}, or raise UPTIDE_WORKER_HEAP_MB)`
+              : `analysis failed: ${(err as Error).message ?? String(err)}`,
+          ],
+        }));
+    });
   const results =
     workers > 1 && workspaces.length > 1
-      ? await mapWithLimit(jobs, workers, (job) => runInWorker(job, opts.onProgress))
-      : await mapWithLimit(jobs, 1, (job) => checkWorkspace(ctx, job));
+      ? await mapWithLimit(
+          jobs,
+          workers,
+          guarded((job) => runInWorker(job, opts.onProgress)),
+        )
+      : await mapWithLimit(
+          jobs,
+          1,
+          guarded((job) => checkWorkspace(ctx, job)),
+        );
   // Pack rules preview their actual edit; check and fix must promise the same work.
   if (adapter.id === 'typescript')
     for (const report of results.flat()) {
@@ -186,6 +274,7 @@ export async function check(opts: CheckOptions): Promise<CheckResult> {
     results.flat().sort((a, b) => (order.get(a.workspace) ?? 0) - (order.get(b.workspace) ?? 0)),
     catalogByWorkspace,
   );
+  for (const p of packages) p.tier ??= tierOf(PACKS, p.name, p.installed, p.target);
   if (adapter.id === 'typescript' && opts.plan !== false) planPackages(packages, opts);
   else for (const p of packages) delete p.planContext;
   await ctx.fetcher.dispose();
@@ -260,6 +349,25 @@ export function sitesOf(f: Finding): number {
   return f.change.kind === 'cause' ? (f.downstream?.length ?? 0) : 1;
 }
 
+/**
+ * A dependency the run tried and could not analyze: the registry did not answer, the
+ * tarball could not be fetched, or the analysis itself failed. Not a failure: no types to
+ * diff, not installed, private, or left out by the time budget (each says so itself).
+ */
+export function isFailure(p: Pick<PackageReport, 'status' | 'skipReason'>): boolean {
+  return (
+    p.status === 'skipped' &&
+    p.skipReason !== undefined &&
+    ![
+      'TIME_BUDGET',
+      'NO_TYPES',
+      'PACKAGE_NOT_INSTALLED',
+      'PACKAGE_NOT_FOUND',
+      'REGISTRY_AUTH',
+    ].includes(p.skipReason)
+  );
+}
+
 export function summarize(packages: PackageReport[]): CheckReport['summary'] {
   const byName = (status: (p: PackageReport) => boolean): number =>
     new Set(packages.filter(status).map((p) => p.name)).size;
@@ -278,6 +386,8 @@ export function summarize(packages: PackageReport[]): CheckReport['summary'] {
       (f) =>
         (f.severity === 'breaking' || f.severity === 'deprecated') && f.fixability === 'mechanical',
     ),
+    skippedForTime: byName((p) => p.skipReason === 'TIME_BUDGET'),
+    failed: byName((p) => isFailure(p)),
   };
 }
 
@@ -405,6 +515,18 @@ export function mergeAcrossWorkspaces(
   return [...result, ...orphans];
 }
 
+/**
+ * What one workspace worker may use: a type-checked program of a large workspace takes
+ * gigabytes, and the analysis holds two (installed and target). 4 GB at least; more when the
+ * machine has it to spare for every worker at once, up to 8 GB. `UPTIDE_WORKER_HEAP_MB` sets it.
+ */
+export function workerHeapMb(workers: number, totalBytes = totalmem(), env = process.env): number {
+  const asked = Number(env.UPTIDE_WORKER_HEAP_MB);
+  if (Number.isFinite(asked) && asked >= 512) return Math.floor(asked);
+  const share = Math.floor(totalBytes / 1024 / 1024 / (Math.max(1, workers) + 1));
+  return Math.min(8192, Math.max(4096, share));
+}
+
 /** A worker thread checks one workspace with the default adapter, fetcher and cache. */
 async function runInWorker(
   job: WorkspaceJob,
@@ -419,7 +541,7 @@ async function runInWorker(
     const worker = new Worker(url, {
       workerData: job,
       execArgv: fromSource ? ['--import', 'tsx'] : [],
-      resourceLimits: { maxOldGenerationSizeMb: 4096 },
+      resourceLimits: { maxOldGenerationSizeMb: workerHeapMb(job.opts.workspaceConcurrency ?? 2) },
     });
     worker.on('message', (message) => {
       if (message.type === 'error') reject(new UptideError(message.code, message.message));
@@ -458,9 +580,35 @@ export async function checkWorkspaceJob(
  * released at the end (it is hundreds of MB).
  */
 async function checkWorkspace(ctx: Ctx, job: WorkspaceJob): Promise<PackageReport[]> {
-  const { adapter, opts } = ctx;
+  const { adapter } = ctx;
+  // The job carries what `check` decided for every workspace: the order and the deadline.
+  const opts: CheckOptions = { ...ctx.opts, ...job.opts };
   const { workspace, workspaces, installedByWorkspace, importedByWorkspace } = job;
   const packages: PackageReport[] = [];
+  // Out of time before this workspace started: loading its program alone can take longer than
+  // the budget. What it imports and is behind is reported as left out, from the manifests
+  // and a text scan, without loading anything.
+  if (opts.deadline !== undefined && Date.now() > opts.deadline) {
+    const declared = installedByWorkspace[workspace] ?? {};
+    const imported = new Set(importedByWorkspace[workspace] ?? []);
+    const late = (name: string, version: string, undeclared: boolean): PackageReport => ({
+      ...notImported(workspace, name, version),
+      status: 'skipped',
+      skipReason: 'TIME_BUDGET',
+      notes: ['time budget reached before this workspace'],
+      ...(undeclared ? { undeclared: {} } : {}),
+    });
+    for (const name of opts.behind ?? []) {
+      if (opts.only && !opts.only.includes(name)) continue;
+      const version = declared[name];
+      if (version !== undefined && /^(link|workspace|file):/.test(version)) continue;
+      if (version !== undefined && (opts.allDeps || imported.has(name)))
+        packages.push(late(name, version, false));
+      else if (version === undefined && imported.has(name))
+        packages.push(late(name, 'unresolved', true));
+    }
+    return packages;
+  }
   {
     const dir = resolve(opts.cwd, workspace);
     const repo: RepoDir = { dir };
@@ -510,9 +658,15 @@ async function checkWorkspace(ctx: Ctx, job: WorkspaceJob): Promise<PackageRepor
       installed.set(name, version);
       undeclared.set(name, via ? { via } : {});
     }
+    const rank = new Map((opts.order ?? []).map((name, i) => [name, i]));
     const entries = [...installed]
-      .sort(([a], [b]) => a.localeCompare(b))
+      .sort(
+        ([a], [b]) =>
+          (rank.get(a) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b) ?? Number.MAX_SAFE_INTEGER) ||
+          a.localeCompare(b),
+      )
       .filter(([name]) => !opts.only || opts.only.includes(name));
+    const behind = new Set(opts.behind ?? []);
     // Release groups: same scope, same major, depending on one another, upgraded together.
     const analyzable = entries.filter(
       ([name, version]) =>
@@ -529,9 +683,13 @@ async function checkWorkspace(ctx: Ctx, job: WorkspaceJob): Promise<PackageRepor
     );
     const groupOf = new Map(groups.flatMap((g) => g.map((m) => [m, g] as const)));
     const done = new Set<string>();
+    // The analysis is CPU-bound on one thread: six at once finish together, late, and each
+    // holds a type-checked program of the whole workspace. Under a budget one at a time
+    // finishes in rank order, so what the deadline cuts is the tail of the ranking, and the
+    // memory in use is one target program, not six.
     const reports = await mapWithLimit(
       entries,
-      opts.concurrency ?? 6,
+      opts.concurrency ?? (opts.deadline !== undefined ? 1 : 6),
       async ([name, installedVersion]): Promise<PackageReport[]> => {
         if (done.has(name)) return [];
         // Nothing to upgrade in a linked workspace package.
@@ -549,15 +707,41 @@ async function checkWorkspace(ctx: Ctx, job: WorkspaceJob): Promise<PackageRepor
           return [notImported(workspace, name, installedVersion)];
         }
         const members = groupOf.get(name) ?? [name];
+        // Out of time: what has something to analyze is left for a run that asks for it by
+        // name. Up-to-date packages still answer (that costs one cached registry lookup).
+        if (opts.deadline !== undefined && Date.now() > opts.deadline && behind.has(name)) {
+          for (const m of members) done.add(m);
+          return members.map((m) => ({
+            ...notImported(workspace, m, installed.get(m) as string),
+            status: 'skipped' as const,
+            skipReason: 'TIME_BUDGET' as const,
+            notes: ['time budget reached before this dependency'],
+          }));
+        }
         for (const m of members) done.add(m);
-        return [
-          await checkGroup(
-            ctx,
-            scopeFor(name),
-            workspace,
-            members.map((m) => ({ name: m, installed: installed.get(m) as string })),
-          ),
-        ];
+        try {
+          return [
+            await checkGroup(
+              { ...ctx, opts },
+              scopeFor(name),
+              workspace,
+              members.map((m) => ({ name: m, installed: installed.get(m) as string })),
+            ),
+          ];
+        } catch (err) {
+          // One dependency that cannot be analyzed is one answer missing, not all of them.
+          const late = errorCode(err) === 'TIME_BUDGET';
+          return members.map((m) => ({
+            ...notImported(workspace, m, installed.get(m) as string),
+            status: 'skipped' as const,
+            skipReason: errorCode(err),
+            notes: [
+              late
+                ? 'time budget reached during its analysis'
+                : `analysis failed: ${(err as Error).message ?? String(err)}`,
+            ],
+          }));
+        }
       },
     );
     const warnings = (await adapter.repoWarnings?.(repo)) ?? [];
@@ -568,7 +752,8 @@ async function checkWorkspace(ctx: Ctx, job: WorkspaceJob): Promise<PackageRepor
       const undeclaredAs = undeclared.get(r.name);
       if (undeclaredAs) r.undeclared = undeclaredAs;
     }
-    packages.push(...reports.flat());
+    // Analyzed in order of impact, reported in a stable one.
+    packages.push(...reports.flat().sort((x, y) => x.name.localeCompare(y.name)));
     for (const [name, reason] of unresolved) {
       if (opts.only && !opts.only.includes(name)) continue;
       packages.push({
@@ -990,6 +1175,16 @@ async function prepare(
  * One dependency, or a release group: Signal A per member, one diff per member, one
  * overlay with every target linked, findings per member, one report.
  */
+/**
+ * Between the phases of one dependency (fetch, diff, compile, runtime probe): past the hard
+ * deadline (the budget and half again), the dependency is abandoned rather than finished. A
+ * phase that is running is not interrupted, so a run ends within one phase of that.
+ */
+function outOfTime(ctx: Ctx): void {
+  if (ctx.opts.hardDeadline !== undefined && Date.now() > ctx.opts.hardDeadline)
+    throw new UptideError('TIME_BUDGET', 'time budget reached');
+}
+
 async function checkGroup(
   ctx: Ctx,
   repo: RepoDir,
@@ -1070,6 +1265,7 @@ async function checkGroup(
   const nodeRange = node?.range;
   const nodeSupport = requireEsmSupport(nodeRange);
   try {
+    outOfTime(ctx);
     const tDiff = Date.now();
     const diffs = new Map<string, Awaited<ReturnType<typeof diffDirs>>>();
     for (const { p, pkg } of fetched) {
@@ -1136,6 +1332,7 @@ async function checkGroup(
     );
     if (sameDeclarations) notes.push('type declarations unchanged; compile check skipped');
     if (ctx.opts.compile !== false && compileMany && !sameDeclarations) {
+      outOfTime(ctx);
       const t2 = Date.now();
       // The baseline overlay links what the installed side is: the installed copy, or the
       // @types release the installed runtime should have.
@@ -1233,6 +1430,7 @@ async function checkGroup(
       ).dir;
     };
     if (ctx.opts.runtime !== false) {
+      outOfTime(ctx);
       const tRuntime = Date.now();
       for (const { p, pkg, runtime } of fetched) {
         const installedDir = (p.runtimeDir ?? p.installedDir).dir;
@@ -1462,12 +1660,55 @@ async function checkGroup(
         // A pack that cannot read its versions adds nothing; the diff findings stand.
       }
     }
+    // Without a pack, only what the compiler or the runtime probe confirms is called breaking.
+    const tier = tierOf(PACKS, name, installed[0] as string, targets.at(-1) as string);
+    const evidence = (f: Finding): Finding['evidence'] => {
+      const p = runtimeOf(f);
+      return evidenceOf(f, p?.runtime, p ? loadRootOf(p) : undefined);
+    };
+    const confirmed =
+      tier === 'generic'
+        ? confirmGeneric(findings, evidence)
+        : findings.map((f) => {
+            const found = f.severity === 'breaking' ? evidence(f) : undefined;
+            return found ? { ...f, evidence: found } : f;
+          });
+    findings.length = 0;
+    findings.push(...confirmed);
+    // An import the target no longer has: what it exports instead is what a person, or the
+    // agent, needs to choose a replacement. Without a pack nothing else says it.
+    if (tier === 'generic')
+      for (const f of findings) {
+        // A resource limit of the compiler, not a property of one expression: the upgrade
+        // makes the types too deep, and where that is reported varies between compilers.
+        if (f.severity === 'breaking' && [2589, 2590].includes(f.usage.compileCode ?? 0))
+          f.details = [
+            ...(f.details ?? []),
+            'the compiler reaches its type-instantiation limit after the upgrade; which expression reports it depends on the compiler version, so yours may name another site',
+          ];
+        if (f.severity !== 'breaking' || ![2305, 2614, 2724].includes(f.usage.compileCode ?? 0))
+          continue;
+        const diff = diffs.get(f.usage.package ?? f.change.package) ?? [...diffs.values()][0];
+        const exported = [
+          ...new Set(
+            (diff?.surfaceB.symbols ?? [])
+              .map((sym) => sym.path)
+              .filter((path) => !/[.#[(]/.test(path)),
+          ),
+        ].sort();
+        if (exported.length > 0)
+          f.details = [
+            ...(f.details ?? []),
+            `${f.change.package} ${f.change.to} exports: ${exported.slice(0, 60).join(', ')}${exported.length > 60 ? `, and ${exported.length - 60} more` : ''}`,
+          ];
+      }
     const unanalyzedCount = prepared.reduce((n, p) => n + p.scan.unanalyzed.length, 0);
     let status = statusOf(findings, usages.length, unanalyzedCount);
     // Nothing to diff and nothing found: the honest status is "no types", with the reason in the notes.
     if (prepared.every((p) => p.untyped) && status !== 'breaking' && status !== 'deprecated')
       status = 'no-types';
     const report = base(status);
+    report.tier = tier;
     const viaTypes = prepared.filter((p) => p.types);
     if (viaTypes.length > 0) {
       report.typesVia = viaTypes

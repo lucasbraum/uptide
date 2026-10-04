@@ -73,6 +73,8 @@ export function notesOf(report: CheckReport): string[] {
     baseline = new Map<number, string[]>();
   notes.add(`Workspaces analyzed: ${[...new Set(report.workspaces)].join(', ')}.`);
   for (const p of report.packages) {
+    // Out of time has its own section; a gap in the analysis is something else.
+    if (p.skipReason === 'TIME_BUDGET') continue;
     for (const note of p.notes) {
       if (/low.confidence|pre-existing|workspaces? (?:analyzed|skipped)/i.test(note)) continue;
       notes.add(note);

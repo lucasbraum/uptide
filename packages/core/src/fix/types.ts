@@ -1,4 +1,4 @@
-import type { Finding } from '../domain/report.js';
+import type { Finding, Tier } from '../domain/report.js';
 import type { ApiChangeFacts, PackContext } from '../packs/types.js';
 import type { BehaviorResult } from './behavior.js';
 import type { InstallReport } from './managers/upgrade.js';
@@ -97,6 +97,8 @@ export interface Fixer {
   fix(input: FixRequest): Promise<FixResponse>;
 }
 export interface FixReport {
+  /** `generic`: no pack covers the upgrade; every edit is the agent's, verified by the compiler. */
+  tier?: Tier;
   lockfile?: InstallReport;
   repo: string;
   package: string;
@@ -145,6 +147,8 @@ export interface FixReport {
     costUsd: number;
     available: boolean;
     disabled?: boolean;
+    /** Set when `--max-cost` stopped the agent: the limit, and the sites it never attempted. */
+    costLimit?: { limitUsd: number; notAttempted: number };
   };
   timingMs: number;
   prBody: string;

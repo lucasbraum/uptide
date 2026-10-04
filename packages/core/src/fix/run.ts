@@ -6,6 +6,7 @@ import { compareVersions } from '../check/version.js';
 import { type ProgressListener, progress } from '../domain/progress.js';
 import type { CheckReport, Finding } from '../domain/report.js';
 import { UptideError } from '../errors.js';
+import { genericPack } from '../packs/generic.js';
 import { stripePack } from '../packs/stripe/index.js';
 import { payloadApiVersions, stripeUsageContext } from '../packs/stripe/relevance.js';
 import type { MigrationPack, PackContext } from '../packs/types.js';
@@ -39,7 +40,8 @@ import { bumpVersions, install, packageManager } from './versions.js';
 export interface FixOptions {
   onProgress?: ProgressListener;
   cwd: string;
-  only: 'zod' | 'stripe';
+  /** Any direct dependency: one with a pack (zod, stripe) or, with the agent, any other. */
+  only: string;
   target?: string;
   includeDeprecated?: boolean;
   pr?: boolean;
@@ -57,6 +59,11 @@ export interface FixOptions {
    * created without `apiVersion`: zero behaviour change, the smallest PR.
    */
   pinCurrentApi?: boolean;
+  /**
+   * Stop asking the agent once its calls have cost this much (USD). Sites not attempted stay
+   * manual and the run says so. Default: 1 for a dependency without a pack, none otherwise.
+   */
+  maxCostUsd?: number;
   /** The build doing the work; injected by tests, which run from a checkout under development. */
   tool?: ReturnType<typeof uptideVersionInfo>;
 }
@@ -120,14 +127,29 @@ function originOf(root: string): string | undefined {
     return undefined;
   }
 }
+/** What a run without a pack may spend on the agent unless told otherwise. */
+export const GENERIC_MAX_COST_USD = 1;
 export async function fix(
   options: FixOptions,
   services: FixServices = defaults,
 ): Promise<FixReport> {
   const started = Date.now();
   const root = realpathSync(resolve(options.cwd));
-  const pack = options.pack ?? (options.only === 'zod' ? zodPack : stripePack);
-  if (!pack || pack.name !== options.only) throw new Error(`no migration pack for ${options.only}`);
+  let pack =
+    options.pack ??
+    [zodPack, stripePack].find((p) => p.name === options.only) ??
+    genericPack(options.only);
+  if (pack.name !== options.only) throw new Error(`no migration pack for ${options.only}`);
+  const fixer = options.fixer === null ? undefined : (options.fixer ?? anthropicFixer());
+  // Without a pack every edit is the agent's: no agent, nothing this command can do.
+  const needsAgent = (candidate: MigrationPack): void => {
+    if (candidate.rules.length === 0 && !fixer)
+      throw new UptideError(
+        'NO_FIXER',
+        `${candidate.name} has no migration pack, so every fix would come from the agent, and ${options.fixer === null ? 'assisted fixes are off (--no-llm)' : 'ANTHROPIC_API_KEY is not set'}`,
+      );
+  };
+  needsAgent(pack);
   projectRoot(root);
   if (git(root, 'status', '--porcelain', '--untracked-files=all'))
     throw new UptideError('DIRTY_WORKING_TREE', 'uptide fix requires a clean working tree');
@@ -160,6 +182,12 @@ export async function fix(
     (p) => p.name === pack.name && !p.notes.includes('up to date'),
   );
   if (!packages.length) throw new Error(`${pack.name} has no upgrade to ${target}`);
+  // A pack that does not cover this upgrade (zod 4 → 4) leaves it to the generic path.
+  if (!options.pack && packages.some((p) => !pack.supports(p.installed, target))) {
+    pack = genericPack(options.only);
+    needsAgent(pack);
+  }
+  const generic = pack.rules.length === 0;
   for (const p of packages) {
     if (!pack.supports(p.installed, target))
       throw new Error(`${pack.name} pack does not support ${p.installed} → ${target}`);
@@ -218,7 +246,10 @@ export async function fix(
     services.diagnostics(root, workspaces),
   );
   // The same scope before and after: the files with reported sites decide which tests relate.
-  const selected = selectedFindings(report, pack.name, options.includeDeprecated ?? false);
+  // Without a pack only what has evidence is migrated: an unconfirmed site is not the agent's.
+  const selected = selectedFindings(report, pack.name, options.includeDeprecated ?? false).filter(
+    (f) => !generic || f.severity === 'breaking',
+  );
   const affected = [...new Set(selected.map((f) => f.usage.file))];
   // Evidence at a site the compiler rejected is confirmed evidence: the change is real there.
   if (packContext.evidence)
@@ -343,11 +374,12 @@ export async function fix(
       root,
       sites,
       pack,
-      options.fixer === null ? undefined : (options.fixer ?? anthropicFixer()),
+      fixer,
       () => services.diagnostics(root, workspaces),
       packContext,
       options.fixer === null,
       options.onProgress,
+      { maxCostUsd: options.maxCostUsd ?? (generic ? GENERIC_MAX_COST_USD : undefined) },
     ),
   );
   const followed: Followed[] = [];
@@ -396,6 +428,7 @@ export async function fix(
     ...(generated.length ? { generated } : {}),
     repo: root,
     package: pack.name,
+    tier: generic ? 'generic' : 'verified',
     from: initialContext.from,
     target,
     targetSource: resolved.source,

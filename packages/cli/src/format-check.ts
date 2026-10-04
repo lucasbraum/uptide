@@ -1,5 +1,12 @@
 import { basename } from 'node:path';
-import { type CheckReport, type PackageReport, type PlanGroup, planPackage } from '@uptide/core';
+import {
+  type CheckReport,
+  isFailure,
+  type PackageReport,
+  type PlanGroup,
+  planPackage,
+  TIER_LEGEND,
+} from '@uptide/core';
 import pc from 'picocolors';
 import { formatCheckDetails } from './format-check-details.js';
 import { importerNotes } from './importers.js';
@@ -25,9 +32,21 @@ export interface FormatCheckOptions {
   invocation?: string;
   /** Flags to repeat in the suggested commands so they act on the same repository and scope. */
   repeat?: { cwd?: string; only?: string; targets?: Record<string, string> };
-  /** Packages `fix` can migrate in this repository (a pack exists and the manager is supported). */
-  fixable?: readonly string[];
+  /**
+   * Packages `fix` can migrate in this repository: every one when the package manager is
+   * supported (`true`), none, or a list.
+   */
+  fixable?: readonly string[] | boolean;
+  /** The time budget the run had, in seconds, to say how to raise it. */
+  maxTime?: number;
 }
+
+/** Rows with no impact beyond this many are folded into one line: the first screen stays one screen. */
+const NO_IMPACT_ROWS = 5;
+/** Rule lines per package on the first screen; beyond that, a count. */
+const MAX_RULE_LINES = 8;
+/** Fix commands suggested at most; the rest is `uptide plan`'s job. */
+const FIX_SUGGESTIONS = 3;
 
 const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
 
@@ -94,13 +113,23 @@ export interface Row {
   verdict: string;
   by: string;
   plan: PlanGroup[];
+  /** Nothing to act on: no breaking, unverified or deprecated site shown. */
+  quiet: boolean;
 }
 
 /** Packages with nothing to decide (never imported, linked, private, up to date) have no row. */
 function rowOf(p: PackageReport, multi: boolean, colors: Colors): Row | undefined {
   if (['not-imported', 'workspace', 'private'].includes(p.status)) return undefined;
   if (p.notes.includes('up to date')) return undefined;
-  const plan = planOf(p);
+  // A release group whose members are all current: nothing to upgrade, nothing to say.
+  if (p.installed === p.target && p.findings.length === 0 && p.status === 'safe') return undefined;
+  // Out of time or failed: listed once, under "Not analyzed", with how to include them.
+  if (p.skipReason === 'TIME_BUDGET' || isFailure(p)) return undefined;
+  // Without a pack, what nothing confirmed is for --details: the first screen acts on evidence.
+  const generic = p.tier === 'generic';
+  const plan = planOf(p).filter((g) => !(generic && g.severity === 'unverified'));
+  const unconfirmed = generic ? sitesOf(planOf(p).filter((g) => g.severity === 'unverified')) : 0;
+  const aside = unconfirmed > 0 ? colors.dim(` · ${unconfirmed} unconfirmed in --details`) : '';
   const of = (severity: PlanGroup['severity']): PlanGroup[] =>
     plan.filter((g) => g.severity === severity);
   const [breaking, unverified, deprecated] = [of('breaking'), of('unverified'), of('deprecated')];
@@ -108,6 +137,7 @@ function rowOf(p: PackageReport, multi: boolean, colors: Colors): Row | undefine
     multi && p.workspace !== '*' && p.workspace !== '.' ? colors.dim(` (${p.workspace})`) : '';
   const members = p.members ? ` (${plural(p.members.length, 'package')})` : '';
   const unanalyzed = p.unanalyzed.length;
+  const gaps = (p.importers ?? []).filter((i) => !i.analyzed).length;
   let verdict: string;
   let by = '';
   if (p.status === 'no-types' || p.status === 'skipped') {
@@ -121,18 +151,23 @@ function rowOf(p: PackageReport, multi: boolean, colors: Colors): Row | undefine
     const sites = sitesOf(breaking);
     const files = filesOf(breaking);
     const extra = unverified.length > 0 ? `, ${sitesOf(unverified)} unverified` : '';
-    verdict = `${colors.red('✗')} ${sites} breaking${sites > 1 ? ` in ${plural(files, 'file')}` : ''}${extra}`;
+    verdict = `${colors.red('✗')} ${sites} breaking${sites > 1 ? ` in ${plural(files, 'file')}` : ''}${extra}${aside}`;
     by = byLine([...breaking, ...unverified]);
   } else if (unverified.length > 0) {
     verdict = `${colors.magenta('?')} ${sitesOf(unverified)} unverified`;
     by = byLine(unverified);
   } else if (deprecated.length > 0) {
-    verdict = `${colors.yellow('!')} ${sitesOf(deprecated)} deprecated`;
+    verdict = `${colors.yellow('!')} ${sitesOf(deprecated)} deprecated${aside}`;
     by = byLine(deprecated);
   } else if (p.status === 'unknown') {
     verdict = `${colors.magenta('?')} ${unanalyzed} of ${plural(p.callSitesChecked + unanalyzed, 'site')} not analyzed`;
   } else if (unanalyzed > 0) {
-    verdict = `${colors.green('✓')} no impact in ${plural(p.callSitesChecked, 'site')}, ${unanalyzed} not analyzed`;
+    verdict = `${colors.green('✓')} no impact in ${plural(p.callSitesChecked, 'site')}, ${unanalyzed} not analyzed${aside}`;
+  } else if (gaps > 0) {
+    // A workspace that imports it was not analyzed: "no impact" would claim more than is known.
+    verdict = `${colors.magenta('?')} no impact in ${plural(p.callSitesChecked, 'site')}, ${plural(gaps, 'workspace')} not analyzed${aside}`;
+  } else if (unconfirmed > 0) {
+    verdict = `${colors.green('✓')} nothing confirmed ${colors.dim(`(${plural(p.callSitesChecked, 'call site')})`)}${aside}`;
   } else {
     verdict = `${colors.green('✓')} no impact ${colors.dim(`(${plural(p.callSitesChecked, 'call site')})`)}`;
   }
@@ -144,6 +179,8 @@ function rowOf(p: PackageReport, multi: boolean, colors: Colors): Row | undefine
     verdict,
     by,
     plan,
+    quiet:
+      plan.length === 0 && gaps === 0 && !['no-types', 'skipped', 'unknown'].includes(p.status),
   };
 }
 
@@ -170,7 +207,23 @@ function sectionLines(row: Row, colors: Colors): string[] {
   const acting = row.plan.filter((g) => g.severity !== 'deprecated');
   const deprecated = row.plan.filter((g) => g.severity === 'deprecated');
   const importers = importerNotes(row.p);
-  if (acting.length === 0 && deprecated.length === 0 && importers.length === 0) return [];
+  // A peer the target asks for and the repository does not have at that version: the usual
+  // root cause of what follows, and the first thing to fix.
+  const peers = row.p.notes.flatMap((note) => {
+    const m = /: (\S+)@(\S+) is outside the peer range (.+?) of (\S+);/.exec(note);
+    return m
+      ? [
+          `${m[4]} ${row.p.target} needs ${m[1]} ${m[3]} (installed: ${m[2]}): upgrade ${m[1]} first`,
+        ]
+      : [];
+  });
+  if (
+    acting.length === 0 &&
+    deprecated.length === 0 &&
+    importers.length === 0 &&
+    peers.length === 0
+  )
+    return [];
   const scope = (g: PlanGroup): string => {
     if (g.fixes !== g.sites)
       return `${plural(g.fixes, 'fix', 'fixes')}, ${plural(g.sites, 'error')}`;
@@ -178,15 +231,26 @@ function sectionLines(row: Row, colors: Colors): string[] {
     // A single site is worth naming; the full path is in --details.
     return g.sites === 1 && only ? `${basename(only.file)}:${only.line}` : plural(g.sites, 'site');
   };
-  const titleWidth = Math.max(...acting.map((g) => g.title.length), 0);
-  const scopeWidth = Math.max(...acting.map((g) => scope(g).length), 0);
+  // A package with dozens of distinct changes (a compiler API that was removed) gets its
+  // largest ones here and the rest as a count: --details has every one.
+  const listed = acting.length > MAX_RULE_LINES ? acting.slice(0, MAX_RULE_LINES - 1) : acting;
+  const titleWidth = Math.max(...listed.map((g) => g.title.length), 0);
+  const scopeWidth = Math.max(...listed.map((g) => scope(g).length), 0);
   const lines = [colors.bold(row.p.name)];
-  for (const g of acting) {
+  for (const g of listed) {
     const mark = g.severity === 'breaking' ? colors.red('✗') : colors.magenta('?');
     lines.push(
       `  ${mark} ${pad(g.title, titleWidth)}   ${pad(scope(g), scopeWidth)}   ${colors.dim(byLabel(g))}`,
     );
     if (g.note) lines.push(colors.dim(`    ${g.note}`));
+  }
+  if (listed.length < acting.length) {
+    const rest = acting.slice(listed.length);
+    lines.push(
+      colors.dim(
+        `  … ${plural(rest.length, 'more change')}, ${plural(sitesOf(rest), 'site')} (--details)`,
+      ),
+    );
   }
   if (deprecated.length > 0) {
     const sites = sitesOf(deprecated);
@@ -199,6 +263,56 @@ function sectionLines(row: Row, colors: Colors): string[] {
   // An importer the manifest does not show, or one the analysis could not reach: the reader
   // decides whether the sites above are all of them.
   for (const note of importers) lines.push(`  ${colors.yellow('⚠')} ${note}`);
+  for (const note of peers) lines.push(`  ${colors.yellow('⚠')} peer: ${note}`);
+  return lines;
+}
+
+/**
+ * What the run left without an answer, and how to get one: dependencies the time budget
+ * did not reach, and dependencies whose analysis failed, each with its reason.
+ */
+function notAnalyzed(report: CheckReport, opts: FormatCheckOptions, colors: Colors): string[] {
+  const uptide = opts.invocation ?? 'npx uptide';
+  const late = report.packages.filter((p) => p.skipReason === 'TIME_BUDGET');
+  const failed = report.packages.filter((p) => isFailure(p));
+  if (late.length === 0 && failed.length === 0) return [];
+  const lines = [colors.bold('Not analyzed')];
+  if (late.length > 0) {
+    const budget = opts.maxTime ? ` (--max-time ${opts.maxTime})` : '';
+    lines.push(
+      `  ${colors.yellow('⚠')} ${late.length} behind, out of time${budget}: ${late
+        .slice(0, 6)
+        .map((p) => p.name)
+        .join(', ')}${late.length > 6 ? `, and ${late.length - 6} more` : ''}`,
+      colors.dim(
+        `    ${uptide} check --only ${late
+          .slice(0, 3)
+          .map((p) => p.name)
+          .join(',')}    by name, no time limit`,
+      ),
+      colors.dim(
+        `    ${uptide} check --max-time ${Math.max(300, (opts.maxTime ?? 60) * 5)}    a longer budget (0: no limit)`,
+      ),
+    );
+  }
+  // One line per cause: twenty dependencies lost to the same failure are one fact.
+  const reasonOf = (p: PackageReport): string =>
+    (p.notes[0] ?? 'analysis failed')
+      .split('\n')[0]
+      ?.replace(/ \(check it alone with --only \S+,/, ' (check one alone with --only,') ?? '';
+  const byReason = new Map<string, PackageReport[]>();
+  for (const p of failed) byReason.set(reasonOf(p), [...(byReason.get(reasonOf(p)) ?? []), p]);
+  for (const [reason, group] of byReason) {
+    const only = group[0] as PackageReport;
+    lines.push(
+      group.length === 1
+        ? `  ${colors.red('✗')} ${only.name} ${only.installed}: ${(only.notes[0] ?? 'analysis failed').split('\n')[0]}`
+        : `  ${colors.red('✗')} ${group.length} failed: ${reason}: ${group
+            .slice(0, 6)
+            .map((p) => p.name)
+            .join(', ')}${group.length > 6 ? `, and ${group.length - 6} more` : ''}`,
+    );
+  }
   return lines;
 }
 
@@ -208,17 +322,23 @@ export function nextCommands(rows: Row[], opts: FormatCheckOptions): [string, st
   const quote = (s: string) => (/^[\w./@:=+-]+$/.test(s) ? s : `'${s.replaceAll("'", "'\"'\"'")}'`);
   const cwd = opts.repeat?.cwd ? ` --cwd ${quote(opts.repeat.cwd)}` : '';
   const commands: [string, string][] = [];
+  const fixable = (name: string): boolean =>
+    opts.fixable === true || (Array.isArray(opts.fixable) && opts.fixable.includes(name));
   for (const row of rows) {
     const name = row.p.name;
-    if (!opts.fixable?.includes(name)) continue;
+    // A release group is several packages: fix takes one.
+    if (!fixable(name) || row.p.members) continue;
+    if (commands.length >= FIX_SUGGESTIONS) break;
     const target = opts.repeat?.targets?.[name];
     const pinned = target ? ` --target ${quote(target)}` : '';
     if (row.plan.some((g) => g.severity !== 'deprecated'))
       commands.push([
         `${uptide} fix --only ${name}${pinned}${cwd}`,
-        'migrate on a new branch, verify, no push',
+        row.p.tier === 'generic'
+          ? 'migrate with the agent on a new branch, verify, no push'
+          : 'migrate on a new branch, verify, no push',
       ]);
-    else if (row.plan.some((g) => g.by.rule > 0))
+    else if (row.p.tier !== 'generic' && row.plan.some((g) => g.by.rule > 0))
       commands.push([
         `${uptide} fix --only ${name}${pinned} --include-deprecated${cwd}`,
         'migrate the deprecated calls on a new branch, no push',
@@ -228,6 +348,8 @@ export function nextCommands(rows: Row[], opts: FormatCheckOptions): [string, st
   const targets = Object.entries(opts.repeat?.targets ?? {})
     .map(([name, version]) => ` --target ${quote(`${name}@${version}`)}`)
     .join('');
+  if (rows.filter((r) => r.plan.length > 0).length > 1)
+    commands.push([`${uptide} plan${only}${cwd}`, 'the order to upgrade in, with the effort']);
   commands.push(
     opts.details
       ? [`${uptide} check${only}${targets}${cwd}`, 'the summary, one line per change']
@@ -280,22 +402,44 @@ export function formatCheck(report: CheckReport, opts: FormatCheckOptions = {}):
   if (opts.details) {
     lines.push(formatCheckDetails(report, { color: opts.color, all: opts.all }).trimEnd(), '');
   } else {
-    const col = (pick: (row: Row) => string): number =>
-      Math.max(...rows.map((r) => width(pick(r))), 0);
     // Where the target came from, next to how far it is: `major · latest on npm`. `fix`
     // resolves it the same way, so both commands name the same version for the same reason.
     const move = (row: Row): string =>
       [row.bump, targetSource(row.p, opts)].filter(Boolean).join(' · ');
-    const [names, versions, bumps] = [col((r) => r.name), col((r) => r.versions), col(move)];
+    // A few no-impact rows are worth their line; dozens are one sentence.
+    const quiet = rows.filter((r) => r.quiet);
+    const folded = quiet.length > NO_IMPACT_ROWS ? quiet : [];
+    const shown = rows.filter((r) => !folded.includes(r));
+    const col = (pick: (row: Row) => string): number =>
+      Math.max(...shown.map((r) => width(pick(r))), 0);
+    const tier = (row: Row): string => row.p.tier ?? '';
+    const [names, versions, bumps, tiers] = [
+      col((r) => r.name),
+      col((r) => r.versions),
+      col(move),
+      col(tier),
+    ];
     // Only rows that say who migrates them set the width of the verdict column.
-    const verdicts = Math.max(...rows.filter((r) => r.by).map((r) => width(r.verdict)), 0);
-    for (const row of rows)
+    const verdicts = Math.max(...shown.filter((r) => r.by).map((r) => width(r.verdict)), 0);
+    // Reports from before tiers existed have none: the column is simply not there.
+    const tierCell = (row: Row): string =>
+      tiers > 0 ? `${pad(colors.dim(tier(row)), tiers)}   ` : '';
+    for (const row of shown)
       lines.push(
-        `${pad(colors.bold(row.name), names)}  ${pad(row.versions, versions)}   ${pad(colors.dim(move(row)), bumps)}   ${row.by ? `${pad(row.verdict, verdicts)}    ${colors.dim(row.by)}` : row.verdict}`,
+        `${pad(colors.bold(row.name), names)}  ${pad(row.versions, versions)}   ${pad(colors.dim(move(row)), bumps)}   ${tierCell(row)}${row.by ? `${pad(row.verdict, verdicts)}    ${colors.dim(row.by)}` : row.verdict}`,
       );
-    if (rows.length === 0)
+    if (folded.length > 0) {
+      const named = folded.slice(0, 6).map((r) => r.p.name);
+      lines.push(
+        `${colors.green('✓')} ${folded.length} more with no impact on your code: ${named.join(', ')}${folded.length > named.length ? `, and ${folded.length - named.length} more` : ''}`,
+      );
+    }
+    const missing = notAnalyzed(report, opts, colors);
+    if (rows.length === 0 && missing.length === 0)
       lines.push(colors.dim('Nothing to upgrade: every checked dependency is up to date.'));
+    if (rows.some((r) => r.p.tier === 'generic')) lines.push('', colors.dim(TIER_LEGEND));
     lines.push('');
+    if (missing.length > 0) lines.push(...missing, '');
     for (const row of rows) {
       const section = sectionLines(row, colors);
       if (section.length > 0) lines.push(...section, '');

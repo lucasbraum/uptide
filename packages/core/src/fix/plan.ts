@@ -17,7 +17,8 @@ const VISIBLE_CONFIDENCE = 0.5;
  * What `fix` would do with a package's findings, without touching a file: the same site list
  * (`selectedFindings`), the pack's own transform as a dry run, the same rule ids as the PR
  * body. A site the transform takes is "by rule"; any other site of a supported upgrade goes
- * to the assisted fixer; without a pack nothing is automated and the site is manual.
+ * to the assisted fixer; without a pack the confirmed breaking sites go to the agent and
+ * everything else is manual.
  */
 export function planPackage(
   p: PackageReport,
@@ -49,7 +50,14 @@ export function planPackage(
         : undefined;
     // A pack's own finding marked manual is a decision, not a site anyone migrates unasked.
     const decision = finding.change.source === 'pack' && finding.fixability === 'manual';
-    const outcome: Outcome = dry?.applied ? 'mechanical' : usable && !decision ? 'agent' : 'manual';
+    // Without a pack, `fix` hands the sites that have evidence to the agent; the rest is a
+    // person's call.
+    const generic = !usable && finding.severity === 'breaking';
+    const outcome: Outcome = dry?.applied
+      ? 'mechanical'
+      : (usable && !decision) || generic
+        ? 'agent'
+        : 'manual';
     const rule =
       finding.rule ??
       dry?.rule ??
@@ -122,6 +130,8 @@ const emptySummary = {
   notImported: 0,
   partiallyAnalyzed: 0,
   autoFixable: 0,
+  skippedForTime: 0,
+  failed: 0,
 };
 
 /** `ZodString#email` as the consumer writes it: `.email`. A top-level name stays as it is. */
@@ -148,6 +158,18 @@ function titleOf(rule: string, sites: Planned[]): string {
       sites.map((s) => s.finding),
     );
   const c = first.change;
+  // The diff names the symbol whose declaration moved; when the compiler rejected every site,
+  // its message says what actually broke there, which is what the reader needs.
+  const compiled = sites.every((s) => s.finding.usage.compileCode !== undefined);
+  // "X removed" stands when the compiler agrees something is missing; when it complains about
+  // anything else at the site, its complaint is the title.
+  const missing = [2305, 2339, 2551, 2614, 2694, 2724].includes(first.usage.compileCode ?? 0);
+  const structural = ['removed', 'renamed', 'moved'].includes(c.kind) && missing;
+  if (compiled && !structural && !['module-format', 'deprecated'].includes(c.kind))
+    return diagnosticTitle(
+      first.usage.compileCode as number,
+      sites.map((s) => s.finding),
+    );
   switch (c.kind) {
     case 'removed':
       return `${rule} removed`;

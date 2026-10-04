@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { PackageFetcher } from '../../domain/io.js';
-import { compileAgainstTarget, compileAgainstTargets } from './compile.js';
+import { compileAgainstTarget, compileAgainstTargets, readableMessage } from './compile.js';
 
 const ROOT = resolve(import.meta.dirname, '../../../../../fixtures');
 const CONSUMER = join(ROOT, 'repos/synthetic-consumer');
@@ -161,6 +161,164 @@ describe("Signal B: the target's own dependencies", () => {
   });
 });
 
+describe('Signal B: a target dependency typed by @types', () => {
+  it('links the @types package the target declares next to an untyped dependency', async () => {
+    // matcher@2 imports `chalk`, which ships no types; its `Chalk` namespace comes from
+    // @types/chalk, declared by matcher next to it, as vitest 5 does with chai.
+    const root = mkdtempSync(join(tmpdir(), 'uptide-types-dep-'));
+    const write = (file: string, text: string) => {
+      mkdirSync(join(root, file, '..'), { recursive: true });
+      writeFileSync(join(root, file), text);
+    };
+    const matcher = (version: string, body: string, deps: Record<string, string>) => {
+      write(
+        `matcher-${version}/package.json`,
+        JSON.stringify({ name: 'matcher', version, types: 'index.d.ts', dependencies: deps }),
+      );
+      write(`matcher-${version}/index.d.ts`, body);
+      return join(root, `matcher-${version}`);
+    };
+    const v1 = matcher(
+      '1.0.0',
+      'export interface Assertion { not: Assertion; ok(): void }\nexport declare function expect(v: unknown): Assertion;\n',
+      {},
+    );
+    const v2 = matcher(
+      '2.0.0',
+      "import * as chalk from 'chalk';\nexport interface Assertion extends Chalk.Assertion { ok(): void }\nexport declare function expect(v: unknown): Assertion;\nexport { chalk };\n",
+      { chalk: '^6.0.0', '@types/chalk': '^5.0.0' },
+    );
+    write(
+      'registry/chalk/package.json',
+      JSON.stringify({ name: 'chalk', version: '6.1.0', main: 'index.js' }),
+    );
+    write('registry/chalk/index.js', 'module.exports = {};\n');
+    write(
+      'registry/types-chalk/package.json',
+      JSON.stringify({ name: '@types/chalk', version: '5.2.0', types: 'index.d.ts' }),
+    );
+    write(
+      'registry/types-chalk/index.d.ts',
+      'declare global { namespace Chalk { interface Assertion { not: this } } }\nexport declare const version: string;\n',
+    );
+    write(
+      'repo/package.json',
+      JSON.stringify({ name: 'repo', dependencies: { matcher: '1.0.0' } }),
+    );
+    write(
+      'repo/tsconfig.json',
+      JSON.stringify({
+        compilerOptions: {
+          module: 'ESNext',
+          moduleResolution: 'Bundler',
+          strict: true,
+          noEmit: true,
+          skipLibCheck: true,
+          types: [],
+        },
+        include: ['src'],
+      }),
+    );
+    write('repo/src/index.ts', "import { expect } from 'matcher';\nexpect(1).not.ok();\n");
+    cpSync(v1, join(root, 'repo/node_modules/matcher'), { recursive: true });
+    const calls: string[] = [];
+    const fetcher: PackageFetcher = {
+      resolve: async (_name, requested) => requested,
+      versions: async (name) =>
+        name === 'chalk' ? ['6.1.0'] : name === '@types/chalk' ? ['5.2.0'] : [],
+      fetch: async (name, version) => {
+        calls.push(`${name}@${version}`);
+        return {
+          name,
+          version,
+          dir: join(root, 'registry', name === 'chalk' ? 'chalk' : 'types-chalk'),
+        };
+      },
+    };
+    const signal = await compileAgainstTarget({ dir: join(root, 'repo') }, 'matcher', v2, {
+      fetcher,
+    });
+    expect(calls.sort()).toEqual(['@types/chalk@5.2.0', 'chalk@6.1.0']);
+    // `.not` comes from the ambient namespace: with it linked, the consumer's code compiles.
+    expect(signal.diagnostics).toEqual([]);
+  });
+});
+
+describe("Signal B: a target's peer dependency", () => {
+  it("is the consumer's copy, as an install leaves it, even outside the peer range", async () => {
+    // hooks@2 asks for the peer i18n >= 2; the app has i18n 1 and upgrades hooks only. An
+    // install keeps i18n 1: compiling against a fetched i18n 2 would pit two copies of its
+    // types against each other and report errors no install produces.
+    const root = mkdtempSync(join(tmpdir(), 'uptide-peer-dep-'));
+    const write = (file: string, text: string) => {
+      mkdirSync(join(root, file, '..'), { recursive: true });
+      writeFileSync(join(root, file), text);
+    };
+    const pkgJson = (name: string, version: string, extra = {}) =>
+      JSON.stringify({ name, version, types: 'index.d.ts', ...extra });
+    const HOOKS = "import type { I18n } from 'i18n';\nexport declare function useI18n(): I18n;\n";
+    write('hooks-1/package.json', pkgJson('hooks', '1.0.0', { peerDependencies: { i18n: '>=1' } }));
+    write('hooks-1/index.d.ts', HOOKS);
+    write('hooks-2/package.json', pkgJson('hooks', '2.0.0', { peerDependencies: { i18n: '>=2' } }));
+    write('hooks-2/index.d.ts', HOOKS);
+    write('repo/node_modules/i18n/package.json', pkgJson('i18n', '1.4.0'));
+    write(
+      'repo/node_modules/i18n/index.d.ts',
+      'export interface I18n { language: string }\nexport declare function change(i: I18n): void;\n',
+    );
+    cpSync(join(root, 'hooks-1'), join(root, 'repo/node_modules/hooks'), { recursive: true });
+    write(
+      'repo/package.json',
+      JSON.stringify({ name: 'repo', dependencies: { hooks: '1.0.0', i18n: '1.4.0' } }),
+    );
+    write(
+      'repo/tsconfig.json',
+      JSON.stringify({
+        compilerOptions: {
+          module: 'ESNext',
+          moduleResolution: 'Bundler',
+          strict: true,
+          noEmit: true,
+          skipLibCheck: true,
+          types: [],
+        },
+        include: ['src'],
+      }),
+    );
+    write(
+      'repo/src/index.ts',
+      "import { useI18n } from 'hooks';\nimport { change } from 'i18n';\nchange(useI18n());\n",
+    );
+    const calls: string[] = [];
+    const fetcher: PackageFetcher = {
+      resolve: async (_name, requested) => requested,
+      versions: async (name) => {
+        calls.push(`versions ${name}`);
+        return ['1.4.0', '2.3.0'];
+      },
+      fetch: async (name, version) => {
+        calls.push(`fetch ${name}@${version}`);
+        throw new Error('the peer must not be fetched');
+      },
+    };
+    const signal = await compileAgainstTarget(
+      { dir: join(root, 'repo') },
+      'hooks',
+      join(root, 'hooks-2'),
+      {
+        fetcher,
+      },
+    );
+    expect(calls).toEqual([]);
+    expect(signal.linkedDependencies).toEqual([]);
+    expect(signal.unsatisfiedDependencies).toEqual([
+      'i18n@1.4.0 is outside the peer range >=2 of hooks; compiled against the installed i18n',
+    ]);
+    // One copy of the peer's types on both sides of the call: nothing to report.
+    expect(signal.diagnostics).toEqual([]);
+  });
+});
+
 describe('workspace dependencies compile from source', () => {
   const APP = join(ROOT, 'repos/workspace-consumer/packages/app');
 
@@ -259,4 +417,20 @@ describe('Node16/NodeNext conditions', () => {
     expect(signal.skipped).toBeUndefined();
     expect(signal.diagnostics).toEqual([]);
   });
+});
+
+it('names a module by package and file, never by where this machine keeps it', () => {
+  expect(
+    readableMessage(
+      "Property 'x' does not exist on type 'typeof import(\"/home/me/.cache/uptide/extracted/typescript/7.0.2/lib/version\")'.",
+    ),
+  ).toBe("Property 'x' does not exist on type 'typeof import(\"typescript@7.0.2/lib/version\")'.");
+  expect(
+    readableMessage(
+      "Namespace '\"/work/app/node_modules/.pnpm/@scope+core@2.0.0/node_modules/@scope/core/dist/index\"' has no exported member 'A'.",
+    ),
+  ).toBe("Namespace '\"@scope/core/dist/index\"' has no exported member 'A'.");
+  expect(readableMessage("Type 'string' is not assignable to type 'number'.")).toBe(
+    "Type 'string' is not assignable to type 'number'.",
+  );
 });

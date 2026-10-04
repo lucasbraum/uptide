@@ -4,6 +4,241 @@
   "packages": [
     {
       "workspace": "*",
+      "name": "vitest",
+      "installed": "3.2.4",
+      "latest": "5.0.3",
+      "target": "5.0.3",
+      "majorsBehind": 2,
+      "findings": [
+        {
+          "change": {
+            "package": "vitest",
+            "from": "3.2.4",
+            "to": "5.0.3",
+            "path": "ExpectStatic",
+            "source": "types",
+            "confidence": 1,
+            "kind": "signature",
+            "before": "interface extends AsymmetricMatchersContaining, Chai.ExpectStatic, Matchers",
+            "after": "interface extends AsymmetricMatchersContaining, Chai.ExpectStatic, Matchers<any>",
+            "severity": "breaking",
+            "evidence": "text",
+            "notes": "base list changed"
+          },
+          "usage": {
+            "file": "packages/api/src/billing/renewal.test.ts",
+            "line": 12,
+            "column": 5,
+            "endLine": 12,
+            "endColumn": 11,
+            "symbolPath": "expect",
+            "access": "call",
+            "snippet": "expect(renewalOf(subscription)).toEqual({",
+            "via": "direct",
+            "package": "vitest"
+          },
+          "severity": "info",
+          "confidence": 0.3,
+          "fixability": "none",
+          "reason": "diff says signature but your code compiles against the target"
+        },
+        {
+          "change": {
+            "package": "vitest",
+            "from": "3.2.4",
+            "to": "5.0.3",
+            "path": "ExpectStatic",
+            "source": "types",
+            "confidence": 1,
+            "kind": "signature",
+            "before": "interface extends AsymmetricMatchersContaining, Chai.ExpectStatic, Matchers",
+            "after": "interface extends AsymmetricMatchersContaining, Chai.ExpectStatic, Matchers<any>",
+            "severity": "breaking",
+            "evidence": "text",
+            "notes": "base list changed"
+          },
+          "usage": {
+            "file": "packages/api/src/routes/orders.test.ts",
+            "line": 10,
+            "column": 5,
+            "endLine": 10,
+            "endColumn": 11,
+            "symbolPath": "expect",
+            "access": "call",
+            "snippet": "expect(parsed.success).toBe(true);",
+            "via": "direct",
+            "package": "vitest"
+          },
+          "severity": "info",
+          "confidence": 0.3,
+          "fixability": "none",
+          "reason": "diff says signature but your code compiles against the target"
+        },
+        {
+          "change": {
+            "package": "vitest",
+            "from": "3.2.4",
+            "to": "5.0.3",
+            "path": "ExpectStatic",
+            "source": "types",
+            "confidence": 1,
+            "kind": "signature",
+            "before": "interface extends AsymmetricMatchersContaining, Chai.ExpectStatic, Matchers",
+            "after": "interface extends AsymmetricMatchersContaining, Chai.ExpectStatic, Matchers<any>",
+            "severity": "breaking",
+            "evidence": "text",
+            "notes": "base list changed"
+          },
+          "usage": {
+            "file": "packages/api/src/routes/orders.test.ts",
+            "line": 15,
+            "column": 5,
+            "endLine": 15,
+            "endColumn": 11,
+            "symbolPath": "expect",
+            "access": "call",
+            "snippet": "expect(parsed.error?.issues.map((issue) => issue.message)).toEqual(['Order is required']);",
+            "via": "direct",
+            "package": "vitest"
+          },
+          "severity": "info",
+          "confidence": 0.3,
+          "fixability": "none",
+          "reason": "diff says signature but your code compiles against the target"
+        },
+        {
+          "change": {
+            "package": "vitest",
+            "from": "3.2.4",
+            "to": "5.0.3",
+            "path": "ExpectStatic",
+            "source": "types",
+            "confidence": 1,
+            "kind": "signature",
+            "before": "interface extends AsymmetricMatchersContaining, Chai.ExpectStatic, Matchers",
+            "after": "interface extends AsymmetricMatchersContaining, Chai.ExpectStatic, Matchers<any>",
+            "severity": "breaking",
+            "evidence": "text",
+            "notes": "base list changed"
+          },
+          "usage": {
+            "file": "packages/shared/src/monitoring.test.ts",
+            "line": 14,
+            "column": 5,
+            "endLine": 14,
+            "endColumn": 11,
+            "symbolPath": "expect",
+            "access": "call",
+            "snippet": "expect(accessLogSchema.safeParse(line).success).toBe(true);",
+            "via": "direct",
+            "package": "vitest"
+          },
+          "severity": "info",
+          "confidence": 0.3,
+          "fixability": "none",
+          "reason": "diff says signature but your code compiles against the target"
+        },
+        {
+          "change": {
+            "package": "vitest",
+            "from": "3.2.4",
+            "to": "5.0.3",
+            "path": "ExpectStatic",
+            "source": "types",
+            "confidence": 1,
+            "kind": "signature",
+            "before": "interface extends AsymmetricMatchersContaining, Chai.ExpectStatic, Matchers",
+            "after": "interface extends AsymmetricMatchersContaining, Chai.ExpectStatic, Matchers<any>",
+            "severity": "breaking",
+            "evidence": "text",
+            "notes": "base list changed"
+          },
+          "usage": {
+            "file": "packages/shared/src/monitoring.test.ts",
+            "line": 15,
+            "column": 5,
+            "endLine": 15,
+            "endColumn": 11,
+            "symbolPath": "expect",
+            "access": "call",
+            "snippet": "expect(accessLogSchema.safeParse({ ...line, clientIp: '2001:db8::7' }).success).toBe(true);",
+            "via": "direct",
+            "package": "vitest"
+          },
+          "severity": "info",
+          "confidence": 0.3,
+          "fixability": "none",
+          "reason": "diff says signature but your code compiles against the target"
+        },
+        {
+          "change": {
+            "package": "vitest",
+            "from": "3.2.4",
+            "to": "5.0.3",
+            "path": "ExpectStatic",
+            "source": "types",
+            "confidence": 1,
+            "kind": "signature",
+            "before": "interface extends AsymmetricMatchersContaining, Chai.ExpectStatic, Matchers",
+            "after": "interface extends AsymmetricMatchersContaining, Chai.ExpectStatic, Matchers<any>",
+            "severity": "breaking",
+            "evidence": "text",
+            "notes": "base list changed"
+          },
+          "usage": {
+            "file": "packages/shared/src/monitoring.test.ts",
+            "line": 21,
+            "column": 5,
+            "endLine": 21,
+            "endColumn": 11,
+            "symbolPath": "expect",
+            "access": "call",
+            "snippet": "expect(parsed.error?.issues[0]?.message).toBe('Required');",
+            "via": "direct",
+            "package": "vitest"
+          },
+          "severity": "info",
+          "confidence": 0.3,
+          "fixability": "none",
+          "reason": "diff says signature but your code compiles against the target"
+        }
+      ],
+      "callSitesChecked": 9,
+      "unanalyzed": [],
+      "status": "safe",
+      "notes": ["5 dependencies of vitest@5.0.3 fetched at the versions it declares"],
+      "timing": {
+        "fetchMs": 53,
+        "diffMs": 2109,
+        "usagesMs": 3211,
+        "compileMs": 5024,
+        "runtimeMs": 148
+      },
+      "tier": "generic",
+      "compile": {
+        "baselineErrors": 0,
+        "unresolvedInTarget": [],
+        "unresolvedFiles": [],
+        "unattributed": []
+      },
+      "runtime": [
+        {
+          "package": "vitest",
+          "node": "v22.20.0",
+          "nodeSource": "current",
+          "changes": [],
+          "inconclusive": "installed copy: both loaders failed: Vitest failed to access its internal state.",
+          "usedKeys": ["expect"]
+        }
+      ],
+      "workspaces": ["packages/api", "packages/shared"],
+      "importers": [
+        { "workspace": "packages/api", "declared": true, "analyzed": true },
+        { "workspace": "packages/shared", "declared": true, "analyzed": true }
+      ]
+    },
+    {
+      "workspace": "*",
       "name": "zod",
       "installed": "3.25.76",
       "latest": "4.6.5",
@@ -42,7 +277,8 @@
           "severity": "breaking",
           "confidence": 0.6,
           "fixability": "assisted",
-          "reason": "declaration kind changed from class to variable; a value+type pair may still construct, but extends/instanceof may break"
+          "reason": "declaration kind changed from class to variable; a value+type pair may still construct, but extends/instanceof may break",
+          "evidence": "compiler"
         },
         {
           "change": {
@@ -76,7 +312,8 @@
           "severity": "breaking",
           "confidence": 1,
           "fixability": "mechanical",
-          "reason": "overload removed or changed"
+          "reason": "overload removed or changed",
+          "evidence": "compiler"
         },
         {
           "change": {
@@ -110,7 +347,8 @@
           "severity": "breaking",
           "confidence": 1,
           "fixability": "mechanical",
-          "reason": "overload removed or changed"
+          "reason": "overload removed or changed",
+          "evidence": "compiler"
         },
         {
           "change": {
@@ -144,7 +382,8 @@
           "severity": "breaking",
           "confidence": 1,
           "fixability": "mechanical",
-          "reason": "overload removed or changed"
+          "reason": "overload removed or changed",
+          "evidence": "compiler"
         },
         {
           "change": {
@@ -178,7 +417,8 @@
           "severity": "breaking",
           "confidence": 1,
           "fixability": "mechanical",
-          "reason": "overload removed or changed"
+          "reason": "overload removed or changed",
+          "evidence": "compiler"
         },
         {
           "change": {
@@ -212,7 +452,8 @@
           "severity": "breaking",
           "confidence": 0.7,
           "fixability": "mechanical",
-          "reason": "parameter 'params' type changed"
+          "reason": "parameter 'params' type changed",
+          "evidence": "compiler"
         },
         {
           "change": {
@@ -246,7 +487,8 @@
           "severity": "breaking",
           "confidence": 1,
           "fixability": "mechanical",
-          "reason": "overload removed or changed"
+          "reason": "overload removed or changed",
+          "evidence": "compiler"
         },
         {
           "change": {
@@ -280,7 +522,8 @@
           "severity": "breaking",
           "confidence": 0.7,
           "fixability": "mechanical",
-          "reason": "parameter 'params' type changed"
+          "reason": "parameter 'params' type changed",
+          "evidence": "compiler"
         },
         {
           "change": {
@@ -314,7 +557,8 @@
           "severity": "breaking",
           "confidence": 1,
           "fixability": "mechanical",
-          "reason": "overload removed or changed"
+          "reason": "overload removed or changed",
+          "evidence": "compiler"
         },
         {
           "change": {
@@ -348,7 +592,8 @@
           "severity": "breaking",
           "confidence": 1,
           "fixability": "mechanical",
-          "reason": "overload removed or changed"
+          "reason": "overload removed or changed",
+          "evidence": "compiler"
         },
         {
           "change": {
@@ -382,7 +627,8 @@
           "severity": "breaking",
           "confidence": 1,
           "fixability": "mechanical",
-          "reason": "overload removed or changed"
+          "reason": "overload removed or changed",
+          "evidence": "compiler"
         },
         {
           "change": {
@@ -416,7 +662,8 @@
           "severity": "breaking",
           "confidence": 1,
           "fixability": "mechanical",
-          "reason": "overload removed or changed"
+          "reason": "overload removed or changed",
+          "evidence": "compiler"
         },
         {
           "change": {
@@ -450,7 +697,8 @@
           "severity": "breaking",
           "confidence": 1,
           "fixability": "mechanical",
-          "reason": "overload removed or changed"
+          "reason": "overload removed or changed",
+          "evidence": "compiler"
         },
         {
           "change": {
@@ -484,7 +732,8 @@
           "severity": "breaking",
           "confidence": 1,
           "fixability": "mechanical",
-          "reason": "overload removed or changed"
+          "reason": "overload removed or changed",
+          "evidence": "compiler"
         },
         {
           "change": {
@@ -518,7 +767,8 @@
           "severity": "breaking",
           "confidence": 0.7,
           "fixability": "mechanical",
-          "reason": "parameter 'params' type changed"
+          "reason": "parameter 'params' type changed",
+          "evidence": "compiler"
         },
         {
           "change": {
@@ -552,7 +802,8 @@
           "severity": "breaking",
           "confidence": 1,
           "fixability": "mechanical",
-          "reason": "overload removed or changed"
+          "reason": "overload removed or changed",
+          "evidence": "compiler"
         },
         {
           "change": {
@@ -586,7 +837,8 @@
           "severity": "breaking",
           "confidence": 1,
           "fixability": "mechanical",
-          "reason": "overload removed or changed"
+          "reason": "overload removed or changed",
+          "evidence": "compiler"
         },
         {
           "change": {
@@ -3581,7 +3833,8 @@
           "severity": "breaking",
           "confidence": 1,
           "fixability": "unknown",
-          "reason": "compile error not attributed to a known API change"
+          "reason": "compile error not attributed to a known API change",
+          "evidence": "compiler"
         },
         {
           "change": {
@@ -3611,7 +3864,8 @@
           "severity": "breaking",
           "confidence": 1,
           "fixability": "unknown",
-          "reason": "compile error not attributed to a known API change"
+          "reason": "compile error not attributed to a known API change",
+          "evidence": "compiler"
         },
         {
           "change": {
@@ -3645,7 +3899,8 @@
           "severity": "breaking",
           "confidence": 1,
           "fixability": "mechanical",
-          "reason": "overload removed or changed"
+          "reason": "overload removed or changed",
+          "evidence": "compiler"
         },
         {
           "change": {
@@ -3679,7 +3934,8 @@
           "severity": "breaking",
           "confidence": 1,
           "fixability": "mechanical",
-          "reason": "overload removed or changed"
+          "reason": "overload removed or changed",
+          "evidence": "compiler"
         },
         {
           "change": {
@@ -3713,7 +3969,8 @@
           "severity": "breaking",
           "confidence": 1,
           "fixability": "mechanical",
-          "reason": "overload removed or changed"
+          "reason": "overload removed or changed",
+          "evidence": "compiler"
         },
         {
           "change": {
@@ -3744,7 +4001,8 @@
           "severity": "breaking",
           "confidence": 1,
           "fixability": "manual",
-          "reason": "removed"
+          "reason": "removed",
+          "evidence": "compiler"
         },
         {
           "change": {
@@ -3778,7 +4036,8 @@
           "severity": "breaking",
           "confidence": 1,
           "fixability": "mechanical",
-          "reason": "overload removed or changed"
+          "reason": "overload removed or changed",
+          "evidence": "compiler"
         },
         {
           "change": {
@@ -3812,7 +4071,8 @@
           "severity": "breaking",
           "confidence": 1,
           "fixability": "mechanical",
-          "reason": "overload removed or changed"
+          "reason": "overload removed or changed",
+          "evidence": "compiler"
         },
         {
           "change": {
@@ -3846,7 +4106,8 @@
           "severity": "breaking",
           "confidence": 0.7,
           "fixability": "mechanical",
-          "reason": "parameter 'params' type changed"
+          "reason": "parameter 'params' type changed",
+          "evidence": "compiler"
         },
         {
           "change": {
@@ -6997,7 +7258,8 @@
           "severity": "breaking",
           "confidence": 1,
           "fixability": "mechanical",
-          "reason": "compile error not attributed to a known API change"
+          "reason": "compile error not attributed to a known API change",
+          "evidence": "compiler"
         },
         {
           "change": {
@@ -7027,7 +7289,8 @@
           "severity": "breaking",
           "confidence": 1,
           "fixability": "mechanical",
-          "reason": "compile error not attributed to a known API change"
+          "reason": "compile error not attributed to a known API change",
+          "evidence": "compiler"
         }
       ],
       "callSitesChecked": 123,
@@ -7035,12 +7298,13 @@
       "status": "breaking",
       "notes": ["1 pre-existing type error at the installed version (subtracted)"],
       "timing": {
-        "fetchMs": 11,
-        "diffMs": 3095,
-        "usagesMs": 4966,
-        "compileMs": 882,
-        "runtimeMs": 4
+        "fetchMs": 25,
+        "diffMs": 3017,
+        "usagesMs": 3831,
+        "compileMs": 719,
+        "runtimeMs": 3
       },
+      "tier": "verified",
       "compile": {
         "baselineErrors": 1,
         "unresolvedInTarget": [],
@@ -7477,9 +7741,8 @@
             "ZodType",
             "ZodTypeDef",
             "safeParse",
-            "SafeParseError",
-            "success",
             "SafeParseSuccess",
+            "success",
             "data",
             "z",
             "object",
@@ -7489,6 +7752,7 @@
             "min",
             "optional",
             "boolean",
+            "SafeParseError",
             "error",
             "uuid",
             "number",
@@ -7632,6 +7896,36 @@
       ]
     },
     {
+      "workspace": ".",
+      "name": "typescript",
+      "installed": "5.9.3",
+      "latest": "5.9.3",
+      "target": "5.9.3",
+      "majorsBehind": 0,
+      "findings": [],
+      "callSitesChecked": 0,
+      "unanalyzed": [],
+      "status": "not-imported",
+      "notes": ["never imported by this workspace, skipped"],
+      "timing": { "fetchMs": 0, "diffMs": 0, "usagesMs": 0, "compileMs": 0 },
+      "tier": "generic"
+    },
+    {
+      "workspace": "packages/api",
+      "name": "@storefront/shared",
+      "installed": "link:../shared",
+      "latest": "link:../shared",
+      "target": "link:../shared",
+      "majorsBehind": 0,
+      "findings": [],
+      "callSitesChecked": 0,
+      "unanalyzed": [],
+      "status": "workspace",
+      "notes": [],
+      "timing": { "fetchMs": 0, "diffMs": 0, "usagesMs": 0, "compileMs": 0 },
+      "tier": "generic"
+    },
+    {
       "workspace": "packages/api",
       "name": "stripe",
       "installed": "14.25.0",
@@ -7668,7 +7962,8 @@
           "severity": "breaking",
           "confidence": 1,
           "fixability": "manual",
-          "reason": "removed"
+          "reason": "removed",
+          "evidence": "compiler"
         },
         {
           "change": {
@@ -7699,7 +7994,8 @@
           "severity": "breaking",
           "confidence": 1,
           "fixability": "manual",
-          "reason": "removed"
+          "reason": "removed",
+          "evidence": "compiler"
         },
         {
           "change": {
@@ -8031,7 +8327,8 @@
           "severity": "breaking",
           "confidence": 1,
           "fixability": "unknown",
-          "reason": "compile error not attributed to a known API change"
+          "reason": "compile error not attributed to a known API change",
+          "evidence": "compiler"
         },
         {
           "change": {
@@ -8061,7 +8358,8 @@
           "severity": "breaking",
           "confidence": 1,
           "fixability": "unknown",
-          "reason": "compile error not attributed to a known API change"
+          "reason": "compile error not attributed to a known API change",
+          "evidence": "compiler"
         }
       ],
       "callSitesChecked": 20,
@@ -8069,12 +8367,13 @@
       "status": "breaking",
       "notes": [],
       "timing": {
-        "fetchMs": 2245,
-        "diffMs": 1119,
-        "usagesMs": 2299,
-        "compileMs": 918,
-        "runtimeMs": 3
+        "fetchMs": 648,
+        "diffMs": 3192,
+        "usagesMs": 1580,
+        "compileMs": 674,
+        "runtimeMs": 1
       },
+      "tier": "verified",
       "compile": {
         "baselineErrors": 0,
         "unresolvedInTarget": [],
@@ -8186,10 +8485,12 @@
     "breaking": 32,
     "deprecated": 15,
     "unverified": 0,
-    "unaffected": 0,
-    "notImported": 0,
+    "unaffected": 1,
+    "notImported": 1,
     "partiallyAnalyzed": 0,
-    "autoFixable": 38
+    "autoFixable": 38,
+    "skippedForTime": 0,
+    "failed": 0
   },
-  "timing": { "totalMs": 9423 }
+  "timing": { "totalMs": 10536 }
 }

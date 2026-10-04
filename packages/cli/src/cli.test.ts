@@ -73,7 +73,7 @@ describe('uptide (no command)', () => {
 });
 
 describe('uptide check', () => {
-  it('checks zod and stripe by default and exits 0 when nothing breaks', async () => {
+  it('checks every dependency that is behind by default, within a minute, and exits 0 when nothing breaks', async () => {
     const cwd = npmRepo();
     const engine = fakeEngine();
     const io = memoryIo({ cwd });
@@ -82,13 +82,27 @@ describe('uptide check', () => {
       {
         cwd,
         targets: {},
-        only: ['zod', 'stripe'],
+        only: undefined,
         compile: true,
         runtime: true,
         allDeps: undefined,
         workspaceConcurrency: 2,
+        maxTimeMs: 60_000,
       },
     ]);
+    // A dependency asked for by name gets the time it needs; --max-time sets it either way.
+    await run(['check', '--only', 'zod'], memoryIo({ cwd }), engine);
+    await run(['check', '--max-time', '0'], memoryIo({ cwd }), engine);
+    await run(['check', '--only', 'zod', '--max-time', '5'], memoryIo({ cwd }), engine);
+    const asked = engine.calls.slice(1) as { only?: string[]; maxTimeMs?: number }[];
+    expect(asked.map((c) => [c.only, c.maxTimeMs])).toEqual([
+      [['zod'], undefined],
+      [undefined, undefined],
+      [['zod'], 5000],
+    ]);
+    const bad = memoryIo({ cwd });
+    expect(await run(['check', '--max-time', 'soon'], bad, engine)).toBe(2);
+    expect(bad.stderr()).toContain('--max-time soon: expected seconds, 0 for no limit');
     expect(io.stdout()).toMatch(/^uptide check · shop \(npm\) · \d+ms\n/);
     expect(io.stdout()).toContain('Next\n  npx uptide check --details    every site and reason\n');
   });
@@ -112,7 +126,9 @@ describe('uptide check', () => {
     const io = memoryIo({ cwd: npmRepo() });
     await run(['check', '--verbose'], io, fakeEngine());
     expect(io.stderr()).toContain('✔ Repository  shop (npm)');
-    expect(io.stderr()).toMatch(/✔ Analysis of zod, stripe {2}0 breaking, 0 deprecated \(/);
+    expect(io.stderr()).toMatch(
+      /✔ Analysis of every dependency that is behind {2}0 breaking, 0 deprecated \(/,
+    );
     expect(io.stderr()).not.toContain('done in');
   });
 
@@ -144,7 +160,7 @@ describe('uptide check', () => {
     });
     const io = memoryIo({ cwd: npmRepo() });
     expect(await run(['check'], io, engine)).toBe(2);
-    expect(io.stderr()).toContain('✖ Analysis of zod, stripe');
+    expect(io.stderr()).toContain('✖ Analysis of every dependency that is behind');
     expect(io.stderr()).toContain('error: adapter exploded');
     expect(io.stdout()).toBe('');
   });
@@ -255,11 +271,90 @@ describe('uptide fix', () => {
     expect(JSON.parse(io.stdout()).branch).toBe('uptide/zod-4.6.5');
   });
 
-  it('exits 2 for a package without a migration pack, or without --only', async () => {
-    const io = memoryIo({ cwd: pnpmGitRepo() });
-    expect(await run(['fix', '--only', 'react'], io, fakeEngine())).toBe(2);
-    expect(io.stderr()).toContain('--only react: fix supports zod and stripe');
+  it('exits 2 without --only, or with more than one dependency', async () => {
     expect(await run(['fix'], memoryIo({ cwd: pnpmGitRepo() }), fakeEngine())).toBe(2);
+    const io = memoryIo({ cwd: pnpmGitRepo() });
+    expect(await run(['fix', '--only', 'zod,stripe'], io, fakeEngine())).toBe(2);
+    expect(io.stderr()).toContain('--only zod,stripe: fix upgrades one dependency at a time');
+  });
+
+  it('a generic package without an agent: says what it cannot do, and nothing happens', async () => {
+    for (const [argv, env, why, next] of [
+      [
+        ['fix', '--only', 'react'],
+        {},
+        'ANTHROPIC_API_KEY is not set',
+        'Next: export ANTHROPIC_API_KEY=<your key> && uptide fix --only react',
+      ],
+      [
+        ['fix', '--only', 'react', '--no-llm'],
+        { ANTHROPIC_API_KEY: 'test-key' },
+        'assisted fixes are off (--no-llm)',
+        'Next: uptide check --only react --details',
+      ],
+    ] as const) {
+      const engine = fakeEngine();
+      const io = memoryIo({ cwd: pnpmGitRepo(), env });
+      expect(await run([...argv], io, engine)).toBe(2);
+      expect(io.stderr()).toContain(
+        `error: react has no migration pack, so every fix would come from the agent, and ${why}`,
+      );
+      expect(io.stderr()).toContain('Nothing was changed: no clone, no branch, no install.');
+      expect(io.stderr()).toContain(next);
+      expect(engine.calls).toEqual([]);
+    }
+  });
+
+  it('a generic package with an agent: runs under a cost limit and says so', async () => {
+    const cwd = pnpmGitRepo({
+      'package.json': JSON.stringify({
+        name: 'shop',
+        packageManager: 'pnpm@10.17.1',
+        dependencies: { react: '^18.0.0' },
+      }),
+      'node_modules/react/package.json': '{"name":"react","version":"18.3.1"}',
+    });
+    const engine = fakeEngine({
+      declared: async () => new Map([['react', '^18.0.0']]),
+      installed: async () => new Map([['react', '18.3.1']]),
+      fix: async (request) => {
+        engine.calls.push(request);
+        return {
+          ...fixReport(true),
+          package: 'react',
+          tier: 'generic',
+          llm: {
+            available: true,
+            inputTokens: 1,
+            outputTokens: 1,
+            costUsd: 1.02,
+            costLimit: { limitUsd: 1, notAttempted: 3 },
+          },
+        };
+      },
+    });
+    const io = memoryIo({ cwd, env: { ANTHROPIC_API_KEY: 'test-key' } });
+    await run(['fix', '--only', 'react'], io, engine);
+    expect(engine.calls).toEqual([expect.objectContaining({ only: 'react', llm: true })]);
+    expect(io.stderr()).toContain(
+      'react has no migration pack (generic tier): every fix comes from the agent, up to $1.00 (--max-cost)',
+    );
+    expect(io.stdout()).toContain(
+      "  Tier      generic: no migration pack; every edit is the agent's, kept on the compiler's word. Review each one.",
+    );
+    expect(io.stdout()).toContain(
+      '  Agent     stopped at $1.00 (--max-cost): 3 sites not attempted',
+    );
+    // --max-cost reaches the engine; nonsense is refused.
+    await run(
+      ['fix', '--only', 'react', '--max-cost', '2.5'],
+      memoryIo({ cwd, env: { ANTHROPIC_API_KEY: 'k' } }),
+      engine,
+    );
+    expect(engine.calls.at(-1)).toMatchObject({ maxCostUsd: 2.5 });
+    const bad = memoryIo({ cwd, env: { ANTHROPIC_API_KEY: 'k' } });
+    expect(await run(['fix', '--only', 'react', '--max-cost', 'lots'], bad, engine)).toBe(2);
+    expect(bad.stderr()).toContain('--max-cost lots: expected an amount in USD');
   });
 });
 

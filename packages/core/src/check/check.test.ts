@@ -8,7 +8,14 @@ import type { ProgressEvent } from '../domain/progress.js';
 import type { Finding, PackageReport } from '../domain/report.js';
 import type { ApiSurface } from '../domain/surface.js';
 import { UptideError } from '../errors.js';
-import { check, mergeAcrossWorkspaces, sitesOf, statusOf, summarize } from './check.js';
+import {
+  check,
+  mergeAcrossWorkspaces,
+  sitesOf,
+  statusOf,
+  summarize,
+  workerHeapMb,
+} from './check.js';
 
 const ROOT = resolve(import.meta.dirname, '../../../../fixtures');
 const CONSUMER = join(ROOT, 'repos/synthetic-consumer');
@@ -109,7 +116,14 @@ describe('check on the synthetic consumer', () => {
       notImported: 0,
       partiallyAnalyzed: 0,
       autoFixable: 1,
+      skippedForTime: 0,
+      failed: 0,
     });
+    // No pack covers `synthetic`: the breaking finding stands because the compiler confirms it.
+    expect(pkg.tier).toBe('generic');
+    expect(pkg.findings.filter((f) => f.severity === 'breaking').map((f) => f.evidence)).toEqual([
+      'compiler',
+    ]);
     expect(pkg.timing.compileMs).toBeGreaterThan(0);
   });
 
@@ -124,8 +138,13 @@ describe('check on the synthetic consumer', () => {
     const pkg = result.packages[0] as (typeof result.packages)[number];
     expect(pkg.compile).toBeUndefined();
     expect(pkg.timing.compileMs).toBe(0);
-    // Without the compiler nothing is arbitrated: the two widened reads stay breaking.
-    expect(result.summary.breaking).toBe(3);
+    // Without the compiler nothing confirms the three sites, and no pack vouches for them:
+    // in the generic tier they are unverified, kept for --details, never called breaking.
+    expect(result.summary.breaking).toBe(0);
+    expect(result.summary.unverified).toBe(3);
+    expect(pkg.findings.filter((f) => f.severity === 'unverified').map((f) => f.reason)).toEqual(
+      expect.arrayContaining([expect.stringContaining('not confirmed by the compiler')]),
+    );
     expect(pkg.findings.every((f) => f.usage.compileError === undefined)).toBe(true);
   });
 
@@ -188,7 +207,7 @@ describe('check skips what cannot matter', () => {
     expect(result.packages.map((p) => `${p.name}:${p.status}`)).toEqual([
       '@types/node:not-imported',
       'left-pad:not-imported',
-      'synthetic:breaking',
+      'synthetic:deprecated',
     ]);
     expect(result.summary.notImported).toBe(2);
     const all = await check({
@@ -202,7 +221,7 @@ describe('check skips what cannot matter', () => {
     expect(all.packages.map((p) => `${p.name}:${p.status}`)).toEqual([
       '@types/node:skipped',
       'left-pad:skipped',
-      'synthetic:breaking',
+      'synthetic:deprecated',
     ]);
   });
 });
@@ -221,17 +240,19 @@ describe('check on a pnpm workspace', () => {
     expect(result.packages.map((p) => `${p.workspace} ${p.name}:${p.status}`)).toEqual([
       '. left-pad:not-imported',
       'packages/app lib:workspace',
-      'packages/app synthetic:breaking',
+      'packages/app synthetic:deprecated',
     ]);
     const app = result.packages.find(
       (p) => p.name === 'synthetic',
     ) as (typeof result.packages)[number];
     expect(
       app.findings.map((f) => `${f.usage.file}:${f.usage.line} ${f.change.path} ${f.severity}`),
-    ).toEqual(['src/index.ts:4 makeClient breaking', 'src/index.ts:6 VERSION deprecated']);
+    ).toEqual(['src/index.ts:4 makeClient unverified', 'src/index.ts:6 VERSION deprecated']);
+    // This run compiles nothing, so the generic tier calls nothing breaking.
     expect(result.summary).toMatchObject({
       packagesNeedingAttention: 1,
-      breaking: 1,
+      breaking: 0,
+      unverified: 1,
       deprecated: 1,
       notImported: 1,
     });
@@ -291,7 +312,7 @@ describe('check on a workspace that imports what it does not declare', () => {
         (f) => `${f.usage.file}:${f.usage.line} ${f.change.path} ${f.severity}`,
       ),
     ).toEqual([
-      'packages/app/src/index.ts:4 makeClient breaking',
+      'packages/app/src/index.ts:4 makeClient unverified',
       'packages/app/src/index.ts:6 VERSION deprecated',
       'packages/lib/src/index.ts:2 VERSION deprecated',
     ]);
@@ -826,4 +847,65 @@ it('preserves a machine-readable registry failure independently of message wordi
     status: 'skipped',
     skipReason: 'REGISTRY_UNREACHABLE',
   });
+});
+
+describe('a time budget and one failing dependency', () => {
+  it('skips what the budget does not reach and says so, without failing', async () => {
+    const result = await check({
+      cwd: CONSUMER,
+      adapter,
+      fetcher,
+      cache: memoryCache(),
+      // Already spent when the first dependency would start.
+      maxTimeMs: 1,
+    });
+    expect(result.packages.find((p) => p.name === 'synthetic')).toMatchObject({
+      status: 'skipped',
+      skipReason: 'TIME_BUDGET',
+      tier: 'generic',
+      findings: [],
+    });
+    expect(result.summary).toMatchObject({ skippedForTime: 1, failed: 0, breaking: 0 });
+  });
+
+  it('does not skip what is up to date: there is nothing to analyze there', async () => {
+    const result = await check({
+      cwd: CONSUMER,
+      adapter,
+      fetcher,
+      cache: memoryCache(),
+      targets: { synthetic: '1.0.0' },
+      maxTimeMs: 1,
+    });
+    expect(result.packages.find((p) => p.name === 'synthetic')?.notes).toEqual(['up to date']);
+    expect(result.summary.skippedForTime).toBe(0);
+  });
+
+  it('reports a dependency whose analysis fails as failed, with the reason', async () => {
+    const result = await check({
+      cwd: CONSUMER,
+      adapter,
+      cache: memoryCache(),
+      fetcher: {
+        ...fetcher,
+        fetch: async () => {
+          throw new UptideError('REGISTRY_HTTP_ERROR', 'tarball: HTTP 503');
+        },
+      },
+    });
+    expect(result.packages.find((p) => p.name === 'synthetic')).toMatchObject({
+      status: 'skipped',
+      skipReason: 'REGISTRY_HTTP_ERROR',
+    });
+    expect(result.summary).toMatchObject({ failed: 1, skippedForTime: 0 });
+  });
+});
+
+it('sizes a worker heap to the machine: 4 GB at least, 8 GB at most, or what the user says', () => {
+  const GB = 1024 ** 3;
+  expect(workerHeapMb(2, 8 * GB, {})).toBe(4096);
+  expect(workerHeapMb(2, 18 * GB, {})).toBe(6144);
+  expect(workerHeapMb(1, 64 * GB, {})).toBe(8192);
+  expect(workerHeapMb(2, 18 * GB, { UPTIDE_WORKER_HEAP_MB: '12000' })).toBe(12000);
+  expect(workerHeapMb(2, 18 * GB, { UPTIDE_WORKER_HEAP_MB: 'lots' })).toBe(6144);
 });

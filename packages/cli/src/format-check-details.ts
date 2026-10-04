@@ -44,6 +44,14 @@ function describeChange(f: Finding): string {
   }
 }
 
+/** What confirms a breaking finding, in the words `--details` prints under it. */
+const EVIDENCE: Record<Exclude<NonNullable<Finding['evidence']>, 'pack'>, string> = {
+  compiler: 'your code does not compile against the target at this site',
+  runtime: 'the runtime probe loaded the target and the export is gone or changed',
+  'module-format': 'a require() of a package whose target is ESM-only',
+  'removed-export': 'the import of a name the target no longer exports',
+};
+
 function findingLines(
   f: Finding,
   mark: string,
@@ -56,6 +64,8 @@ function findingLines(
   const confidence = f.confidence < 1 ? colors.dim(` (${Math.round(f.confidence * 100)}%)`) : '';
   const second = `      ${description.padEnd(62)} ${colors.dim(f.fixability)}${confidence}`;
   const lines = [first, second];
+  if (f.severity === 'breaking' && f.evidence && f.evidence !== 'pack')
+    lines.push(colors.dim(`      evidence: ${EVIDENCE[f.evidence]}`));
   if (f.usage.compileError)
     lines.push(colors.dim(`      compiler: ${f.usage.compileError.split('\n')[0]}`));
   for (const detail of f.details ?? []) lines.push(colors.dim(`      ${detail}`));
@@ -89,7 +99,8 @@ function packageLines(p: PackageReport, opts: DetailOptions, colors: Colors): st
       )
     : '';
   const via = p.typesVia ? colors.dim(`   · types via ${p.typesVia}`) : '';
-  const header = `${colors.bold(title)}  ${p.installed} → ${p.target}${behind}${where}${via}`;
+  const tier = p.tier ? colors.dim(`   · ${p.tier}`) : '';
+  const header = `${colors.bold(title)}  ${p.installed} → ${p.target}${behind}${tier}${where}${via}`;
   const lines: string[] = [];
   if (p.status === 'no-types') {
     // The real reason: which version lacks declarations, or where the types live instead.
@@ -103,6 +114,8 @@ function packageLines(p: PackageReport, opts: DetailOptions, colors: Colors): st
   // Never imported, linked from the workspace, private, or up to date: nothing to say per package.
   if (p.status === 'not-imported' || p.status === 'workspace' || p.status === 'private') return [];
   if (p.notes.includes('up to date')) return [];
+  // Left out by the time budget: the first screen's "Not analyzed" block names them once.
+  if (p.skipReason === 'TIME_BUDGET') return [];
   if (p.status === 'skipped') {
     return [
       `${colors.bold(p.name)}  ${p.installed}  ${colors.dim(`skipped: ${p.notes.join('; ') || 'unknown reason'}`)}`,
@@ -156,7 +169,7 @@ function packageLines(p: PackageReport, opts: DetailOptions, colors: Colors): st
   if (unverified.length > 0) {
     lines.push(
       '',
-      `  ${colors.magenta(colors.bold('UNVERIFIED'))}  ${plural(unverified.length, 'call site')} ${colors.dim('(verification incomplete)')}`,
+      `  ${colors.magenta(colors.bold('UNVERIFIED'))}  ${plural(unverified.length, 'call site')} ${colors.dim(p.tier === 'generic' ? '(the declarations changed here; nothing confirmed that the code breaks)' : '(verification incomplete)')}`,
     );
     lines.push(...render(unverified, '?', colors, colors.magenta));
   }

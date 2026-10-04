@@ -94,6 +94,8 @@ export function checkResult(summary: Partial<CheckResult['summary']> = {}): Chec
       notImported: 0,
       partiallyAnalyzed: 0,
       autoFixable: 0,
+      skippedForTime: 0,
+      failed: 0,
       ...summary,
     },
     timing: { totalMs: 1 },

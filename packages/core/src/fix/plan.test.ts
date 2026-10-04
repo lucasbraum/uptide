@@ -174,21 +174,48 @@ describe('planPackage', () => {
     ]);
   });
 
-  it('is manual without a pack, or when the pack does not cover the upgrade', () => {
+  it('without a pack, sends confirmed breaking sites to the agent and nothing to a rule', () => {
     const removed = finding({ package: 'sharp', path: 'sharp.cache', kind: 'removed' }, {});
     const noPack = planPackage(pkg([removed], { name: 'sharp' }));
     expect(noPack[0]).toMatchObject({
       rule: 'sharp.cache',
       title: 'sharp.cache removed',
-      by: { rule: 0, agent: 0, manual: 1 },
+      by: { rule: 0, agent: 1, manual: 0 },
     });
-    // zod 4 → 4 is outside the pack: nothing is promised to a rule or the agent.
+    // When the compiler rejected every site, the title is what it said, not the diff's symbol.
+    const rejected = finding(
+      { package: 'avatars', path: 'Style', kind: 'type' },
+      {
+        compileCode: 2305,
+        compileError: "Module '\"avatars\"' has no exported member 'createAvatar'.",
+      },
+    );
+    expect(planPackage(pkg([rejected], { name: 'avatars' }))[0]?.title).toBe(
+      'createAvatar is no longer exported',
+    );
+    // A removal the compiler does not see as a missing name is titled by what it does see.
+    const deep = finding(
+      { package: 'i18n-hooks', path: 'DefaultNamespace', kind: 'removed' },
+      {
+        compileCode: 2589,
+        compileError: 'Type instantiation is excessively deep and possibly infinite.',
+      },
+    );
+    expect(planPackage(pkg([deep], { name: 'i18n-hooks' }))[0]?.title).toBe(
+      'A type became too deep for the compiler to instantiate',
+    );
+    // What nothing confirmed is nobody's to migrate unasked.
+    const unconfirmed = planPackage(
+      pkg([{ ...removed, severity: 'unverified' }], { name: 'sharp' }),
+    );
+    expect(unconfirmed[0]?.by).toEqual({ rule: 0, agent: 0, manual: 1 });
+    // zod 4 → 4 is outside the pack: no rule is promised; it is a generic upgrade.
     const sameMajor = planPackage(
       pkg([finding({ path: 'string' }, { line: 2, column: 21 })], { installed: '4.0.0' }),
       zodPack,
       read,
     );
-    expect(sameMajor[0]?.by).toEqual({ rule: 0, agent: 0, manual: 1 });
+    expect(sameMajor[0]?.by).toEqual({ rule: 0, agent: 1, manual: 0 });
   });
 
   it('keeps a pack finding marked manual as a decision, under the rule the pack named', () => {

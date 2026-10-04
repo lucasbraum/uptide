@@ -6,11 +6,18 @@ export {
 export { createFsSurfaceCache } from './cache/fs-surface-cache.js';
 export { defaultCacheDir } from './cache/paths.js';
 export { requireFindUsages } from './check/capabilities.js';
-export { type CheckOptions, type CheckResult, check } from './check/check.js';
+export {
+  type CheckOptions,
+  type CheckResult,
+  check,
+  isFailure,
+  workerHeapMb,
+} from './check/check.js';
 export { resolveDirection } from './check/direction.js';
 export { deprecationReplacement, fixabilityOf } from './check/fixability.js';
 export { match } from './check/match.js';
 export { type MergedSignals, mergeSignals, symbolFromMessage } from './check/merge.js';
+export { TIER_LEGEND } from './check/tier.js';
 export {
   formatTruthTable,
   scoreAgainstTruth,
@@ -122,5 +129,16 @@ export type { Fixer, FixReport, FixRequest, FixResponse } from './fix/types.js';
 export { sdkApiVersion, stripeConcerns, stripePack } from './packs/stripe/index.js';
 export type { MigrationPack, MigrationRule } from './packs/types.js';
 export { zodPack } from './packs/zod/index.js';
+export { type PlanServices, upgradePlan } from './plan/gather.js';
+export {
+  type Effort,
+  effortOf,
+  type PeerConstraint,
+  type PeerLookup,
+  type PlannedPackage,
+  planUpgrades,
+  type UpgradePlan,
+  type UpgradeStep,
+} from './plan/plan.js';
 export { diffRuntime, probeRuntime } from './runtime/runtime.js';
 export { UPTIDE_COMMAND, uptideCommand, uptideVersionInfo, version } from './version.js';

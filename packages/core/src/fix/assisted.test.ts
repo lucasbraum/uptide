@@ -274,3 +274,21 @@ it("shows the import of a shared helper's module next to the enclosing function"
   expect(shown).toContain('import { prisma, getStripeOrThrow } from "@acme/core";');
   expect(shown).not.toContain('./other');
 });
+
+it('shows where an import is used when the site is the import itself', () => {
+  const source = [
+    "import { lorelei } from 'styles';",
+    "import { createAvatar } from 'avatars';",
+    '',
+    'const unrelated = 1;',
+    '',
+    'export function Avatar(seed: string) {',
+    '  return createAvatar(lorelei, { seed }).toDataUri();',
+    '}',
+    '',
+  ].join('\n');
+  const shown = enclosingContext(source, 2, 10);
+  expect(shown).toContain("Lines 2-2:\nimport { createAvatar } from 'avatars';");
+  expect(shown).toContain('Lines 6-8:\nexport function Avatar(seed: string) {');
+  expect(shown).not.toContain('unrelated');
+});

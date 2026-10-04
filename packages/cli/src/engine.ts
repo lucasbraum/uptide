@@ -15,11 +15,13 @@ import {
   typescriptAdapter,
   UptideError,
   updatePrBody,
+  workerHeapMb,
 } from '@uptide/core';
 import {
   type CheckRequest,
   type FixRequest,
   type Job,
+  type PlanResult,
   runJob,
   type VerifyRequest,
 } from './jobs.js';
@@ -35,6 +37,8 @@ export type UpdatePrBody = (opts: {
 /** The engine as the CLI uses it. Tests substitute an in-memory one. */
 export interface Engine {
   check(request: CheckRequest, onProgress?: ProgressListener): Promise<CheckResult>;
+  /** `check`, then the order to upgrade in with peer constraints and effort. */
+  plan?(request: CheckRequest, onProgress?: ProgressListener): Promise<PlanResult>;
   fix(request: FixRequest, onProgress?: ProgressListener): Promise<FixReport>;
   /** Remove kept temporary clones older than `days`; lists what was removed and what remains. */
   clean?(days: number): { removed: string[]; kept: string[] };
@@ -66,7 +70,8 @@ async function offThread<T>(job: Job, onProgress?: ProgressListener): Promise<T>
   return new Promise<T>((resolvePromise, reject) => {
     const worker = new Worker(new URL('./engine-worker.js', here), {
       workerData: job,
-      resourceLimits: { maxOldGenerationSizeMb: 4096 },
+      // The job thread holds the programs of a single-package repository itself.
+      resourceLimits: { maxOldGenerationSizeMb: workerHeapMb(1) },
     });
     let settled = false;
     worker.on(
@@ -96,6 +101,7 @@ async function offThread<T>(job: Job, onProgress?: ProgressListener): Promise<T>
 export function defaultEngine(): Engine {
   return {
     check: (request, onProgress) => offThread<CheckResult>({ kind: 'check', request }, onProgress),
+    plan: (request, onProgress) => offThread<PlanResult>({ kind: 'plan', request }, onProgress),
     fix: (request, onProgress) => offThread<FixReport>({ kind: 'fix', request }, onProgress),
     verify: (request, onProgress) => offThread<FixReport>({ kind: 'verify', request }, onProgress),
     clean: (days) => cleanRuns({ days }),

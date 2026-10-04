@@ -58,6 +58,16 @@ export async function locateDependencies(
   return dependencies;
 }
 
+/** Every dependency some workspace declares and a registry could serve: not `workspace:`, `link:` or `file:`. */
+export async function declaredDependencies(repo: Repo, engine: Engine): Promise<string[]> {
+  const names = new Set<string>();
+  for (const workspace of repo.workspaces) {
+    const declared = await engine.declared(join(repo.root, workspace));
+    for (const [name, spec] of declared) if (!/^(workspace|link|file):/.test(spec)) names.add(name);
+  }
+  return [...names].sort();
+}
+
 /** Where each supported dependency stands: the lockfile plus one registry lookup each. */
 export async function collectStatus(
   repo: Repo,
