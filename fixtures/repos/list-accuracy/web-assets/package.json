@@ -1,0 +1,15 @@
+{
+  "name": "synthetic-web-assets",
+  "private": true,
+  "dependencies": {
+    "scss-theme": "1.0.0",
+    "sass-theme": "1.0.0",
+    "less-theme": "1.0.0",
+    "css-theme": "1.0.0",
+    "@theme/tokens": "1.0.0",
+    "forward-theme": "1.0.0",
+    "angular": "1.0.0",
+    "html-theme": "1.0.0",
+    "orphan": "1.0.0"
+  }
+}

@@ -1,0 +1,142 @@
+[
+  {
+    "file": ".huskyrc",
+    "tool": "husky",
+    "content": "{}\n"
+  },
+  {
+    "file": ".huskyrc.json",
+    "tool": "husky",
+    "content": "{}\n"
+  },
+  {
+    "file": ".huskyrc.js",
+    "tool": "husky",
+    "content": "throw new Error('must not execute'); module.exports = {};\n"
+  },
+  {
+    "file": ".lintstagedrc",
+    "tool": "lint-staged",
+    "content": "{}\n"
+  },
+  {
+    "file": ".lintstagedrc.json",
+    "tool": "lint-staged",
+    "content": "{}\n"
+  },
+  {
+    "file": ".lintstagedrc.js",
+    "tool": "lint-staged",
+    "content": "throw new Error('must not execute'); module.exports = {};\n"
+  },
+  {
+    "file": ".lintstagedrc.yaml",
+    "tool": "lint-staged",
+    "content": "{}\n"
+  },
+  {
+    "file": ".lintstagedrc.yml",
+    "tool": "lint-staged",
+    "content": "{}\n"
+  },
+  {
+    "file": "lint-staged.config.js",
+    "tool": "lint-staged",
+    "content": "throw new Error('must not execute'); module.exports = {};\n"
+  },
+  {
+    "file": "lint-staged.config.cjs",
+    "tool": "lint-staged",
+    "content": "throw new Error('must not execute'); module.exports = {};\n"
+  },
+  {
+    "file": "lint-staged.config.mjs",
+    "tool": "lint-staged",
+    "content": "throw new Error('must not execute'); module.exports = {};\n"
+  },
+  {
+    "file": ".prettierrc",
+    "tool": "prettier",
+    "content": "{}\n"
+  },
+  {
+    "file": ".prettierrc.json",
+    "tool": "prettier",
+    "content": "{}\n"
+  },
+  {
+    "file": ".prettierrc.yaml",
+    "tool": "prettier",
+    "content": "{}\n"
+  },
+  {
+    "file": ".prettierrc.js",
+    "tool": "prettier",
+    "content": "throw new Error('must not execute'); module.exports = {};\n"
+  },
+  {
+    "file": "prettier.config.js",
+    "tool": "prettier",
+    "content": "throw new Error('must not execute'); module.exports = {};\n"
+  },
+  {
+    "file": ".eslintrc",
+    "tool": "eslint",
+    "content": "{}\n"
+  },
+  {
+    "file": ".eslintrc.json",
+    "tool": "eslint",
+    "content": "{}\n"
+  },
+  {
+    "file": ".eslintrc.js",
+    "tool": "eslint",
+    "content": "throw new Error('must not execute'); module.exports = {};\n"
+  },
+  {
+    "file": ".stylelintrc",
+    "tool": "stylelint",
+    "content": "{}\n"
+  },
+  {
+    "file": ".stylelintrc.json",
+    "tool": "stylelint",
+    "content": "{}\n"
+  },
+  {
+    "file": ".stylelintrc.js",
+    "tool": "stylelint",
+    "content": "throw new Error('must not execute'); module.exports = {};\n"
+  },
+  {
+    "file": ".babelrc",
+    "tool": "@babel/core",
+    "content": "{}\n"
+  },
+  {
+    "file": "babel.config.js",
+    "tool": "@babel/core",
+    "content": "throw new Error('must not execute'); module.exports = {};\n"
+  },
+  {
+    "file": "commitlint.config.js",
+    "tool": "@commitlint/cli",
+    "content": "throw new Error('must not execute'); module.exports = {};\n"
+  },
+  {
+    "file": ".czrc",
+    "tool": "commitizen",
+    "content": "{}\n"
+  },
+  {
+    "file": ".standard",
+    "tool": "standard",
+    "content": "{}\n"
+  },
+  {
+    "file": ".standardrc",
+    "tool": "standard",
+    "content": "{}\n"
+  }
+]

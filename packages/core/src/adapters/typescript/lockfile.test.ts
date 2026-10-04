@@ -108,3 +108,17 @@ packages:
     ]);
   });
 });
+
+it('selects the declared npm alias range rather than the first Yarn alias entry', () => {
+  const text = `"alias@npm:actual@^1.0.0":
+  version "1.2.0"
+
+"alias@npm:actual@^2.0.0":
+  version "2.3.0"
+`;
+  expect(
+    parseYarn(text, { importer: '.', declared: new Map([['alias', 'npm:actual@^2.0.0']]) }).get(
+      'alias',
+    ),
+  ).toBe('2.3.0');
+});

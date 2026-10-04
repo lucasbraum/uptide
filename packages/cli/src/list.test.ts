@@ -140,3 +140,28 @@ it('keeps tooling-group peers in their collapsed group instead of dropping them'
   expect(text).toContain('peer of tool');
   expect(text).toContain('uptide check --group tool');
 });
+
+it('returns incomplete discovery and preserves unknown packages in JSON', async () => {
+  const unknown = [
+    {
+      name: 'jquery',
+      currentVersions: ['1.0.0'],
+      workspaces: ['.'],
+      reason: 'timed out on registry.npmjs.org, skipped',
+    },
+  ];
+  const cwd = tempRepo({ 'package.json': '{"name":"shop"}', 'package-lock.json': '{}' });
+  const io = memoryIo({ cwd });
+  const engine = fakeEngine({
+    list: async () => ({
+      ...report,
+      unknown,
+      failures: [
+        { name: 'jquery', kind: 'registry', reason: 'timed out on registry.npmjs.org, skipped' },
+      ],
+    }),
+  });
+  expect(await run(['list', '--json'], io, engine)).toBe(2);
+  expect(JSON.parse(io.stdout()).unknown).toEqual(unknown);
+  expect(JSON.parse(io.stdout()).packages).toHaveLength(3);
+});

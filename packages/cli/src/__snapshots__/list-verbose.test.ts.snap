@@ -1,0 +1,31 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`formats all five timings and file counts deterministically 1`] = `
+"manifest read  1.3 ms · 1 package manifest · 6 installed manifests
+registry       20.0 ms
+source scan    8.3 ms · 36 source files · 5 asset files · 7 parsed · 2 workers
+config scan    2.5 ms · 3 config files
+render         1.5 ms
+files          48 visited (built-in excluded directories not enumerated)
+skipped        .gitignore: 4 files · 1 directory
+skipped        no dependency text: 29 files · 0 directories
+"
+`;
+
+exports[`warns about broad Git rules in summary/verbose without treating them as discovery failures ({"flags":[]}) 1`] = `
+"uptide list
+
+1 outdated   1 major   0 minor   0 groups   0 tooling
+
+Usage warning: .gitignore skipped 3 of 4 candidate source
+files (75%); rules: "hidden*.js" (3). Usage may be
+understated.
+
+PACKAGES
+  axios          1.0.0 → 2.0.0   major   1 file   1 call
+
+Usage is a syntax scan, no type analysis.
+Generic analysis is the default; verified means a migration…
+Next  uptide check axios
+"
+`;

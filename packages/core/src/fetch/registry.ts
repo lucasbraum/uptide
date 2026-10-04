@@ -5,7 +5,7 @@ import {
   UptideError,
   VersionNotFoundError,
 } from '../errors.js';
-import { type RegistryConfig, registryFor, tokenFor } from './npmrc.js';
+import { authHeaders, type RegistryConfig, registryFor } from './npmrc.js';
 
 export type FetchFn = typeof fetch;
 
@@ -15,6 +15,7 @@ export interface ResolvedVersion {
   name: string;
   version: string;
   tarball: string;
+  dependencies?: Record<string, string>;
   peerDependencies?: Record<string, string>;
   bin?: string | Record<string, string>;
   /** SRI string (`sha512-…`) when the registry provides one. */
@@ -24,6 +25,7 @@ export interface ResolvedVersion {
 }
 
 interface Manifest {
+  dependencies?: Record<string, string>;
   peerDependencies?: Record<string, string>;
   bin?: string | Record<string, string>;
   version?: string;
@@ -42,11 +44,6 @@ export function packumentUrl(name: string, registry: string): string {
 
 export function manifestUrl(name: string, version: string, registry: string): string {
   return `${packumentUrl(name, registry)}/${encodeURIComponent(version)}`;
-}
-
-function authHeaders(url: string, config: RegistryConfig): Record<string, string> {
-  const token = tokenFor(url, config);
-  return token ? { authorization: `Bearer ${token}` } : {};
 }
 
 export interface RetryOptions {
@@ -135,6 +132,7 @@ function toResolved(name: string, manifest: Manifest | undefined): ResolvedVersi
     name,
     version: manifest.version,
     tarball: manifest.dist.tarball,
+    ...(manifest.dependencies ? { dependencies: manifest.dependencies } : {}),
     peerDependencies: manifest.peerDependencies ?? {},
   };
   if (manifest.bin) resolved.bin = manifest.bin;

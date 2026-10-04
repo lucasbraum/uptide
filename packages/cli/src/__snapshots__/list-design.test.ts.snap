@@ -21,7 +21,7 @@ PACKAGES
 
 TOOLING  21 packages, used by scripts and config · --all
 
-POSSIBLY UNUSED  2 packages, no source or tooling usage found · --all
+POSSIBLY UNUSED  2 packages, no usage found by Uptide's scan; verify before removing · --all
 
 Usage is a syntax scan, no type analysis.
 Generic analysis is the default; verified means a migration pack is available.
@@ -50,7 +50,7 @@ exports[`Nest terminal design, TTY=true 1`] = `
 
 [1mTOOLING[22m  [2m21 packages, used by scripts and config · --all[22m
 
-[1mPOSSIBLY UNUSED[22m  [2m2 packages, no source or tooling usage found · --all[22m
+[1mPOSSIBLY UNUSED[22m  [2m2 packages, no usage found by Uptide's scan; verify before removing · --all[22m
 
 [2mUsage is a syntax scan, no type analysis.[22m
 [2mGeneric analysis is the default; verified means a migration pack is available.[22m

@@ -1,0 +1,16 @@
+{
+  "name": "synthetic-rc-configs",
+  "private": true,
+  "dependencies": {
+    "husky": "1.0.0",
+    "lint-staged": "1.0.0",
+    "prettier": "1.0.0",
+    "eslint": "1.0.0",
+    "stylelint": "1.0.0",
+    "@babel/core": "1.0.0",
+    "@commitlint/cli": "1.0.0",
+    "commitizen": "1.0.0",
+    "standard": "1.0.0",
+    "orphan": "1.0.0"
+  }
+}

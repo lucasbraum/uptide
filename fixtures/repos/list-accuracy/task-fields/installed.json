@@ -1,0 +1,7 @@
+{
+  "hook-worker": {
+    "bin": {
+      "check-hooks": "bin/run.js"
+    }
+  }
+}

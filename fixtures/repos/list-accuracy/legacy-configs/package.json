@@ -1,0 +1,18 @@
+{
+  "name": "synthetic-legacy-configs",
+  "private": true,
+  "dependencies": {
+    "gulp": "1.0.0",
+    "gulp-example": "1.0.0",
+    "karma-jasmine": "1.0.0",
+    "jasmine": "1.0.0",
+    "webpack-plugin-example": "1.0.0",
+    "babel-plugin-example": "1.0.0",
+    "babel-preset-example": "1.0.0",
+    "jest-preset-example": "1.0.0",
+    "hook-tool": "1.0.0",
+    "commitlint-config-example": "1.0.0",
+    "cz-adapter-example": "1.0.0",
+    "orphan": "1.0.0"
+  }
+}

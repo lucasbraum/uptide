@@ -1,0 +1,24 @@
+{
+  "name": "synthetic-tool-ignore-scope",
+  "dependencies": {
+    "nanoid": "1.0.0",
+    "jquery": "1.0.0",
+    "pdfjs-dist": "1.0.0",
+    "axios": "1.0.0"
+  },
+  "standard": {
+    "ignore": [
+      "**/*.js"
+    ]
+  },
+  "lint-staged": {
+    "linters": {
+      "*.js": [
+        "prettier --write"
+      ]
+    },
+    "ignore": [
+      "**/*.js"
+    ]
+  }
+}

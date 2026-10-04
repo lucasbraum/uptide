@@ -1,0 +1,72 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`collapses possibly unused with cautious wording and explains rows on expansion 1`] = `
+"uptide list
+
+12 outdated   12 major   0 minor   0 groups   11 tooling
+
+TOOLING  11 packages, used by scripts and config · --all
+
+POSSIBLY UNUSED  1 package, no usage found by Uptide's scan; verify before removing · --all
+
+Usage is a syntax scan, no type analysis.
+Generic analysis is the default; verified means a migration pack is available.
+Next  uptide check babel-plugin-example
+"
+`;
+
+exports[`keeps configured peer members out of Possibly unused while locating the group by its lead 1`] = `
+"uptide list
+
+6 outdated   6 major   0 minor   0 groups   4 tooling
+
+TOOLING  4 packages, used by scripts and config
+  husky           1.0.0 → 2.0.0   major   0 files
+    config file .huskyrc
+  lint-staged     1.0.0 → 2.0.0   major   0 files
+    referenced by configuration
+    hook/task command in .huskyrc
+    config file .lintstagedrc
+  prettier        1.0.0 → 2.0.0   major   peer of unused-plugin
+    known configuration or build tool
+    referenced by configuration
+    lint-staged command
+    config file .prettierrc
+  standard        1.0.0 → 2.0.0   major   0 files
+    referenced by configuration
+    lint-staged command
+
+POSSIBLY UNUSED  2 packages, no usage found by Uptide's scan; verify before removing
+unused-plugin   2 packages (1 in this section)   → 2.x   uptide check --group unused-plugin
+  unused-plugin   1.0.0 → 2.0.0   major   0 files
+    no static imports, script/bin usage, configuration references, stylesheet imports or HTML assets found
+  pretty-quick    1.0.0 → 2.0.0   major   0 files
+    no static imports, script/bin usage, configuration references, stylesheet imports or HTML assets found
+
+Usage is a syntax scan, no type analysis.
+Generic analysis is the default; verified means a migration pack is available.
+Next  uptide check husky
+"
+`;
+
+exports[`retains unknown counts and collapses repeated network failures (TTY=false) 1`] = `
+"uptide list
+
+0 outdated   6 not checked (timed out)   0 major   0 minor   0 groups   0 tooling
+
+? 6 packages on registry.npmjs.org: timed out, skipped
+Usage is a syntax scan, no type analysis.
+Generic analysis is the default; verified means a migration pack is available.
+"
+`;
+
+exports[`retains unknown counts and collapses repeated network failures (TTY=true) 1`] = `
+"[1muptide list[22m
+
+[1m0[22m outdated   [1m6[22m not checked (timed out)   [1m0[22m major   [1m0[22m minor   [1m0[22m groups   [1m0[22m tooling
+
+? 6 packages on registry.npmjs.org: timed out, skipped
+[2mUsage is a syntax scan, no type analysis.[22m
+[2mGeneric analysis is the default; verified means a migration pack is available.[22m
+"
+`;

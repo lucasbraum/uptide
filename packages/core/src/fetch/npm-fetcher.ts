@@ -7,7 +7,7 @@ import { defaultCacheDir, packagePathSegments } from '../cache/paths.js';
 import type { PackageDir } from '../domain/adapter.js';
 import type { PackageFetcher } from '../domain/io.js';
 import { errorCode, IntegrityError } from '../errors.js';
-import { loadRegistryConfig, type RegistryConfig, registryFor, tokenFor } from './npmrc.js';
+import { authHeaders, loadRegistryConfig, type RegistryConfig, registryFor } from './npmrc.js';
 import {
   downloadTarball,
   type FetchFn,
@@ -129,8 +129,8 @@ export function createNpmFetcher(opts: NpmFetcherOptions = {}): PackageFetcher {
           ...result,
           publicRegistry:
             registry === 'https://registry.npmjs.org' &&
-            !tokenFor(manifestUrl(name, requested, registry), config) &&
-            !tokenFor(packumentUrl(name, registry), config),
+            !authHeaders(manifestUrl(name, requested, registry), config).authorization &&
+            !authHeaders(packumentUrl(name, registry), config).authorization,
         };
       },
     );
@@ -161,7 +161,11 @@ export function createNpmFetcher(opts: NpmFetcherOptions = {}): PackageFetcher {
         EXACT_VERSION.test(version),
         async () => {
           const manifest = await resolveVersion(name, version, config, fetchFn);
-          return { peerDependencies: manifest.peerDependencies ?? {}, bin: manifest.bin };
+          return {
+            ...(manifest.dependencies ? { dependencies: manifest.dependencies } : {}),
+            peerDependencies: manifest.peerDependencies ?? {},
+            bin: manifest.bin,
+          };
         },
       ),
     async resolve(name, requested) {

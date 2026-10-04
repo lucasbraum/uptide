@@ -1,0 +1,1 @@
+{"linters":{"**/*.{html,scss}":["prettier --write","git add"],"app/**/*.js":["standard --fix"]},"ignore":["dist/","app/bower_components/"]}

@@ -1,0 +1,1 @@
+{"linters":{"*.js":"standard --fix"},"ignore":["**/*.js"]}

@@ -1,0 +1,32 @@
+{
+  "name": "synthetic-dependency-sources",
+  "private": true,
+  "dependencies": {
+    "github-protocol": "github:example/synthetic#v1.0.0",
+    "github-shorthand": "example/synthetic#v1.0.0",
+    "git-https": "git+https://example.invalid/synthetic.git#v1.0.0",
+    "git-ssh": "git+ssh://git@example.invalid/synthetic.git#v1.0.0",
+    "git-protocol": "git://example.invalid/synthetic.git#v1.0.0",
+    "git-scp": "git@example.invalid:example/synthetic.git",
+    "local-file": "file:../synthetic-private-path",
+    "local-link": "link:../synthetic-private-path",
+    "local-workspace": "workspace:*",
+    "http-tarball": "http://example.invalid/synthetic.tgz?token=synthetic-private-token",
+    "https-tarball": "https://example.invalid/synthetic.tgz?token=synthetic-private-token",
+    "alias-github": "npm:actual@github:example/synthetic#v1.0.0",
+    "alias-git-https": "npm:actual@git+https://example.invalid/synthetic.git",
+    "alias-git-ssh": "npm:actual@git+ssh://git@example.invalid/synthetic.git",
+    "alias-git-protocol": "npm:actual@git://example.invalid/synthetic.git",
+    "alias-file": "npm:actual@file:../synthetic-private-path",
+    "alias-link": "npm:@example/actual@link:../synthetic-private-path",
+    "alias-workspace": "npm:actual@workspace:*",
+    "alias-http": "npm:actual@http://example.invalid/synthetic.tgz",
+    "alias-https": "npm:actual@https://example.invalid/synthetic.tgz",
+    "alias-direct-github": "npm:github:example/synthetic",
+    "alias-direct-file": "npm:file:../synthetic-private-path",
+    "registry-alias": "npm:real-runtime@1.0.0",
+    "scoped-alias": "npm:@example/real-scoped@^1.0.0",
+    "tool-alias": "npm:typescript@1.0.0",
+    "ordinary": "^1.0.0"
+  }
+}

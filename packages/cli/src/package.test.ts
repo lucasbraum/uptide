@@ -33,10 +33,13 @@ describe('published package', () => {
     const files = readdirSync(`${root}dist`);
     // The engine resolves `./worker.js` relative to its own chunk: everything stays flat.
     expect(files).toContain('worker.js');
+    expect(files).toContain('list-worker.js');
     expect(files.every((f) => f.endsWith('.js'))).toBe(true);
     const sources = files.map((f) => readFileSync(`${root}dist/${f}`, 'utf8')).join('\n');
     expect(sources).not.toMatch(/from\s*["']@uptide\/core["']/);
-    expect(sources).not.toMatch(/from\s*["'](ts-morph|commander|picocolors|semver)["']/);
+    expect(sources).not.toMatch(
+      /from\s*["'](ts-morph|commander|picocolors|semver|ignore|picomatch)["']/,
+    );
   });
 
   it.skipIf(!existsSync(bin))('reports the package version, not the engine constant', () => {

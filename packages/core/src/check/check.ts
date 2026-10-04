@@ -161,7 +161,7 @@ export async function check(opts: CheckOptions): Promise<CheckResult> {
     ...new Set(Object.values(installedByWorkspace).flatMap((deps) => Object.keys(deps))),
   ];
   const scopedImports =
-    opts.only && !opts.adapter ? scanImports(opts.cwd, candidates, workspaces) : undefined;
+    opts.only && !opts.adapter ? await scanImports(opts.cwd, candidates, workspaces) : undefined;
   const roots = new Map<string, string[]>();
   for (const workspace of workspaces) {
     const files = new Set<string>();

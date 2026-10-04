@@ -29,7 +29,7 @@ import {
 import { formatHuman } from './format.js';
 import { type CheckHeader, formatCheck, repoLine } from './format-check.js';
 import { formatFixSummary } from './format-fix.js';
-import { formatList } from './format-list.js';
+import { formatList, formatListTimings } from './format-list.js';
 import { formatPlan } from './format-plan.js';
 import { writeListHtml } from './html/list.js';
 import { writeMigrationHtml } from './html/migration.js';
@@ -301,7 +301,8 @@ ${PRIVACY}`,
       .option('--all', 'expand minor/patch upgrades, tooling and possibly unused packages')
       .option('--html [path]', 'write a self-contained HTML report (default: OS temp directory)')
       .option('--open', 'open the HTML report in a browser (requires --html)')
-      .option('--details', 'show top symbols and source file lists'),
+      .option('--details', 'show top symbols and source file lists')
+      .option('--verbose', 'show discovery/render phase timings and file counts'),
   )
     .addHelpText(
       'after',
@@ -309,7 +310,13 @@ ${PRIVACY}`,
     )
     .action(
       (
-        flags: Shared & { all?: boolean; html?: string | true; open?: boolean; details?: boolean },
+        flags: Shared & {
+          all?: boolean;
+          html?: string | true;
+          open?: boolean;
+          details?: boolean;
+          verbose?: boolean;
+        },
       ) =>
         act(flags, async ({ cwd, progress, ui }) => {
           if (flags.open && !flags.html) throw new CliError('--open requires --html');
@@ -318,9 +325,15 @@ ${PRIVACY}`,
           if (!engine.list) throw new CliError('this build cannot list dependencies');
           const discover = engine.list;
           const report = await progress.phase('Discovery', () =>
-            discover({ cwd: repo.root, details: flags.details }),
+            discover({
+              cwd: repo.root,
+              details: flags.details,
+              ...(flags.verbose ? { verbose: true } : {}),
+            }),
           );
           telemetry?.record(() => listMetrics(report));
+          const renderStart = io.now();
+          let renderMs: number | undefined;
           if (flags.json) emit(report);
           else
             io.out(
@@ -349,6 +362,7 @@ ${PRIVACY}`,
               io.cwd,
             );
             io.err(`HTML report: ${path}\n`);
+            renderMs = io.now() - renderStart;
             if (flags.open && ui.interactive && io.outTty) {
               try {
                 await openHtml(path);
@@ -359,7 +373,8 @@ ${PRIVACY}`,
               }
             }
           }
-          return report.failures.length ? EXIT.error : EXIT.ok;
+          if (flags.verbose) io.err(formatListTimings(report, renderMs ?? io.now() - renderStart));
+          return report.failures.length || report.unknown?.length ? EXIT.error : EXIT.ok;
         }),
     );
 

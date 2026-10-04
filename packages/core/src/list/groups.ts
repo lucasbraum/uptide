@@ -92,7 +92,10 @@ export function dependencyGroups(
           .sort();
         if (peerOf.length) {
           p.peerOf = peerOf;
-          p.classification = 'peer';
+          if (p.classification === 'possibly-unused' && lead.classification !== 'possibly-unused') {
+            p.classification = 'peer';
+            p.reasons = peerOf.map((name) => `peer of ${name}`);
+          }
         }
       }
       members.sort(
@@ -133,6 +136,7 @@ export function dependencyGroups(
     const scope = group.scope && scopeSets.get(group.scope) === group ? group.scope : undefined;
     return {
       id: scope ? scope.slice(1) : group.lead,
+      lead: group.lead,
       name: scope ? `${scope}/*` : group.lead,
       members: group.members,
     };

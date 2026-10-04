@@ -206,7 +206,7 @@ export function parseYarn(text: string, query: LockfileQuery): Map<string, strin
   }
   const out = new Map<string, string>();
   for (const [name, range] of query.declared) {
-    const v = byRange.get(`${name}@${range}`) ?? first.get(name);
+    const v = byRange.get(`${name}@${range.replace(/^npm:/, '')}`) ?? first.get(name);
     if (v) out.set(name, v);
   }
   return out;

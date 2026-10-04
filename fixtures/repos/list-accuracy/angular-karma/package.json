@@ -1,0 +1,22 @@
+{
+  "name": "synthetic-angular-karma",
+  "private": true,
+  "scripts": {
+    "test": "karma start"
+  },
+  "dependencies": {
+    "karma": "1.0.0",
+    "karma-jasmine": "1.0.0",
+    "jasmine-core": "1.0.0",
+    "karma-webpack": "1.0.0",
+    "karma-coverage": "1.0.0",
+    "karma-spec-reporter": "1.0.0",
+    "karma-chrome-launcher": "1.0.0",
+    "karma-sourcemap-loader": "1.0.0",
+    "karma-extra": "1.0.0",
+    "direct-helper": "1.0.0",
+    "peer-helper": "1.0.0",
+    "dev-only-helper": "1.0.0",
+    "orphan": "1.0.0"
+  }
+}

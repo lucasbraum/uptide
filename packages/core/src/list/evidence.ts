@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
+import { configConsumers, lintStaged, manifestCommands, type TaskCommands } from './config.js';
 
 export interface Manifest {
+  [key: string]: unknown;
   name?: string;
   version?: string;
   scripts?: Record<string, string>;
@@ -28,9 +30,11 @@ export function installedManifest(
 }
 
 export const isConfig = (file: string): boolean =>
-  /(?:^|\/)(?:tsconfig[^/]*\.jsonc?|nest-cli\.json|\.(?:eslintrc|prettierrc|babelrc)(?:\.[^/]+)?|[^/]*\.config\.[^/]+|(?:jest|eslint|prettier|webpack)[^/]*\.(?:json|[cm]?[jt]s))$/.test(
+  configConsumers(file).length > 0 ||
+  /(?:^|\/)(?:tsconfig[^/]*\.jsonc?|nest-cli\.json|\.(?:eslintrc|prettierrc|babelrc|commitlintrc|czrc|cz-config)(?:\.[^/]+)?|[^/]*\.config\.[^/]+|(?:karma\.conf|gulpfile|jest|eslint|prettier|webpack|commitlint|cz)[^/]*\.(?:json|[cm]?[jt]s))$/.test(
     file,
-  );
+  ) ||
+  /(?:^|\/)\.husky\//.test(file);
 
 export const knownTool = (name: string): boolean =>
   /^(?:eslint|prettier)/.test(name) ||
@@ -56,11 +60,15 @@ export function toolingReasons(
   metadata: Manifest[],
   scripts: string,
   configs: string,
+  manifests: Manifest[] = [],
+  tasks: TaskCommands[] = [],
 ): string[] {
   const reasons: string[] = [];
   if (knownTool(name)) reasons.push('known configuration or build tool');
   const bins = metadata.flatMap((m) =>
-    typeof m.bin === 'string' ? [name.split('/').at(-1) as string] : Object.keys(m.bin ?? {}),
+    typeof m.bin === 'string'
+      ? [(m.name ?? name).split('/').at(-1) as string]
+      : Object.keys(m.bin ?? {}),
   );
   if (
     [name, ...bins].some((token) => mentions(scripts, token)) ||
@@ -68,6 +76,50 @@ export function toolingReasons(
     scripts.includes(`node_modules/${name}/`)
   )
     reasons.push('used by package scripts');
-  if (mentions(configs, name)) reasons.push('referenced by configuration');
-  return reasons;
+  if (referencesPackage(configs, name) || bins.some((bin) => mentions(configs, bin)))
+    reasons.push('referenced by configuration');
+  for (const command of [...tasks, ...manifests.flatMap(manifestCommands)]) {
+    if (
+      [name, ...bins].some((bin) => mentions(command.text, bin)) ||
+      command.text.split(/[\s;&|\x22\x27`]+/).some((token) => bins.includes(basename(token)))
+    )
+      reasons.push(command.reason);
+  }
+  for (const manifest of manifests) {
+    if (Object.hasOwn(manifest, name)) reasons.push(`package.json field: ${name}`);
+    for (const [field, consumers] of Object.entries(CONFIG_FIELDS)) {
+      const value =
+        field === 'config.commitizen'
+          ? (manifest.config as { commitizen?: unknown } | undefined)?.commitizen
+          : manifest[field];
+      if (value === undefined) continue;
+      const text =
+        field === 'lint-staged' ? lintStaged(value).commands.join('\n') : JSON.stringify(value);
+      if (
+        consumers.includes(name) ||
+        referencesPackage(text, name) ||
+        bins.some((bin) => mentions(text, bin))
+      )
+        reasons.push(`package.json field: ${field}`);
+    }
+  }
+  return [...new Set(reasons)];
 }
+
+const CONFIG_FIELDS: Record<string, string[]> = {
+  husky: ['husky'],
+  'lint-staged': ['lint-staged'],
+  'simple-git-hooks': ['simple-git-hooks'],
+  'config.commitizen': ['commitizen'],
+  prettier: ['prettier'],
+  eslintConfig: ['eslint'],
+  babel: ['@babel/core', 'babel-core'],
+  jest: ['jest'],
+  browserslist: ['browserslist'],
+  stylelint: ['stylelint'],
+};
+function referencesPackage(text: string, name: string): boolean {
+  return mentions(text, name) || mentions(text.replace(/(?:\.\.?\/)*node_modules\//g, ''), name);
+}
+export const UNUSED_REASON =
+  'no static imports, script/bin usage, configuration references, stylesheet imports or HTML assets found';

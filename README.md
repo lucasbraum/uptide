@@ -58,16 +58,67 @@ Next
 
 `list` reads manifests, lockfiles, source imports and registry metadata. Groups come first,
 with a command such as `uptide check --group nestjs` to check their members together.
-External peers are members labeled by the package that requires them. Each row gives current → latest, upgrade
+External peers are members labeled by the package that requires them. Each member keeps its own
+classification and evidence. A group header follows its lead; members with independent usage
+appear in their own section, and the group command/JSON still includes the complete member list. Each row gives current → latest, upgrade
 kind and major gap, verified/generic tier, importing files, calls, references and top symbols.
 Workspace columns appear only in workspaces. Top symbols require `--details`; terminal
 columns fit the available width, and only verified packages carry a tier tag. Minor/patch upgrades, tooling and possibly
 unused packages are collapsed; `--all` expands them. Tools used by scripts/configs, runtime
-types and required peers are classified separately from possibly unused packages.
+types and required direct dependencies/peers are classified separately from possibly unused packages. This includes
+package.json tool settings (including keys matching dependency names), tool rc file presence,
+installed bin names (including collisions), hook/task commands, Karma plugin mappings and auto-loading, stylesheet
+imports and HTML assets under node_modules. Expanded rows explain the evidence; “possibly
+unused” means no usage was found by Uptide's scan, so verify before removing. Legacy lint-staged
+`linters` maps and current flat glob maps both supply commands. Their `ignore` entries are
+neither commands nor source-scan exclusions.
+
+Registry settings use environment overrides, project and user `.npmrc` files, scoped
+registries and host/path-scoped credentials. Discovery uses abbreviated metadata with up to
+16 concurrent requests, a 10-second timeout per attempt (including response bodies), and one
+retry for timeouts or HTTP 5xx. Only a host that returns 401, 403 or 405 is blocked for the
+rest of that run. Credentials and registry responses are never written to the discovery cache.
+Unresolved packages stay in JSON's `unknown` list, the summary reports the shared reason (e.g. “3 not checked (access denied)”)
+or simply “N not checked” for mixed reasons,
+and HTML keeps one named row per incomplete package. Repeated failures are grouped by host and
+reason (more than five network errors, or multiple access failures); `--details` lists names.
+Successful packages remain visible; incomplete discovery exits 2. Analysis commands retain
+their normal retry policy.
+
+Git/GitHub, local file/link/workspace dependencies and HTTP(S) sources are intentional skips,
+including `npm:` aliases pointing to those sources. They appear as collapsed “not checked:
+non-registry source (github)” lines (expand with `--all` or `--details`) and a collapsed HTML
+section; JSON keeps them in `skipped`. They do not make discovery incomplete or change exit 0.
+Registry aliases resolve the real package name, retaining their local dependency names for
+usage scanning and adding `registryName` to aliased upgrade rows in JSON.
 `--json` gives every row. `--html [--open]` creates a report styled like check, with copyable
 commands and no source code or file paths by default; `--details` adds file lists.
 Usage is syntactic: indirect aliases and reflection are not followed. With different locked
 versions, usage is shown across the repository.
+
+`list --verbose` prints phase timings and file counts to stderr: manifest read, registry,
+source scan, config scan and render. Source scan includes file traversal and stylesheet/HTML
+assets; config scan includes configuration parsing and classification. Render covers terminal/JSON
+and optional HTML writing, excluding browser launch. With `--json`, verbose phase/count data is
+also included under `timing`; default JSON stays unchanged. This helps distinguish registry
+latency from repositories with many source/config files. Configs are read statically, never executed.
+
+The scan skips only `node_modules`, `.git`, `coverage`, `dist`, `build`, `bower_components`,
+`vendor`, generated-file patterns (`*.min.js`, `*.bundle.js`, `*.map`), and root/nested `.gitignore`
+rules. Git patterns are relative to their declaring directory and support negation. Tool scopes
+(`.prettierignore`, `.eslintignore`, `.stylelintignore`, `standard.ignore`, lint-staged `ignore`)
+do not exclude application code: files a formatter or linter skips may still use dependencies.
+A dependency-name text gate and lexer select candidates for full syntax parsing; bindings,
+shadowing, calls and references still use the syntax parser. Large batches (at least 32
+candidates / 8 MB) use up to four CPU workers; smaller batches avoid worker startup overhead.
+
+If Git rules exclude **more than 50%** of candidate application JS/TS files, the summary,
+HTML and `--verbose` warn with the matching patterns and counts. JSON includes `scanWarnings`;
+a usage warning alone does not change the exit code. Candidates exclude built-in/generated
+artifacts, declaration files and tool configs, and are counted before dependency text/lexer
+filtering. Git-ignored subtrees get a filename-only audit without reading/parsing source;
+built-in excluded directories are never enumerated. Verbose output shows candidates, excluded
+sources, parsed files, workers and per-reason skip counts.
 
 `check` requires names (`uptide check zod stripe`). With no names it points to `uptide list`
 and exits 2 before doing work. It retains tiers and partial results per named package.

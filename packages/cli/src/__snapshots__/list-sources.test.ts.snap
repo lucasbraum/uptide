@@ -1,0 +1,53 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`collapses non-registry sources by reason in the terminal (TTY=false) 1`] = `
+"uptide list
+
+4 outdated   4 major   0 minor   0 groups   1 tooling
+
+PACKAGES
+  ordinary         1.0.0 → 2.0.0   major   1 file   1 call
+  registry-alias   1.0.0 → 2.0.0   major   1 file   1 call
+  scoped-alias     1.0.0 → 2.0.0   major   1 file   1 call
+
+TOOLING  1 package, used by scripts and config · --all
+
+3 packages not checked: non-registry source (file) · --all
+7 packages not checked: non-registry source (git) · --all
+4 packages not checked: non-registry source (github) · --all
+2 packages not checked: non-registry source (http) · --all
+2 packages not checked: non-registry source (https) · --all
+2 packages not checked: non-registry source (link) · --all
+2 packages not checked: non-registry source (workspace) · --all
+
+Usage is a syntax scan, no type analysis.
+Generic analysis is the default; verified means a migration pack is available.
+Next  uptide check ordinary
+"
+`;
+
+exports[`collapses non-registry sources by reason in the terminal (TTY=true) 1`] = `
+"[1muptide list[22m
+
+[1m4[22m outdated   [1m4[22m major   [1m0[22m minor   [1m0[22m groups   [1m1[22m tooling
+
+[1mPACKAGES[22m
+  [1mordinary[22m         1.0.0 → 2.0.0   [33mmajor[39m   1 file   1 call
+  [1mregistry-alias[22m   1.0.0 → 2.0.0   [33mmajor[39m   1 file   1 call
+  [1mscoped-alias[22m     1.0.0 → 2.0.0   [33mmajor[39m   1 file   1 call
+
+[1mTOOLING[22m  [2m1 package, used by scripts and config · --all[22m
+
+[2m3 packages not checked: non-registry source (file) · --all[22m
+[2m7 packages not checked: non-registry source (git) · --all[22m
+[2m4 packages not checked: non-registry source (github) · --all[22m
+[2m2 packages not checked: non-registry source (http) · --all[22m
+[2m2 packages not checked: non-registry source (https) · --all[22m
+[2m2 packages not checked: non-registry source (link) · --all[22m
+[2m2 packages not checked: non-registry source (workspace) · --all[22m
+
+[2mUsage is a syntax scan, no type analysis.[22m
+[2mGeneric analysis is the default; verified means a migration pack is available.[22m
+[1mNext[22m  uptide check ordinary
+"
+`;
