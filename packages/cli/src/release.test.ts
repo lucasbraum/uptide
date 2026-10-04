@@ -1,4 +1,7 @@
-import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const read = (path: string): string =>
@@ -31,7 +34,7 @@ describe('release pipeline', () => {
     );
     expect(workflow).toMatch(/NPM_CONFIG_PROVENANCE: \$\{\{ env\.UPTIDE_PROVENANCE \}\}/);
     expect(workflow).not.toMatch(/NPM_CONFIG_PROVENANCE: '?(true|false)/);
-    expect(workflow).toContain('pnpm changeset version --snapshot next');
+    expect(workflow).not.toContain('pnpm changeset version');
   });
 
   it('tests the tarball before publishing it', () => {
@@ -54,11 +57,12 @@ describe('release pipeline', () => {
   });
 
   describe('latest', () => {
-    it('runs only by hand, defaults to a dry run of 0.3.0', () => {
+    it('runs only by hand, requires a version and defaults to a dry run', () => {
       const triggers = latest.slice(latest.indexOf('\non:'), latest.indexOf('\nconcurrency:'));
       expect(triggers).toContain('workflow_dispatch:');
       expect(triggers).not.toMatch(/\n {2}(push|pull_request|schedule|release):/);
-      expect(triggers).toMatch(/version:[\s\S]*?default: 0\.3\.0/);
+      expect(triggers).toMatch(/version:[\s\S]*?required: true/);
+      expect(triggers).not.toContain('default: 0.3.0');
       expect(triggers).toMatch(/dry_run:[\s\S]*?default: true/);
     });
 
@@ -88,3 +92,48 @@ describe('release pipeline', () => {
     });
   });
 });
+
+for (const [channel, text] of [
+  ['latest', latest],
+  ['next', workflow],
+] as const) {
+  it(`${channel} checks the committed version before install or build, without rewriting it`, () => {
+    const guard = text.indexOf('run: node scripts/check-release-version.mjs');
+    expect(guard).toBeGreaterThan(text.indexOf('uses: actions/checkout@v4'));
+    expect(guard).toBeLessThan(text.indexOf('uses: pnpm/action-setup@v4'));
+    expect(text).toMatch(/VERSION: \$\{\{ inputs\.version \}\}/);
+    expect(text).toMatch(/version:[\s\S]*?required: true/);
+    expect(text).not.toMatch(/npm pkg set|changeset version/);
+  });
+}
+
+it.each(['0.4.0', '0.4.0-next.20261004'])(
+  'requires the typed version to match the checked-out manifest (%s)',
+  (version) => {
+    const root = mkdtempSync(join(tmpdir(), 'uptide-release-version-'));
+    try {
+      mkdirSync(join(root, 'scripts'));
+      mkdirSync(join(root, 'packages/cli'), { recursive: true });
+      const manifest = join(root, 'packages/cli/package.json');
+      const contents = JSON.stringify({ name: 'uptide', version });
+      writeFileSync(manifest, contents);
+      const script = join(root, 'scripts/check-release-version.mjs');
+      writeFileSync(script, read('scripts/check-release-version.mjs'));
+      for (const input of [version, '0.1.0', '']) {
+        const result = spawnSync(process.execPath, [script], {
+          cwd: tmpdir(),
+          env: { ...process.env, VERSION: input },
+          encoding: 'utf8',
+        });
+        expect(result.status).toBe(input === version ? 0 : 1);
+        if (input !== version) {
+          expect(result.stderr).toContain(`packages/cli/package.json (${version})`);
+          expect(result.stderr).toContain('Merge the version PR first');
+        }
+        expect(readFileSync(manifest, 'utf8')).toBe(contents);
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
