@@ -43,6 +43,8 @@ export interface FormatCheckOptions {
 
 /** Rows with no impact beyond this many are folded into one line: the first screen stays one screen. */
 const NO_IMPACT_ROWS = 5;
+/** Rule lines per package on the first screen; beyond that, a count. */
+const MAX_RULE_LINES = 8;
 /** Fix commands suggested at most; the rest is `uptide plan`'s job. */
 const FIX_SUGGESTIONS = 3;
 
@@ -206,15 +208,26 @@ function sectionLines(row: Row, colors: Colors): string[] {
     // A single site is worth naming; the full path is in --details.
     return g.sites === 1 && only ? `${basename(only.file)}:${only.line}` : plural(g.sites, 'site');
   };
-  const titleWidth = Math.max(...acting.map((g) => g.title.length), 0);
-  const scopeWidth = Math.max(...acting.map((g) => scope(g).length), 0);
+  // A package with dozens of distinct changes (a compiler API that was removed) gets its
+  // largest ones here and the rest as a count: --details has every one.
+  const listed = acting.length > MAX_RULE_LINES ? acting.slice(0, MAX_RULE_LINES - 1) : acting;
+  const titleWidth = Math.max(...listed.map((g) => g.title.length), 0);
+  const scopeWidth = Math.max(...listed.map((g) => scope(g).length), 0);
   const lines = [colors.bold(row.p.name)];
-  for (const g of acting) {
+  for (const g of listed) {
     const mark = g.severity === 'breaking' ? colors.red('✗') : colors.magenta('?');
     lines.push(
       `  ${mark} ${pad(g.title, titleWidth)}   ${pad(scope(g), scopeWidth)}   ${colors.dim(byLabel(g))}`,
     );
     if (g.note) lines.push(colors.dim(`    ${g.note}`));
+  }
+  if (listed.length < acting.length) {
+    const rest = acting.slice(listed.length);
+    lines.push(
+      colors.dim(
+        `  … ${plural(rest.length, 'more change')}, ${plural(sitesOf(rest), 'site')} (--details)`,
+      ),
+    );
   }
   if (deprecated.length > 0) {
     const sites = sitesOf(deprecated);

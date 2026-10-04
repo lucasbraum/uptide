@@ -158,6 +158,14 @@ function titleOf(rule: string, sites: Planned[]): string {
       sites.map((s) => s.finding),
     );
   const c = first.change;
+  // The diff names the symbol whose declaration moved; when the compiler rejected every site,
+  // its message says what actually broke there, which is what the reader needs.
+  const compiled = sites.every((s) => s.finding.usage.compileCode !== undefined);
+  if (compiled && !['removed', 'renamed', 'moved', 'module-format', 'deprecated'].includes(c.kind))
+    return diagnosticTitle(
+      first.usage.compileCode as number,
+      sites.map((s) => s.finding),
+    );
   switch (c.kind) {
     case 'removed':
       return `${rule} removed`;

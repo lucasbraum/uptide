@@ -663,7 +663,7 @@ async function checkWorkspace(ctx: Ctx, job: WorkspaceJob): Promise<PackageRepor
         try {
           return [
             await checkGroup(
-              ctx,
+              { ...ctx, opts },
               scopeFor(name),
               workspace,
               members.map((m) => ({ name: m, installed: installed.get(m) as string })),
@@ -671,11 +671,16 @@ async function checkWorkspace(ctx: Ctx, job: WorkspaceJob): Promise<PackageRepor
           ];
         } catch (err) {
           // One dependency that cannot be analyzed is one answer missing, not all of them.
+          const late = errorCode(err) === 'TIME_BUDGET';
           return members.map((m) => ({
             ...notImported(workspace, m, installed.get(m) as string),
             status: 'skipped' as const,
             skipReason: errorCode(err),
-            notes: [`analysis failed: ${(err as Error).message ?? String(err)}`],
+            notes: [
+              late
+                ? 'time budget reached during its analysis'
+                : `analysis failed: ${(err as Error).message ?? String(err)}`,
+            ],
           }));
         }
       },
@@ -1111,6 +1116,16 @@ async function prepare(
  * One dependency, or a release group: Signal A per member, one diff per member, one
  * overlay with every target linked, findings per member, one report.
  */
+/**
+ * Between the phases of one dependency (fetch, diff, compile, runtime probe): past the
+ * deadline, the dependency is abandoned rather than finished. A phase that is running is
+ * not interrupted, so a run ends within one phase of its budget.
+ */
+function outOfTime(ctx: Ctx): void {
+  if (ctx.opts.deadline !== undefined && Date.now() > ctx.opts.deadline)
+    throw new UptideError('TIME_BUDGET', 'time budget reached');
+}
+
 async function checkGroup(
   ctx: Ctx,
   repo: RepoDir,
@@ -1191,6 +1206,7 @@ async function checkGroup(
   const nodeRange = node?.range;
   const nodeSupport = requireEsmSupport(nodeRange);
   try {
+    outOfTime(ctx);
     const tDiff = Date.now();
     const diffs = new Map<string, Awaited<ReturnType<typeof diffDirs>>>();
     for (const { p, pkg } of fetched) {
@@ -1257,6 +1273,7 @@ async function checkGroup(
     );
     if (sameDeclarations) notes.push('type declarations unchanged; compile check skipped');
     if (ctx.opts.compile !== false && compileMany && !sameDeclarations) {
+      outOfTime(ctx);
       const t2 = Date.now();
       // The baseline overlay links what the installed side is: the installed copy, or the
       // @types release the installed runtime should have.
@@ -1354,6 +1371,7 @@ async function checkGroup(
       ).dir;
     };
     if (ctx.opts.runtime !== false) {
+      outOfTime(ctx);
       const tRuntime = Date.now();
       for (const { p, pkg, runtime } of fetched) {
         const installedDir = (p.runtimeDir ?? p.installedDir).dir;

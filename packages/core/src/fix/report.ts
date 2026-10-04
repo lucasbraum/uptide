@@ -99,6 +99,10 @@ const typeOf = (text: string): string => (text.length > 40 ? `${text.slice(0, 37
 /** `billing_cycle_anchor no longer accepts a string (expects BillingCycleAnchor)`, from the message and the line. */
 function concreteTitle(code: number, f: Finding): string | undefined {
   const message = f.usage.compileError?.split('\n')[0] ?? '';
+  if (code === 2305 || code === 2724 || code === 2614) {
+    const m = /has no exported member(?: named)? '([^']+)'/.exec(message);
+    return m ? `${m[1]} is no longer exported` : undefined;
+  }
   if (code === 2322) {
     const m = /^Type '(.+?)' is not assignable to type '(.+?)'\.?$/.exec(message);
     if (!m) return undefined;

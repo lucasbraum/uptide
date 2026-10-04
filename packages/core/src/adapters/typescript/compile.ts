@@ -403,6 +403,18 @@ function overlayProgram(
             wanted.set(dep, { range, from: importer });
           }
         }
+        // An untyped dependency is typed by the @types package the importer declares next to
+        // it (vitest 5: `chai` and `@types/chai`). Nothing imports `@types/x` by name, so it
+        // is wanted with `x`: without it the import is `any` and the ambient namespace it
+        // declares (`Chai`) is missing, which shows up as errors at the consumer's call sites.
+        const typesDep = `@types/${dep.startsWith('@') ? dep.slice(1).replace('/', '__') : dep}`;
+        const typesRange = declaredRange(from, typesDep);
+        if (typesRange !== undefined && !deps.decided.has(typesDep) && !deps.links.has(typesDep)) {
+          const importer = overlayDirs.get(from) as string;
+          const consumer = installedVersion(repo, typesDep);
+          if (!consumerCopySatisfies(importer, typesDep, typesRange, consumer?.version))
+            wanted.set(typesDep, { range: typesRange, from: importer });
+        }
       }
       const direct = ts.resolveModuleName(
         name,
