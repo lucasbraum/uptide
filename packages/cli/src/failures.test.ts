@@ -1,6 +1,6 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { UptideError } from '@uptide/core';
+import { type PackageReport, UptideError } from '@uptide/core';
 import { describe, expect, it } from 'vitest';
 import { run } from './cli.js';
 import { checkResult, fakeEngine, memoryIo, npmRepo, pnpmGitRepo, tempRepo } from './test-utils.js';
@@ -82,7 +82,7 @@ describe('friendly failures: each says what to run next', () => {
     );
     expect(code).toBe(2);
     expect(stderr).toContain('✖ Dependencies');
-    expect(stderr).toContain('error: zod and stripe are in the lockfile but not installed');
+    expect(stderr).toContain('error: stripe and zod are in the lockfile but not installed');
     expect(stderr).toContain(`Next: ${next}\n`);
     expect(engine.calls).toEqual([]);
   });
@@ -120,20 +120,22 @@ describe('friendly failures: each says what to run next', () => {
     expect(stderr).toContain('Next: npm install\n');
   });
 
-  it('monorepo where no package uses zod or stripe: an answer, exit 0', async () => {
-    const cwd = tempRepo({ 'package.json': '{"name":"mono"}', 'pnpm-lock.yaml': '' });
+  it('a repository without zod or stripe is checked like any other', async () => {
+    const cwd = tempRepo({
+      'package.json': '{"name":"mono"}',
+      'pnpm-lock.yaml': '',
+      'node_modules/react/package.json': '{"name":"react","version":"18.3.1"}',
+    });
     const engine = fakeEngine({
       workspaces: async () => ['.', 'packages/a', 'packages/b'],
-      declared: async () => new Map([['react', '^19.0.0']]),
+      declared: async () => new Map([['react', '^18.0.0']]),
+      installed: async () => new Map([['react', '18.3.1']]),
     });
-    const { code, stderr, stdout } = await fail(['check'], cwd, engine);
+    const { code, stdout } = await fail(['check'], cwd, engine);
     expect(code).toBe(0);
-    expect(stderr).toContain(
-      'None of the 2 workspace packages (or the root) depends on zod or stripe.',
-    );
-    expect(stderr).toContain('Next: uptide check --only all');
-    expect(stdout).toBe('');
-    expect(engine.calls).toEqual([]);
+    expect(engine.calls).toHaveLength(1);
+    expect(engine.calls[0]).toMatchObject({ only: undefined, maxTimeMs: 60_000 });
+    expect(stdout).toContain('Nothing to upgrade: every checked dependency is up to date.');
   });
 
   it('a dependency asked for by name that is not there: exit 2', async () => {
@@ -169,13 +171,13 @@ describe('friendly failures: each says what to run next', () => {
       fakeEngine({ check: async () => report }),
     );
     expect(code).toBe(2);
-    expect(stderr).toContain('✖ Analysis of zod, stripe');
+    expect(stderr).toContain('✖ Analysis of every dependency that is behind');
     expect(stderr).toContain('error: cannot reach the npm registry');
     expect(stderr).toContain('Next: npm ping');
     expect(stdout).toBe('');
   });
 
-  it('rate limited: a dependency the registry refused has no result, whatever else was analyzed', async () => {
+  it('one dependency fails: the others are reported, the failed one is named, and the exit code says incomplete', async () => {
     const report = checkResult();
     const base = {
       workspace: '.',
@@ -215,11 +217,38 @@ describe('friendly failures: each says what to run next', () => {
       fakeEngine({ check: async () => report }),
     );
     expect(code).toBe(2);
-    expect(stderr).toContain('error: the npm registry is rate limiting this machine (HTTP 429)');
-    expect(stderr).toContain('after 3 retries');
-    expect(stderr).toContain('Next: run the same command again in 145s');
-    expect(stderr).not.toContain('not analyzed');
-    expect(stdout).toBe('');
+    // The report is there: zod was analyzed and has its row.
+    expect(stdout).toMatch(/zod +3\.23\.8 → 4\.6\.5 .*✓ no impact/);
+    expect(stdout).toContain('Not analyzed');
+    expect(stdout).toContain(
+      '✗ stripe 14.25.0: could not resolve latest: https://registry.npmjs.org/stripe/latest: HTTP 429, rate limited; the registry asks to wait 145s',
+    );
+    expect(stdout).not.toMatch(/^stripe +14/m);
+    expect(stderr).not.toContain('error:');
+  });
+
+  it('breaking found and a dependency failed: breaking is the answer (exit 1)', async () => {
+    const report = checkResult({ breaking: 2 });
+    const failedOne = (): PackageReport => ({
+      workspace: '.',
+      name: 'stripe',
+      installed: '14.25.0',
+      latest: '14.25.0',
+      target: '14.25.0',
+      majorsBehind: 0,
+      findings: [],
+      callSitesChecked: 0,
+      unanalyzed: [],
+      status: 'skipped',
+      skipReason: 'REGISTRY_HTTP_ERROR',
+      notes: ['could not resolve latest: HTTP 503'],
+      timing: { fetchMs: 0, diffMs: 0, usagesMs: 0, compileMs: 0 },
+    });
+    const breaking: PackageReport = { ...failedOne(), name: 'zod', status: 'breaking', notes: [] };
+    delete breaking.skipReason;
+    report.packages = [failedOne(), breaking];
+    const { code } = await fail(['check'], npmRepo(), fakeEngine({ check: async () => report }));
+    expect(code).toBe(1);
   });
 
   it('a registry error thrown by the engine is the same failure', async () => {

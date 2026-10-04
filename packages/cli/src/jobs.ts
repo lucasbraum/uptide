@@ -11,7 +11,14 @@ import {
 /** Plain data only: a request crosses into a worker thread and its result comes back. */
 export type CheckRequest = Pick<
   CheckOptions,
-  'cwd' | 'targets' | 'only' | 'compile' | 'runtime' | 'allDeps' | 'workspaceConcurrency'
+  | 'cwd'
+  | 'targets'
+  | 'only'
+  | 'compile'
+  | 'runtime'
+  | 'allDeps'
+  | 'workspaceConcurrency'
+  | 'maxTimeMs'
 >;
 
 export interface FixRequest {

@@ -6,11 +6,12 @@ export {
 export { createFsSurfaceCache } from './cache/fs-surface-cache.js';
 export { defaultCacheDir } from './cache/paths.js';
 export { requireFindUsages } from './check/capabilities.js';
-export { type CheckOptions, type CheckResult, check } from './check/check.js';
+export { type CheckOptions, type CheckResult, check, isFailure } from './check/check.js';
 export { resolveDirection } from './check/direction.js';
 export { deprecationReplacement, fixabilityOf } from './check/fixability.js';
 export { match } from './check/match.js';
 export { type MergedSignals, mergeSignals, symbolFromMessage } from './check/merge.js';
+export { TIER_LEGEND } from './check/tier.js';
 export {
   formatTruthTable,
   scoreAgainstTruth,

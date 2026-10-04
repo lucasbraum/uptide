@@ -193,9 +193,9 @@ describe('formatCheck, the first screen', () => {
       { color: false },
     );
     expect(out).toMatchSnapshot();
-    // No migration pack for sharp: nothing is promised to a rule or the agent.
-    expect(out).toMatch(/sharp +0\.33\.0 → 0\.35\.0 +minor +✗ 2 breaking in 2 files {4}2 manual/);
-    expect(out).toMatch(/✗ sharp\.cache removed +2 sites +manual/);
+    // No migration pack for sharp: no rule is promised; the confirmed sites are the agent's.
+    expect(out).toMatch(/sharp +0\.33\.0 → 0\.35\.0 +minor +✗ 2 breaking in 2 files {4}2 by agent/);
+    expect(out).toMatch(/✗ sharp\.cache removed +2 sites +by agent/);
     for (const absent of ['@me/shared', '@me/private', 'never', 'current'])
       expect(out).not.toContain(absent);
   });
@@ -254,6 +254,7 @@ describe('the Next block', () => {
     expect(next(formatCheck(storefront, shown))).toEqual([
       'npx uptide@next fix --only zod | migrate on a new branch, verify, no push',
       'npx uptide@next fix --only stripe | migrate on a new branch, verify, no push',
+      'npx uptide@next plan | the order to upgrade in, with the effort',
       'npx uptide@next check --details | every site and reason',
     ]);
   });
@@ -266,6 +267,7 @@ describe('the Next block', () => {
     expect(next(out)).toEqual([
       'npx uptide@next fix --only zod --target 4.6.5 --cwd ../storefront | migrate on a new branch, verify, no push',
       'npx uptide@next fix --only stripe --cwd ../storefront | migrate on a new branch, verify, no push',
+      'npx uptide@next plan --only zod --cwd ../storefront | the order to upgrade in, with the effort',
       'npx uptide@next check --only zod --target zod@4.6.5 --details --cwd ../storefront | every site and reason',
     ]);
   });
@@ -273,6 +275,7 @@ describe('the Next block', () => {
   it('offers fix only where fix can run, and --include-deprecated when that is all there is', () => {
     // A bun repository: check works, fix does not.
     expect(next(formatCheck(storefront, { ...shown, fixable: [] }))).toEqual([
+      'npx uptide@next plan | the order to upgrade in, with the effort',
       'npx uptide@next check --details | every site and reason',
     ]);
     const named = (name: string): PackageReport =>
@@ -288,7 +291,103 @@ describe('the Next block', () => {
     expect(next(formatCheck(deprecatedOnly, shown))).toEqual([
       'npx uptide@next fix --only stripe | migrate on a new branch, verify, no push',
       'npx uptide@next fix --only zod --include-deprecated | migrate the deprecated calls on a new branch, no push',
+      'npx uptide@next plan | the order to upgrade in, with the effort',
       'npx uptide@next check --details | every site and reason',
     ]);
+  });
+});
+
+describe('tiers, the time budget and failures on the first screen', () => {
+  const unconfirmed = removed('src/image.ts', 4, { severity: 'unverified' });
+  const generic = pkg({
+    name: 'sharp',
+    installed: '0.33.0',
+    target: '0.35.0',
+    latest: '0.35.0',
+    tier: 'generic',
+    status: 'breaking',
+    findings: [removed('src/thumb.ts', 9), unconfirmed],
+  });
+  const verified = pkg({
+    name: 'zod',
+    installed: '3.25.76',
+    target: '4.6.5',
+    latest: '4.6.5',
+    tier: 'verified',
+  });
+
+  it('names the tier of every row and explains the difference in one line', () => {
+    const out = formatCheck(report([generic, verified]), { color: false });
+    expect(out).toMatch(/sharp +0\.33\.0 → 0\.35\.0 +minor · latest on npm +generic +✗ 1 breaking/);
+    expect(out).toMatch(/zod +3\.25\.76 → 4\.6\.5 +major · latest on npm +verified +✓ no impact/);
+    expect(
+      out.match(/verified: a migration pack with rules and tests · generic: no pack/g),
+    ).toHaveLength(1);
+    // Nothing generic on screen, nothing to explain.
+    expect(formatCheck(report([verified]), { color: false })).not.toContain('generic: no pack');
+  });
+
+  it('keeps what nothing confirmed off the first screen of a generic package', () => {
+    const out = formatCheck(report([generic]), { color: false });
+    expect(out).toContain('✗ 1 breaking · 1 unconfirmed in --details');
+    expect(out).not.toContain('? ');
+    expect(out).not.toContain('unverified');
+    const none = formatCheck(report([{ ...generic, status: 'safe', findings: [unconfirmed] }]), {
+      color: false,
+    });
+    expect(none).toContain('✓ nothing confirmed (12 call sites) · 1 unconfirmed in --details');
+    // The verified tier still shows what it could not verify.
+    const kept = formatCheck(
+      report([{ ...generic, name: 'zod', tier: 'verified', findings: [unconfirmed] }]),
+      { color: false },
+    );
+    expect(kept).toContain('? 1 unverified');
+  });
+
+  it('folds many no-impact upgrades into one line', () => {
+    const quiet = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((name) =>
+      pkg({ name, tier: 'generic' }),
+    );
+    const out = formatCheck(report([generic, ...quiet]), { color: false });
+    expect(out).toContain('✓ 8 more with no impact on your code: a, b, c, d, e, f, and 2 more');
+    expect(out).not.toMatch(/^a +5\.0\.1/m);
+    // Five or fewer keep their rows.
+    expect(formatCheck(report(quiet.slice(0, 5)), { color: false })).toMatch(/^a +5\.0\.1/m);
+  });
+
+  it('lists what the budget did not reach and what failed, with how to include them', () => {
+    const late = (name: string) =>
+      pkg({
+        name,
+        tier: 'generic',
+        status: 'skipped',
+        skipReason: 'TIME_BUDGET',
+        notes: ['time budget reached before this dependency'],
+      });
+    const failed = pkg({
+      name: 'pg',
+      installed: '8.11.0',
+      tier: 'generic',
+      status: 'skipped',
+      skipReason: 'REGISTRY_HTTP_ERROR',
+      notes: ['could not fetch pg@9.0.0: HTTP 503'],
+    });
+    const out = formatCheck(report([generic, late('react'), late('next'), failed]), {
+      color: false,
+      invocation: 'npx uptide',
+      maxTime: 60,
+    });
+    expect(out).toContain(
+      [
+        'Not analyzed',
+        '  ⚠ 2 behind, out of time (--max-time 60): react, next',
+        '    npx uptide check --only react,next    by name, no time limit',
+        '    npx uptide check --max-time 300    a longer budget (0: no limit)',
+        '  ✗ pg 8.11.0: could not fetch pg@9.0.0: HTTP 503',
+      ].join('\n'),
+    );
+    // Neither gets a row: they have no verdict.
+    expect(out).not.toMatch(/^react +5/m);
+    expect(out).not.toMatch(/^pg +8/m);
   });
 });

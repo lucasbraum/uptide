@@ -2,6 +2,10 @@ import type { Finding, RuntimeReport, Tier } from '../domain/report.js';
 import type { MigrationPack } from '../packs/types.js';
 import { runtimeConfirms } from './file-kind.js';
 
+/** The difference, in one line, wherever a tier is shown. */
+export const TIER_LEGEND =
+  'verified: a migration pack with rules and tests · generic: no pack, breaking only when the compiler or the runtime probe confirms it';
+
 /**
  * `verified`: a migration pack covers this upgrade (rules, a guide, ground truth it is scored
  * against). `generic`: no pack; the analysis is the same, and only what the compiler or the

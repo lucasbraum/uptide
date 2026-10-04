@@ -87,24 +87,6 @@ export function notADependency(repo: Repo, missing: readonly string[]): CliError
 
 const workspaceCount = (repo: Repo): number => repo.workspaces.filter((w) => w !== '.').length;
 
-/**
- * The default scope found nothing: an answer, not a tool error, so it exits 0. Printed
- * instead of an empty report.
- */
-export function nothingToCheck(repo: Repo, supported: readonly string[]): string {
-  const count = workspaceCount(repo);
-  const where =
-    count > 0
-      ? `None of the ${count} workspace packages (or the root) depends on ${names(supported)}`
-      : `This project does not depend on ${names(supported)}`;
-  return [
-    `${where}.`,
-    `  Those are the upgrades uptide covers today; nothing to check.`,
-    `  Next: uptide check --only all   (generic check of every dependency, no migrations)`,
-    '',
-  ].join('\n');
-}
-
 const REGISTRY_FAILURES = ['REGISTRY_UNREACHABLE', 'REGISTRY_HTTP_ERROR'];
 
 /** The registry did not answer, or answered with an error after the retries. */
@@ -136,13 +118,18 @@ export function noNetwork(detail: string): CliError {
 }
 
 /**
- * The engine reports a registry failure as a skipped package. A dependency the registry did
- * not answer for has no result: the run says so and exits 2, never "not analyzed" with a
- * verdict of the rest.
+ * The engine reports a registry failure as a skipped package. When nothing at all could be
+ * analyzed there is no report to show: the run says why and exits 2. When other
+ * dependencies were analyzed, the report lists them and names the ones that failed.
  */
 export function networkFailure(report: CheckResult): CliError | undefined {
   const failed = report.packages.filter((p) => REGISTRY_FAILURES.includes(p.skipReason ?? ''));
-  return failed.length > 0 ? noNetwork(failed[0]?.notes[0] ?? 'registry unavailable') : undefined;
+  const answered = report.packages.some(
+    (p) => !['skipped', 'not-imported', 'workspace', 'private'].includes(p.status),
+  );
+  return failed.length > 0 && !answered
+    ? noNetwork(failed[0]?.notes[0] ?? 'registry unavailable')
+    : undefined;
 }
 
 /** Whether `name` resolves from `dir` the way Node would look it up. */
@@ -161,6 +148,23 @@ export function requireInstalled(repo: Repo, dependencies: readonly DependencySt
     .filter((dep) => dep.workspaces.some((w) => !installedIn(join(repo.root, w), dep.name)))
     .map((dep) => dep.name);
   if (missing.length > 0) throw missingNodeModules(repo, missing);
+}
+
+/**
+ * Before a check of everything: the repository has been installed at all. One optional or
+ * platform-specific package missing is normal; every declared dependency missing means
+ * `node_modules` is not there.
+ */
+export function requireNodeModules(repo: Repo, dependencies: readonly DependencyStatus[]): void {
+  const declared = dependencies.filter((dep) => dep.workspaces.length > 0);
+  const missing = declared.filter((dep) =>
+    dep.workspaces.every((w) => !installedIn(join(repo.root, w), dep.name)),
+  );
+  if (declared.length > 0 && missing.length === declared.length)
+    throw missingNodeModules(
+      repo,
+      missing.slice(0, 3).map((dep) => dep.name),
+    );
 }
 
 function git(root: string, ...args: string[]): string | undefined {

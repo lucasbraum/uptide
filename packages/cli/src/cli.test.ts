@@ -73,7 +73,7 @@ describe('uptide (no command)', () => {
 });
 
 describe('uptide check', () => {
-  it('checks zod and stripe by default and exits 0 when nothing breaks', async () => {
+  it('checks every dependency that is behind by default, within a minute, and exits 0 when nothing breaks', async () => {
     const cwd = npmRepo();
     const engine = fakeEngine();
     const io = memoryIo({ cwd });
@@ -82,13 +82,27 @@ describe('uptide check', () => {
       {
         cwd,
         targets: {},
-        only: ['zod', 'stripe'],
+        only: undefined,
         compile: true,
         runtime: true,
         allDeps: undefined,
         workspaceConcurrency: 2,
+        maxTimeMs: 60_000,
       },
     ]);
+    // A dependency asked for by name gets the time it needs; --max-time sets it either way.
+    await run(['check', '--only', 'zod'], memoryIo({ cwd }), engine);
+    await run(['check', '--max-time', '0'], memoryIo({ cwd }), engine);
+    await run(['check', '--only', 'zod', '--max-time', '5'], memoryIo({ cwd }), engine);
+    const asked = engine.calls.slice(1) as { only?: string[]; maxTimeMs?: number }[];
+    expect(asked.map((c) => [c.only, c.maxTimeMs])).toEqual([
+      [['zod'], undefined],
+      [undefined, undefined],
+      [['zod'], 5000],
+    ]);
+    const bad = memoryIo({ cwd });
+    expect(await run(['check', '--max-time', 'soon'], bad, engine)).toBe(2);
+    expect(bad.stderr()).toContain('--max-time soon: expected seconds, 0 for no limit');
     expect(io.stdout()).toMatch(/^uptide check · shop \(npm\) · \d+ms\n/);
     expect(io.stdout()).toContain('Next\n  npx uptide check --details    every site and reason\n');
   });
@@ -112,7 +126,9 @@ describe('uptide check', () => {
     const io = memoryIo({ cwd: npmRepo() });
     await run(['check', '--verbose'], io, fakeEngine());
     expect(io.stderr()).toContain('✔ Repository  shop (npm)');
-    expect(io.stderr()).toMatch(/✔ Analysis of zod, stripe {2}0 breaking, 0 deprecated \(/);
+    expect(io.stderr()).toMatch(
+      /✔ Analysis of every dependency that is behind {2}0 breaking, 0 deprecated \(/,
+    );
     expect(io.stderr()).not.toContain('done in');
   });
 
@@ -144,7 +160,7 @@ describe('uptide check', () => {
     });
     const io = memoryIo({ cwd: npmRepo() });
     expect(await run(['check'], io, engine)).toBe(2);
-    expect(io.stderr()).toContain('✖ Analysis of zod, stripe');
+    expect(io.stderr()).toContain('✖ Analysis of every dependency that is behind');
     expect(io.stderr()).toContain('error: adapter exploded');
     expect(io.stdout()).toBe('');
   });

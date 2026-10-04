@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 import type { CheckReport, CheckResult, FixReport } from '@uptide/core';
-import { formatFix, uptideCommand } from '@uptide/core';
+import { formatFix, isFailure, TIER_LEGEND, uptideCommand } from '@uptide/core';
 import { Command, CommanderError } from 'commander';
 import { describeRepo, detectRepo, type Repo } from './detect.js';
 import { defaultEngine, type Engine } from './engine.js';
@@ -13,9 +13,9 @@ import {
   noApiKeyNote,
   noNetwork,
   notADependency,
-  nothingToCheck,
   requireFixable,
   requireInstalled,
+  requireNodeModules,
 } from './failures.js';
 import { formatHuman } from './format.js';
 import { type CheckHeader, formatCheck, repoLine } from './format-check.js';
@@ -25,7 +25,7 @@ import { openHtml, writeHtml } from './html/write.js';
 import { type Io, type Ui, type UiFlags, uiOf } from './io.js';
 import { PRIVACY } from './privacy.js';
 import { createProgress, elapsed, type Progress } from './progress.js';
-import { collectStatus, formatStatus, locateDependencies, SUPPORTED } from './status.js';
+import { collectStatus, declaredDependencies, formatStatus, locateDependencies } from './status.js';
 
 /** Replaced by the bundler with this package's version; tests and tsx run the source. */
 declare const __UPTIDE_VERSION__: string | undefined;
@@ -35,11 +35,11 @@ export const VERSION =
     : (JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
         .version as string);
 
-const EXIT_CODES = (zero: string, one: string): string => `
+const EXIT_CODES = (zero: string, one: string, two = ''): string => `
 Exit codes:
   0  ${zero}
   1  ${one}
-  2  uptide could not answer: bad arguments, unsupported repository, no network
+  2  uptide could not answer: bad arguments, unsupported repository, no network${two}
 `;
 
 interface Shared extends UiFlags {
@@ -217,7 +217,11 @@ ${PRIVACY}`,
       .description('Which of your call sites an upgrade breaks, and what fixing them costs')
       .option(
         '--only <packages>',
-        'comma-separated dependencies to check, or `all` (default: zod,stripe)',
+        'comma-separated dependencies to check (default: every direct dependency that is behind)',
+      )
+      .option(
+        '--max-time <seconds>',
+        'stop starting new dependencies after this long; 0 for no limit (default: 60, or no limit with --only)',
       )
       .option(
         '--target <spec...>',
@@ -237,17 +241,31 @@ ${PRIVACY}`,
     .addHelpText(
       'after',
       `
+What it checks:
+  Every direct dependency that is behind its latest version, most likely to hurt first
+  (major upgrades, then the most imported), for 60 seconds. What it did not reach is listed
+  with the command that includes it.
+
+Tiers:
+  ${TIER_LEGEND}
+
 Examples:
-  $ uptide check                          zod and stripe against their latest versions
+  $ uptide check                          every dependency that is behind, within a minute
+  $ uptide check --max-time 300           the same, with five minutes
   $ uptide check --only zod --target 4.6.5
   $ uptide check --details                every site and reason
   $ uptide check --json --ci > uptide.json
-${EXIT_CODES('no breaking change reaches your code', 'breaking changes found at your call sites')}`,
+${EXIT_CODES(
+  'no breaking change reaches your code, in everything that was analyzed',
+  'breaking changes found at your call sites',
+  ';\n     or nothing breaking was found but a dependency failed to analyze (the report\n     still lists the others). Dependencies left out by --max-time do not change the code.',
+)}`,
     )
     .action(
       (
         flags: Shared & {
           only?: string;
+          maxTime?: string;
           target?: string[];
           html?: string | true;
           open?: boolean;
@@ -268,8 +286,14 @@ ${EXIT_CODES('no breaking change reaches your code', 'breaking changes found at 
             const quiet = !flags.verbose;
             const requested = list(flags.only);
             const everything = requested?.length === 1 && requested[0] === 'all';
-            const only = everything ? undefined : (requested ?? [...SUPPORTED]);
+            const only = everything ? undefined : requested;
             const targets = parseTargets(flags.target, only);
+            // Everything, within a minute; a dependency asked for by name gets the time it needs.
+            const maxTime = flags.maxTime !== undefined ? Number(flags.maxTime) : only ? 0 : 60;
+            if (!Number.isFinite(maxTime) || maxTime < 0)
+              throw new CliError(`--max-time ${flags.maxTime}: expected seconds, 0 for no limit`, {
+                next: 'uptide check --max-time 300',
+              });
             const repo = await progress.phase(
               'Repository',
               () => detectRepo(cwd, engine.workspaces),
@@ -298,7 +322,7 @@ ${EXIT_CODES('no breaking change reaches your code', 'breaking changes found at 
                         ...targets,
                       },
                     },
-                    fixable: FIX_MANAGERS.includes(repo.manager) ? SUPPORTED : [],
+                    fixable: FIX_MANAGERS.includes(repo.manager),
                   },
                   flags.html,
                   io.cwd,
@@ -317,52 +341,31 @@ ${EXIT_CODES('no breaking change reaches your code', 'breaking changes found at 
             };
             // Without a terminal there is no live line: say what started, then how long it took.
             if (quiet && !ui.interactive) io.err(`uptide check · ${repoLine(headerOf(repo, 0))}\n`);
-            if (only) {
-              const located = await progress.phase(
-                'Dependencies',
-                async () => {
-                  const deps = await locateDependencies(repo, engine, only);
+            await progress.phase(
+              'Dependencies',
+              async () => {
+                const deps = await locateDependencies(
+                  repo,
+                  engine,
+                  only ?? (await declaredDependencies(repo, engine)),
+                );
+                if (only) {
+                  // Asked for by name and absent is an error, not an empty answer.
                   const absent = deps.filter((d) => d.workspaces.length === 0).map((d) => d.name);
-                  // Asked for by name and absent is an error; the default scope just narrows.
-                  if (requested && absent.length > 0) throw notADependency(repo, absent);
+                  if (absent.length > 0) throw notADependency(repo, absent);
                   requireInstalled(repo, deps);
-                  return deps;
-                },
-                (deps) =>
-                  deps
-                    .map((d) =>
-                      d.workspaces.length === 0
-                        ? `${d.name} not declared`
-                        : `${d.name} ${d.installed}`,
-                    )
-                    .join(', '),
-              );
-              if (located.every((d) => d.workspaces.length === 0)) {
-                if (flags.json)
-                  emit({ repo: repo.root, workspaces: repo.workspaces, packages: [] });
-                io.err(nothingToCheck(repo, only));
-                await htmlReport({
-                  repo: repo.root,
-                  workspaces: repo.workspaces,
-                  packages: [],
-                  summary: {
-                    packagesNeedingAttention: 0,
-                    breaking: 0,
-                    deprecated: 0,
-                    unverified: 0,
-                    unaffected: 0,
-                    notImported: 0,
-                    partiallyAnalyzed: 0,
-                    autoFixable: 0,
-                    skippedForTime: 0,
-                    failed: 0,
-                  },
-                });
-                return EXIT.ok;
-              }
-            }
+                } else requireNodeModules(repo, deps);
+                return deps;
+              },
+              (deps) =>
+                only
+                  ? deps.map((d) => `${d.name} ${d.installed}`).join(', ')
+                  : `${deps.length} declared`,
+            );
             const report = await progress.phase(
-              only ? `Analysis of ${only.join(', ')}` : 'Analysis of every dependency',
+              only
+                ? `Analysis of ${only.join(', ')}`
+                : 'Analysis of every dependency that is behind',
               async () => {
                 // A registry that cannot be reached is a failed phase, not an empty report.
                 const result = await engine
@@ -375,6 +378,7 @@ ${EXIT_CODES('no breaking change reaches your code', 'breaking changes found at 
                       runtime: flags.runtime ?? true,
                       allDeps: flags.allDeps,
                       workspaceConcurrency: Number(flags.workspaces ?? 2),
+                      ...(maxTime > 0 ? { maxTimeMs: maxTime * 1000 } : {}),
                     },
                     progress.event,
                   )
@@ -405,11 +409,16 @@ ${EXIT_CODES('no breaking change reaches your code', 'breaking changes found at 
                     ...(flags.only ? { only: flags.only } : {}),
                     targets,
                   },
-                  fixable: FIX_MANAGERS.includes(repo.manager) ? SUPPORTED : [],
+                  fixable: FIX_MANAGERS.includes(repo.manager),
+                  ...(maxTime > 0 ? { maxTime } : {}),
                 }),
               );
             await htmlReport(report);
-            return report.summary.breaking > 0 ? EXIT.breaking : EXIT.ok;
+            // Breaking is an answer whatever else happened. Without it, a dependency that
+            // failed to analyze means the question was not fully answered: the report above
+            // lists the others and says which failed, and the code says "incomplete".
+            if (report.summary.breaking > 0) return EXIT.breaking;
+            return report.packages.some((p) => isFailure(p)) ? EXIT.error : EXIT.ok;
           },
           { quiet: !flags.verbose },
         ),
