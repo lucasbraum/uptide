@@ -97,6 +97,8 @@ Local preparation and launching the sender have a small fixed overhead.
 
 ## Release configuration (maintainers)
 
+The published bundle contains a write-only PostHog project key that cannot read data.
+
 1. Create a PostHog Cloud **EU** project. Enable **Discard client IP data** and do not
    add transformations that identify users or enrich IP addresses. GeoIP is also
    disabled per event, because discarding IP alone does not prevent enrichment.
