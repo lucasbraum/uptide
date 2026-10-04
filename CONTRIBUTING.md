@@ -19,7 +19,8 @@ pnpm typecheck
 Run the CLI you just built against any repository:
 
 ```sh
-node packages/cli/dist/index.js check --cwd /path/to/repo
+node packages/cli/dist/index.js list --cwd /path/to/repo
+node packages/cli/dist/index.js check zod --cwd /path/to/repo
 ```
 
 Other suites, when your change touches them:
