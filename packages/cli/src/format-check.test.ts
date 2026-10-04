@@ -320,9 +320,7 @@ describe('tiers, the time budget and failures on the first screen', () => {
     const out = formatCheck(report([generic, verified]), { color: false });
     expect(out).toMatch(/sharp +0\.33\.0 → 0\.35\.0 +minor · latest on npm +generic +✗ 1 breaking/);
     expect(out).toMatch(/zod +3\.25\.76 → 4\.6\.5 +major · latest on npm +verified +✓ no impact/);
-    expect(
-      out.match(/verified: a migration pack with rules and tests · generic: no pack/g),
-    ).toHaveLength(1);
+    expect(out.match(/verified: migration pack · generic: no pack/g)).toHaveLength(1);
     // Nothing generic on screen, nothing to explain.
     expect(formatCheck(report([verified]), { color: false })).not.toContain('generic: no pack');
   });

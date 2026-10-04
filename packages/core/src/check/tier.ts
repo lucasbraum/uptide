@@ -4,7 +4,7 @@ import { runtimeConfirms } from './file-kind.js';
 
 /** The difference, in one line, wherever a tier is shown. */
 export const TIER_LEGEND =
-  'verified: a migration pack with rules and tests · generic: no pack, breaking only when the compiler or the runtime probe confirms it';
+  'verified: migration pack · generic: no pack, breaking only if the compiler or the runtime probe confirms it';
 
 /**
  * `verified`: a migration pack covers this upgrade (rules, a guide, ground truth it is scored
