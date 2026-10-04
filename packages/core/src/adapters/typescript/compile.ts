@@ -58,6 +58,23 @@ function messageOf(d: ts.Diagnostic): string {
   return ts.flattenDiagnosticMessageText(d.messageText, '\n');
 }
 
+/**
+ * The compiler names a module by the file it resolved: the cache or node_modules path on this
+ * machine. A report says which package and file, not where this machine keeps it:
+ * `"typescript@7.0.2/lib/version"` instead of `"/home/me/.cache/uptide/extracted/typescript/7.0.2/lib/version"`.
+ */
+export function readableMessage(message: string): string {
+  return message
+    .replace(
+      /(?:[A-Za-z]:)?[\\/][^\s"'()]*[\\/]extracted[\\/]((?:@[^\\/"'\s]+[\\/])?[^\\/"'\s]+)[\\/](\d+\.\d+\.\d+[^\\/"'\s]*)[\\/]/g,
+      (_all, name: string, version: string) => `${name.replace('\\', '/')}@${version}/`,
+    )
+    .replace(
+      /(?:[A-Za-z]:)?[\\/][^\s"'()]*[\\/]node_modules[\\/]((?:@[^\\/"'\s]+[\\/])?[^\\/"'\s]+)[\\/]/g,
+      (_all, name: string) => `${name.replace('\\', '/')}/`,
+    );
+}
+
 /** Identity of a diagnostic across the two checks: where, which, and what it says. */
 function keyOf(d: ts.Diagnostic, repoDir: string): string {
   const file = relative(repoDir, d.file?.fileName ?? '');
@@ -75,7 +92,7 @@ function toDiagnostic(d: ts.Diagnostic, file: ts.SourceFile, repoDir: string): C
     endLine: to.line + 1,
     endColumn: to.character + 1,
     code: d.code,
-    message: messageOf(d),
+    message: readableMessage(messageOf(d)),
     snippet: (file.text.split('\n')[from.line] ?? '').trim(),
   };
 }

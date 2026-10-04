@@ -92,13 +92,17 @@ export interface CheckOptions {
   /**
    * Time budget for the whole check. Dependencies are analyzed in order of likely impact
    * (see `rank.ts`); once the budget is spent no new one is started, and those left are
-   * reported as skipped (`TIME_BUDGET`). What is already running finishes.
+   * reported as skipped (`TIME_BUDGET`). What is already running gets half the budget again
+   * to finish (the most likely to hurt started first, and is worth its answer), then is
+   * abandoned at its next phase.
    */
   maxTimeMs?: number;
   /** Set by `check` for its workspace jobs: the analysis order. */
   order?: string[];
   /** Set by `check` for its workspace jobs: when no new dependency may start (epoch ms). */
   deadline?: number;
+  /** Set by `check`: when a dependency still being analyzed is abandoned (epoch ms). */
+  hardDeadline?: number;
   /** Set by `check` for its workspace jobs: the dependencies with something to analyze. */
   behind?: string[];
 }
@@ -185,7 +189,9 @@ export async function check(opts: CheckOptions): Promise<CheckResult> {
     order: ranked.map((c) => c.name),
     // A registry that did not answer is not "up to date": the package is still attempted.
     behind: ranked.filter((c) => c.latest === undefined || isBehind(c)).map((c) => c.name),
-    ...(opts.maxTimeMs ? { deadline: started + opts.maxTimeMs } : {}),
+    ...(opts.maxTimeMs
+      ? { deadline: started + opts.maxTimeMs, hardDeadline: started + opts.maxTimeMs * 1.5 }
+      : {}),
   };
   // Heaviest workspaces first, so the last worker is not left alone with the largest one.
   const jobs: WorkspaceJob[] = [...workspaces]
@@ -628,9 +634,12 @@ async function checkWorkspace(ctx: Ctx, job: WorkspaceJob): Promise<PackageRepor
     );
     const groupOf = new Map(groups.flatMap((g) => g.map((m) => [m, g] as const)));
     const done = new Set<string>();
+    // The analysis is CPU-bound on one thread: six at once finish together, late. Under a
+    // budget two at a time finish in rank order, so what the deadline cuts is the tail of
+    // the ranking and not six half-done dependencies.
     const reports = await mapWithLimit(
       entries,
-      opts.concurrency ?? 6,
+      opts.concurrency ?? (opts.deadline !== undefined ? 2 : 6),
       async ([name, installedVersion]): Promise<PackageReport[]> => {
         if (done.has(name)) return [];
         // Nothing to upgrade in a linked workspace package.
@@ -1117,12 +1126,12 @@ async function prepare(
  * overlay with every target linked, findings per member, one report.
  */
 /**
- * Between the phases of one dependency (fetch, diff, compile, runtime probe): past the
- * deadline, the dependency is abandoned rather than finished. A phase that is running is
- * not interrupted, so a run ends within one phase of its budget.
+ * Between the phases of one dependency (fetch, diff, compile, runtime probe): past the hard
+ * deadline (the budget and half again), the dependency is abandoned rather than finished. A
+ * phase that is running is not interrupted, so a run ends within one phase of that.
  */
 function outOfTime(ctx: Ctx): void {
-  if (ctx.opts.deadline !== undefined && Date.now() > ctx.opts.deadline)
+  if (ctx.opts.hardDeadline !== undefined && Date.now() > ctx.opts.hardDeadline)
     throw new UptideError('TIME_BUDGET', 'time budget reached');
 }
 

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { PackageFetcher } from '../../domain/io.js';
-import { compileAgainstTarget, compileAgainstTargets } from './compile.js';
+import { compileAgainstTarget, compileAgainstTargets, readableMessage } from './compile.js';
 
 const ROOT = resolve(import.meta.dirname, '../../../../../fixtures');
 const CONSUMER = join(ROOT, 'repos/synthetic-consumer');
@@ -342,4 +342,20 @@ describe('Node16/NodeNext conditions', () => {
     expect(signal.skipped).toBeUndefined();
     expect(signal.diagnostics).toEqual([]);
   });
+});
+
+it('names a module by package and file, never by where this machine keeps it', () => {
+  expect(
+    readableMessage(
+      "Property 'x' does not exist on type 'typeof import(\"/home/me/.cache/uptide/extracted/typescript/7.0.2/lib/version\")'.",
+    ),
+  ).toBe("Property 'x' does not exist on type 'typeof import(\"typescript@7.0.2/lib/version\")'.");
+  expect(
+    readableMessage(
+      "Namespace '\"/work/app/node_modules/.pnpm/@scope+core@2.0.0/node_modules/@scope/core/dist/index\"' has no exported member 'A'.",
+    ),
+  ).toBe("Namespace '\"@scope/core/dist/index\"' has no exported member 'A'.");
+  expect(readableMessage("Type 'string' is not assignable to type 'number'.")).toBe(
+    "Type 'string' is not assignable to type 'number'.",
+  );
 });
