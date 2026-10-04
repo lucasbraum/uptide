@@ -10,6 +10,8 @@ import { type RegistryConfig, registryFor, tokenFor } from './npmrc.js';
 export type FetchFn = typeof fetch;
 
 export interface ResolvedVersion {
+  /** Evidence from an unauthenticated public npm metadata response; absent in older caches. */
+  publicRegistry?: boolean;
   name: string;
   version: string;
   tarball: string;

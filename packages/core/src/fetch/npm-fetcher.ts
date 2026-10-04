@@ -7,11 +7,13 @@ import { defaultCacheDir, packagePathSegments } from '../cache/paths.js';
 import type { PackageDir } from '../domain/adapter.js';
 import type { PackageFetcher } from '../domain/io.js';
 import { errorCode, IntegrityError } from '../errors.js';
-import { loadRegistryConfig, type RegistryConfig } from './npmrc.js';
+import { loadRegistryConfig, type RegistryConfig, registryFor, tokenFor } from './npmrc.js';
 import {
   downloadTarball,
   type FetchFn,
   listVersions,
+  manifestUrl,
+  packumentUrl,
   type ResolvedVersion,
   resolveVersion,
   withRetry,
@@ -118,7 +120,19 @@ export function createNpmFetcher(opts: NpmFetcherOptions = {}): PackageFetcher {
     return remembered(
       [...packagePathSegments(name), `resolve-${requested}`],
       EXACT_VERSION.test(requested),
-      () => resolveVersion(name, requested, config, fetchFn),
+      async () => {
+        const result = await resolveVersion(name, requested, config, fetchFn);
+        const registry = registryFor(name, config);
+        // Authenticated npm can serve private packages. Only the public, anonymous path
+        // is evidence that this exact name/version may be included in optional telemetry.
+        return {
+          ...result,
+          publicRegistry:
+            registry === 'https://registry.npmjs.org' &&
+            !tokenFor(manifestUrl(name, requested, registry), config) &&
+            !tokenFor(packumentUrl(name, registry), config),
+        };
+      },
     );
   }
 

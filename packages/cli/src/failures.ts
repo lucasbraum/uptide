@@ -240,6 +240,6 @@ export function noApiKeyNote(only: string): string {
 export const ASSISTED_NOTE = [
   'note: assisted fixes are on. For sites the rules cannot migrate, the finding, the',
   '  enclosing function and the compiler error are sent to Anthropic with your key.',
-  '  Pass --no-llm to keep everything on this machine.',
+  '  Pass --no-llm to keep code on this machine.',
   '',
 ].join('\n');

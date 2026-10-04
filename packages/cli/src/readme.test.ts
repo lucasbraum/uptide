@@ -57,7 +57,12 @@ describe('README', () => {
     for (const heading of ['## How verification works', '## Privacy', '## Documentation'])
       expect(readme).toContain(heading);
     const privacy = readme.slice(readme.indexOf('## Privacy'), readme.indexOf('## Exit codes'));
-    for (const fact of ['ANTHROPIC_API_KEY', '--no-llm', 'No telemetry', 'No LLM call'])
+    for (const fact of [
+      'ANTHROPIC_API_KEY',
+      '--no-llm',
+      'Anonymous telemetry is off by default',
+      'No LLM call',
+    ])
       expect(privacy).toContain(fact);
     expect(readme).toMatch(
       /\*\*0\*\* nothing breaking, \*\*1\*\* breaking changes found,\n\*\*2\*\*/,

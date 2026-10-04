@@ -184,3 +184,17 @@ Builds embed the Uptide commit and whether its source checkout had working-tree 
 and type verification on the recorded commit without installing or changing source.
 Diffs, file lists, verification and run details are collapsed; the Action comment and
 terminal share the compact migration renderer.
+
+## `uptide telemetry on|off|status|show`
+
+Anonymous telemetry is off by default. The first interactive run asks once, default
+no; CI, JSON, help/version and piped runs never prompt. `on` and `off` save the local
+preference, `status` explains effective consent and transport configuration, and
+`show` prints the last sanitized event as JSON without sending it. `--json` is
+available for all four actions. Turning it off clears local identifiers and the event.
+
+`UPTIDE_TELEMETRY=0` always disables it; CI (including `--ci`) requires an explicit
+`UPTIDE_TELEMETRY=1`, regardless of saved consent. Builds without a capture key send
+nothing. Events contain aggregate usage and proven public npm versions, never code,
+paths, IP addresses or repo/user names. Storage is PostHog EU with a 90-day retention
+policy. See [telemetry.md](telemetry.md) for exact fields and deployment requirements.

@@ -6,6 +6,9 @@ import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSy
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 
+// Never send smoke-test usage, even when the release build contains a capture key.
+process.env.UPTIDE_TELEMETRY = '0';
+
 const [tarballDir, fixturesDir, resultsFile] = process.argv.slice(2);
 const tarball = join(
   tarballDir,
@@ -44,6 +47,16 @@ sh('/', 'git', 'config', '--global', 'user.email', 'smoke@uptide.test');
 sh('/', 'git', 'config', '--global', 'user.name', 'uptide smoke');
 sh('/', 'git', 'config', '--global', 'init.defaultBranch', 'main');
 const version = sh('/', 'uptide', '--version').trim();
+for (const action of ['on', 'status', 'off']) {
+  const result = uptide('/', 'telemetry', action, '--json');
+  expect(`telemetry ${action}: exit 0`, result.code === 0, result.err);
+  const state = JSON.parse(result.out);
+  expect(
+    `telemetry ${action}: environment opt-out dominates`,
+    state.enabled === false && state.sending === false,
+  );
+}
+expect('telemetry show after off', uptide('/', 'telemetry', 'show').out.trim() === 'null');
 
 const INSTALL = {
   npm: ['npm', 'ci', '--ignore-scripts', '--silent'],

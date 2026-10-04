@@ -30,6 +30,9 @@ jobs:
       # npm provenance: the registry verifies this workflow's OIDC identity.
       id-token: write
     env:
+      # Set the write-only key only after the privacy/90-day setup in docs/telemetry.md.
+      UPTIDE_TELEMETRY_BUILD_KEY: ${{ secrets.UPTIDE_TELEMETRY_BUILD_KEY }}
+      UPTIDE_TELEMETRY_BUILD_HOST: https://eu.i.posthog.com
       VERSION: ${{ inputs.version }}
     steps:
       - name: A stable release comes from the public repository's main branch

@@ -1,3 +1,5 @@
+import { createInterface } from 'node:readline';
+
 /** Everything the CLI touches outside its own process state, so tests can run it in memory. */
 export interface Io {
   out(text: string): void;
@@ -9,6 +11,8 @@ export interface Io {
   /** stderr is a terminal: progress may redraw one line. */
   errTty: boolean;
   now(): number;
+  inTty?: boolean;
+  confirmTelemetry?: () => Promise<boolean>;
 }
 
 export function processIo(): Io {
@@ -20,6 +24,28 @@ export function processIo(): Io {
     outTty: process.stdout.isTTY === true,
     errTty: process.stderr.isTTY === true,
     now: () => Date.now(),
+    inTty: process.stdin.isTTY === true,
+    confirmTelemetry: () =>
+      new Promise<boolean>((resolve) => {
+        const rl = createInterface({
+          input: process.stdin,
+          output: process.stderr,
+          terminal: true,
+        });
+        let settled = false;
+        const done = (yes: boolean): void => {
+          if (settled) return;
+          settled = true;
+          rl.close();
+          resolve(yes);
+        };
+        rl.on('SIGINT', () => done(false));
+        rl.on('close', () => done(false));
+        rl.question(
+          'Share anonymous CLI usage with Uptide (PostHog EU, 90-day retention)?\nRandom IDs, public package versions and aggregate counts only; no IP, code, paths or repo names.\nDetails: https://github.com/lucasbraum/uptide/blob/main/docs/telemetry.md\nEnable telemetry? [y/N] ',
+          (answer) => done(/^y(?:es)?$/i.test(answer.trim())),
+        );
+      }),
   };
 }
 

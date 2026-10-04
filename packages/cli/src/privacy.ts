@@ -6,7 +6,9 @@ export const PRIVACY = `Privacy:
   Analysis runs locally. Your code is sent only to the LLM provider (Anthropic), only
   for assisted fixes in \`uptide fix\`, and only with your own ANTHROPIC_API_KEY: for each
   site the rules cannot migrate, the finding, the enclosing function and the compiler
-  error. \`uptide fix --no-llm\` turns assisted fixes off. No telemetry, no account.
-  Other network use: your npm registry for package metadata and tarballs, and GitHub
-  only when you pass \`fix --pr\` or run \`pr-body\`.
+  error. \`uptide fix --no-llm\` turns assisted fixes off. No account.
+  Anonymous telemetry is off by default and asks for consent in an interactive terminal.
+  Set UPTIDE_TELEMETRY=0 to disable it. No IP, code, paths or repo names are collected.
+  Other network use: your npm registry for package metadata and tarballs, PostHog EU only
+  after telemetry opt-in, and GitHub when you pass \`fix --pr\` or run \`pr\` / \`pr-body\`.
 `;

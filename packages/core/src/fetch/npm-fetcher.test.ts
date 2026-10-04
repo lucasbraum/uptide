@@ -268,3 +268,42 @@ it('reads and caches peer metadata without tarballs, including caches from older
   expect(fetchFn.mock.calls).toHaveLength(calls);
   expect(existsSync(tarballCachePath(cacheDir, 'demo', '1.0.0'))).toBe(false);
 });
+
+it.each<RegistryConfig & { publicRegistry: boolean }>([
+  { registry: 'https://registry.npmjs.org', scoped: {}, tokens: {}, publicRegistry: true },
+  {
+    registry: 'https://registry.npmjs.org',
+    scoped: {},
+    tokens: { 'registry.npmjs.org/': 'secret' },
+    publicRegistry: false,
+  },
+  {
+    registry: 'https://registry.npmjs.org',
+    scoped: {},
+    tokens: { 'registry.npmjs.org/demo/': 'secret' },
+    publicRegistry: false,
+  },
+  { registry: 'https://private.test', scoped: {}, tokens: {}, publicRegistry: false },
+])(
+  'records public metadata provenance only for anonymous npm: %j',
+  async ({ publicRegistry, ...config }) => {
+    const cacheDir = mkdtempSync(join(tmpdir(), 'uptide-public-provenance-'));
+    const fetcher = createNpmFetcher({
+      cacheDir,
+      config,
+      fetch: async () =>
+        new Response(
+          JSON.stringify({
+            version: '1.0.0',
+            dist: { tarball: 'https://registry.npmjs.org/demo/-/demo-1.0.0.tgz' },
+          }),
+        ),
+    });
+    await fetcher.resolve('demo', 'latest');
+    const cached = JSON.parse(
+      readFileSync(join(cacheDir, 'registry/demo/resolve-latest.json'), 'utf8'),
+    );
+    expect(cached.value.publicRegistry).toBe(publicRegistry);
+    expect(JSON.stringify(cached)).not.toContain('secret');
+  },
+);
