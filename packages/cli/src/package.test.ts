@@ -1,5 +1,16 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
@@ -33,3 +44,38 @@ describe('published package', () => {
     expect(out.trim()).toBe(manifest.version);
   });
 });
+
+it.skipIf(!existsSync(bin))(
+  'uses the installed CLI version in --version and HTML even after post-build versioning',
+  () => {
+    const root = mkdtempSync(join(tmpdir(), 'uptide-installed-version-'));
+    try {
+      cpSync(`${fileURLToPath(new URL('..', import.meta.url))}dist`, join(root, 'dist'), {
+        recursive: true,
+      });
+      const version = '0.9.8-next.20261004';
+      writeFileSync(
+        join(root, 'package.json'),
+        JSON.stringify({ name: 'uptide', version, type: 'module' }),
+      );
+      const consumer = join(root, 'consumer');
+      mkdirSync(consumer);
+      writeFileSync(join(consumer, 'package.json'), '{"name":"empty-app"}');
+      writeFileSync(join(consumer, 'package-lock.json'), '{}');
+      const installed = join(root, 'dist/index.js');
+      expect(
+        execFileSync(process.execPath, [installed, '--version'], { encoding: 'utf8' }).trim(),
+      ).toBe(version);
+      execFileSync(process.execPath, [installed, 'list', '--html', 'report.html', '--ci'], {
+        cwd: consumer,
+        env: { ...process.env, UPTIDE_TELEMETRY: '0' },
+        stdio: 'pipe',
+      });
+      expect(readFileSync(join(consumer, 'report.html'), 'utf8')).toContain(
+        `Uptide CLI ${version}`,
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);

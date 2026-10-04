@@ -97,7 +97,7 @@ describe('formatCheck, the first screen', () => {
 
   it('labels every rule with what fix will do, from the plan the engine attached', () => {
     const out = formatCheck(storefront, shown);
-    expect(out).toMatch(/✗ 28 breaking in 7 files {4}24 by rule · 4 by agent/);
+    expect(out).toMatch(/✗ 28 breaking in 7 files +24 by rule · 4 by agent/);
     expect(out).toMatch(/✗ New error API \(required_error → error\) +24 sites +by rule/);
     expect(out).toMatch(/✗ ZodTypeDef removed +1 fix, 3 errors +by agent/);
     expect(out).toMatch(/✗ \.ip\(\) removed +monitoring\.ts:6 +by agent/);
@@ -123,7 +123,7 @@ describe('formatCheck, the first screen', () => {
 
   it('shows full paths, reasons, compiler messages and notes with --details', () => {
     const out = formatCheck(storefront, { ...shown, details: true });
-    expect(out.split('\n')[0]).toBe('uptide check · storefront (pnpm, 2 packages) · 25s');
+    expect(out.split('\n')[0]).toBe('uptide check · storefront · pnpm · 25s');
     expect(out).toContain('packages/shared/src/monitoring.ts:6');
     expect(out).toContain("compiler: Property 'ip' does not exist on type 'ZodString'.");
     expect(out).toContain('1 pre-existing type error at the installed version (subtracted)');
@@ -194,7 +194,7 @@ describe('formatCheck, the first screen', () => {
     );
     expect(out).toMatchSnapshot();
     // No migration pack for sharp: no rule is promised; the confirmed sites are the agent's.
-    expect(out).toMatch(/sharp +0\.33\.0 → 0\.35\.0 +minor +✗ 2 breaking in 2 files {4}2 by agent/);
+    expect(out).toMatch(/sharp +0\.33\.0 → 0\.35\.0 +minor +✗ 2 breaking in 2 files +2 by agent/);
     expect(out).toMatch(/✗ sharp\.cache removed +2 sites +by agent/);
     for (const absent of ['@me/shared', '@me/private', 'never', 'current'])
       expect(out).not.toContain(absent);
@@ -318,7 +318,7 @@ describe('tiers, the time budget and failures on the first screen', () => {
 
   it('names the tier of every row and explains the difference in one line', () => {
     const out = formatCheck(report([generic, verified]), { color: false });
-    expect(out).toMatch(/sharp +0\.33\.0 → 0\.35\.0 +minor · latest on npm +generic +✗ 1 breaking/);
+    expect(out).toMatch(/sharp +0\.33\.0 → 0\.35\.0 +minor · latest on npm +✗ 1 breaking/);
     expect(out).toMatch(/zod +3\.25\.76 → 4\.6\.5 +major · latest on npm +verified +✓ no impact/);
     expect(out.match(/verified: migration pack · generic: no pack/g)).toHaveLength(1);
     // Nothing generic on screen, nothing to explain.

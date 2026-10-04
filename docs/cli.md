@@ -7,28 +7,52 @@ cannot show.
 
 Fast discovery with no compile, install, tarball downloads or execution of repository code.
 Requires a lockfile (exact manifest versions also work once the repository is detected).
-Shows every outdated direct dependency, its current and latest version, major/minor/patch,
-verified/generic tier, import-file count, direct call/new/JSX count, top symbols and workspaces.
-Majors first, then importing files and call sites, with name/version tie breakers.
+Shows every outdated direct dependency, current → latest, major/minor/patch (including
+`major ×2` for 10 → 12), verified/generic tier, importing files, calls and references,
+and nonzero top symbols. Workspace columns appear only in workspace repositories.
+Groups come first: scoped packages with matching current/latest versions and packages
+coupled by peer requirements have one group and a command checking all members. Names use
+the framework scope or lead package; external peers are labeled `peer of <package>`.
+`uptide check --group nestjs` discovers and expands the exact member list before checking.
+JSON retains each member, the stable group selector and peer relationships.
+Other rows put majors first, then importing files and call sites. Terminal rows align to
+the available width; narrow terminals truncate names and omit trailing columns. Top symbols
+are hidden until `--details`. Only verified packages have a tier tag; generic is the default.
+Color is disabled for pipes, `NO_COLOR`, `--no-color` and CI.
 
-- `--all`: expand minor/patch rows, collapsed by default.
-- `--json`: every row and per-package discovery failure, in deterministic order.
+- `--all`: expand minor/patch rows, tooling and possibly unused packages.
+- `--json`: every row, group, classification reason and discovery failure.
+- `--html [path]`: write a local HTML report with check's template, styling and copy buttons.
+  By default it lives beside check reports in the OS temporary `uptide` directory; its path
+  is printed to stderr. Nothing is generated without this flag. JSON stdout stays pure.
+- `--open`: with `--html`, open the page in an interactive terminal (never in CI or a pipe).
+- `--details`: include top symbols and source file lists. HTML includes no source code, file paths, or
+  workspace paths by default; commands without `--details` should be run from the named repo.
 - `--cwd <dir>`, `--ci`, `--no-color`: shared options.
 
-Unused means no static source import was found. Script tools, config plugins and type
-packages may still be needed. Syntax scanning includes imports, re-exports, require,
-import-equals, literal dynamic imports and JS/TS/JSX/TSX; it does not resolve indirect aliases
-or reflection. Counts are repository-wide when several workspaces lock different versions.
+Tooling is separate and collapsed: script commands and package bins, known build/config
+tools, packages referenced in configuration, types for used runtime packages (and Node),
+and peers of used packages. Only the remaining packages without source imports are
+“possibly unused.” Configuration is read as data, never executed; local installed metadata
+is preferred for bins and peers, with registry metadata as a fallback.
+
+Syntax scanning includes imports, re-exports, require, import-equals, literal dynamic
+imports and JS/TS/JSX/TSX. Calls/new/JSX and non-call references are separate counts;
+passing a binding as a value, such as `app.register(cookie)`, counts as a reference.
+Indirect aliases and reflection are not followed. Counts are repository-wide when several
+workspaces lock different versions. HTML shows all upgrade rows, with tooling and
+possibly unused packages in collapsed sections, and a copyable check command per row.
 Internal workspace dependencies and local/git/URL specifiers are excluded from registry queries.
 
 ## `uptide check <package...>`
 
-Examples: `uptide check zod`, `uptide check zod stripe`. No names prints a short pointer to
+Examples: `uptide check zod`, `uptide check zod stripe`, `uptide check --group nestjs`. No names or group prints a short pointer to
 `uptide list` and exits 2, before reading or analyzing a repository. There is no automatic
 whole-repository budgeted mode or `--max-time` flag.
 
 | Flag | Meaning |
 | --- | --- |
+| `--group nestjs` | discover the named release group and check all members, including required peers |
 | `--only zod,stripe` | compatibility alias for positional package names; `all` is rejected |
 | `--target zod@4.6.5` | exact target, repeatable; bare version with one selected package |
 | `--details` | every site, reason, compiler message and analysis note |
@@ -101,11 +125,14 @@ uptide check zod --json --html --ci     # stdout stays JSON; the HTML path is pr
 The report uses the terminal's migration plan: dependency summary first, then expandable
 rules and sites, deprecated calls, analysis notes, and copyable next commands. Search
 and severity filters work with plain inline JavaScript; the report remains readable
-without it. Printing expands the details. Dark/light themes follow your system.
+without it. Printing expands the details. Dark/light themes follow your system, with
+`data-theme="light"` and `data-theme="dark"` overrides on the document element. Both list
+and check use the same offline logo, typography, design tokens and square copy buttons.
 
-One self-contained file, no network requests, web fonts, images, or analytics. It includes
-only the reported source excerpts (three lines before/after, up to 50 excerpts per group),
-with VS Code file links. Missing or out-of-repository files are disclosed instead of read.
+One self-contained file, no network requests, external fonts, external images or analytics.
+Default reports omit source code, file paths and workspace paths. Add `--details` for
+reported source excerpts (three lines before/after, up to 50 excerpts per group), compiler
+messages, analysis notes and VS Code file links. Missing or out-of-repository files are disclosed instead of read.
 Long lines/excerpts and very large reports are trimmed with a notice to keep the file
 below 300 KB. Review excerpts before sharing. `--open` never opens a browser in CI or
 when output is redirected; `--open` requires `--html`.

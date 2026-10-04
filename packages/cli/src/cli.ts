@@ -31,6 +31,7 @@ import { type CheckHeader, formatCheck, repoLine } from './format-check.js';
 import { formatFixSummary } from './format-fix.js';
 import { formatList } from './format-list.js';
 import { formatPlan } from './format-plan.js';
+import { writeListHtml } from './html/list.js';
 import { writeMigrationHtml } from './html/migration.js';
 import { writePlanHtml } from './html/plan.js';
 import { openHtml, writeHtml } from './html/write.js';
@@ -47,13 +48,9 @@ import {
 import { createTelemetry, type Telemetry } from './telemetry/client.js';
 import { checkMetrics, fixMetrics, listMetrics } from './telemetry/metrics.js';
 
-/** Replaced by the bundler with this package's version; tests and tsx run the source. */
-declare const __UPTIDE_VERSION__: string | undefined;
-export const VERSION =
-  typeof __UPTIDE_VERSION__ === 'string'
-    ? __UPTIDE_VERSION__
-    : (JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
-        .version as string);
+import { VERSION } from './version.js';
+
+export { VERSION } from './version.js';
 
 const EXIT_CODES = (zero: string, one: string, two = ''): string => `
 Exit codes:
@@ -179,6 +176,10 @@ export async function run(
     options: { quiet?: boolean } = {},
   ): Promise<void> => {
     const ui = uiOf(io, flags);
+    if (['list', 'check'].includes(argv[0] ?? '') && (!io.outTty || !ui.color)) {
+      ui.color = false;
+      ui.interactive = false;
+    }
     try {
       code = await body({
         ui,
@@ -297,32 +298,69 @@ ${PRIVACY}`,
     program
       .command('list')
       .description('Discover outdated dependencies without compiling or installing')
-      .option('--all', 'expand minor and patch upgrades'),
+      .option('--all', 'expand minor/patch upgrades, tooling and possibly unused packages')
+      .option('--html [path]', 'write a self-contained HTML report (default: OS temp directory)')
+      .option('--open', 'open the HTML report in a browser (requires --html)')
+      .option('--details', 'show top symbols and source file lists'),
   )
     .addHelpText(
       'after',
-      `\nExamples:\n  $ uptide list\n  $ uptide list --all --json\n\nNo compilation, install or tarball downloads; registry metadata only.\nUsage counts direct calls/new/JSX through imported bindings. Unused tools may still\nbe needed by scripts/configuration. Majors first, then importing files and call sites.\n${EXIT_CODES('discovery complete', 'not used', '; incomplete discovery retains successful rows')}`,
+      `\nExamples:\n  $ uptide list\n  $ uptide list --all --json\n\nNo compilation, install or tarball downloads; registry metadata only.\nUsage counts calls/new/JSX and references through imported bindings. Tooling and\npossibly unused packages are collapsed; use --all to expand. Majors first, then importing files and call sites.\n${EXIT_CODES('discovery complete', 'not used', '; incomplete discovery retains successful rows')}`,
     )
-    .action((flags: Shared & { all?: boolean }) =>
-      act(flags, async ({ cwd, progress }) => {
-        const started = io.now();
-        const repo = await detectRepo(cwd, engine.workspaces);
-        if (!engine.list) throw new CliError('this build cannot list dependencies');
-        const discover = engine.list;
-        const report = await progress.phase('Discovery', () => discover({ cwd: repo.root }));
-        telemetry?.record(() => listMetrics(report));
-        if (flags.json) emit(report);
-        else
-          io.out(
-            formatList(report, {
-              all: flags.all,
-              header: headerOf(repo, io.now() - started),
-              invocation: INVOCATION,
-              cwd: flags.cwd,
-            }),
+    .action(
+      (
+        flags: Shared & { all?: boolean; html?: string | true; open?: boolean; details?: boolean },
+      ) =>
+        act(flags, async ({ cwd, progress, ui }) => {
+          if (flags.open && !flags.html) throw new CliError('--open requires --html');
+          const started = io.now();
+          const repo = await detectRepo(cwd, engine.workspaces);
+          if (!engine.list) throw new CliError('this build cannot list dependencies');
+          const discover = engine.list;
+          const report = await progress.phase('Discovery', () =>
+            discover({ cwd: repo.root, details: flags.details }),
           );
-        return report.failures.length ? EXIT.error : EXIT.ok;
-      }),
+          telemetry?.record(() => listMetrics(report));
+          if (flags.json) emit(report);
+          else
+            io.out(
+              formatList(report, {
+                all: flags.all,
+                color: ui.color && io.outTty,
+                width: io.columns,
+                details: flags.details,
+                header: headerOf(repo, io.now() - started),
+                invocation: 'uptide',
+                cwd: flags.cwd,
+              }),
+            );
+          if (flags.html) {
+            const path = writeListHtml(
+              report,
+              {
+                version: VERSION,
+                date: new Date().toISOString(),
+                header: headerOf(repo, io.now() - started),
+                invocation: 'uptide',
+                details: flags.details,
+                cwd: resolve(io.cwd) === resolve(repo.root) ? undefined : repo.root,
+              },
+              flags.html,
+              io.cwd,
+            );
+            io.err(`HTML report: ${path}\n`);
+            if (flags.open && ui.interactive && io.outTty) {
+              try {
+                await openHtml(path);
+              } catch (error) {
+                io.err(
+                  `Could not open browser: ${error instanceof Error ? error.message : String(error)}. Open the report manually.\n`,
+                );
+              }
+            }
+          }
+          return report.failures.length ? EXIT.error : EXIT.ok;
+        }),
     );
 
   shared(
@@ -330,6 +368,7 @@ ${PRIVACY}`,
       .command('check [packages...]')
       .description('Which of your call sites an upgrade breaks, and what fixing them costs')
       .option('--only <packages>', 'deprecated alias for positional package names')
+      .option('--group <name>', 'check every member of a group shown by uptide list')
       .option(
         '--target <spec...>',
         '`<package>@<version>`, repeatable; a bare version with one named package (default: latest)',
@@ -361,6 +400,7 @@ Tiers:
 Examples:
   $ uptide list                           discover upgrades without compiling
   $ uptide check zod stripe               analyze the named packages
+  $ uptide check --group nestjs           analyze every group member
   $ uptide check zod --target 4.6.5
   $ uptide check zod --details                every site and reason
   $ uptide check zod --json --ci > uptide.json
@@ -375,6 +415,7 @@ ${EXIT_CODES(
         packages: string[],
         flags: Shared & {
           only?: string;
+          group?: string;
           target?: string[];
           html?: string | true;
           open?: boolean;
@@ -394,12 +435,11 @@ ${EXIT_CODES(
             const started = io.now();
             const quiet = !flags.verbose;
             const only = [...new Set([...packages, ...(list(flags.only) ?? [])])];
-            if (only.length === 0 || only.includes('all'))
+            if ((!flags.group && only.length === 0) || only.includes('all'))
               throw new CliError(
                 'check requires one or more package names. Start with uptide list.',
                 { next: 'uptide list' },
               );
-            const targets = parseTargets(flags.target, only);
             if (
               flags.workspaces &&
               (!Number.isInteger(Number(flags.workspaces)) || Number(flags.workspaces) < 1)
@@ -410,12 +450,34 @@ ${EXIT_CODES(
               () => detectRepo(cwd, engine.workspaces),
               describeRepo,
             );
+            if (flags.group) {
+              if (!engine.list) throw new CliError('this build cannot discover groups');
+              const discoverGroup = engine.list;
+              const discovery = await progress.phase('Group discovery', () =>
+                discoverGroup({ cwd: repo.root }),
+              );
+              const group = discovery.groups.find(
+                (g) => g.id === flags.group || g.name === flags.group,
+              );
+              if (!group)
+                throw new CliError(
+                  `unknown group '${flags.group}'${discovery.groups.length ? `; available: ${discovery.groups.map((g) => g.id).join(', ')}` : ''}`,
+                  { next: 'uptide list' },
+                );
+              if (discovery.failures.length)
+                throw new CliError(
+                  'group discovery is incomplete; run uptide list to resolve its failures before checking a group',
+                );
+              only.push(...group.members.map((p) => p.name).filter((name) => !only.includes(name)));
+            }
+            const targets = parseTargets(flags.target, only);
             const htmlReport = async (report: CheckReport): Promise<void> => {
               if (flags.html) {
                 const path = writeHtml(
                   report,
                   {
                     root: repo.root,
+                    details: flags.details,
                     version: VERSION,
                     date: new Date().toISOString(),
                     header: headerOf(repo, io.now() - started),
@@ -492,7 +554,8 @@ ${EXIT_CODES(
             else
               io.out(
                 formatCheck(report, {
-                  color: ui.color,
+                  color: ui.color && io.outTty,
+                  width: io.columns,
                   details: flags.details,
                   all: flags.all,
                   header: headerOf(repo, ms),

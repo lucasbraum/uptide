@@ -5,29 +5,67 @@ exports[`HTML report > renders clean from report JSON without requiring JS 1`] =
 <html lang="en">
 <body>
 <main>
-<header>
-<div class="brand">UPTIDE / CHECK</div>
+<header class="hero dots">
+<div class="report-top">
+<div class="brand">
+<svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
+<path d="M3 23c4.5 0 6.8-2.6 8.6-6.4C13.6 12.2 16.2 8 21.2 8c3.9 0 6.8 2.6 6.8 5.8 0 2.4-1.8 4.1-4.1 4.1-1.9 0-3.1-1.2-3.1-2.8" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M3 27.5h26" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+</svg>
+<span>uptide</span>
+</div>
+<span class="label">Dependency check / local report</span>
+</div>
+<div class="label">Your upgrade, before you merge</div>
 <h1>demo</h1>
 <div class="meta">
 <span>pnpm</span>
-<span>1 workspace analyzed</span>
-<time datetime="2026-10-02T12:00:00Z">Oct 2, 2026, 5:00 AM PDT</time>
+<time datetime="2026-10-02T12:00:00Z">Generated Oct 2, 2026, 5:00 AM PDT</time>
 <span>Uptide CLI 0.1.0</span>
-<span>25s</span>
 </div>
-<p class="muted">No confirmed breaking changes.</p>
 </header>
+<div class="stats" style="--stat-count:5">
+<div class="stat ">
+<strong>0</strong>
+<span class="label">Packages</span>
+</div>
+<div class="stat warn">
+<strong>0</strong>
+<span class="label">Breaking</span>
+</div>
+<div class="stat ">
+<strong>0</strong>
+<span class="label">Deprecated</span>
+</div>
+<div class="stat safe">
+<strong>0</strong>
+<span class="label">By rule</span>
+</div>
+<div class="stat ">
+<strong>0</strong>
+<span class="label">By agent</span>
+</div>
+</div>
+<p class="more">No confirmed breaking changes.</p>
+<div class="section-label">
+<h2>01 / Packages</h2>
+<p>Upgrade impact</p>
+</div>
 <div class="filters" hidden role="search" aria-label="Filter findings">
 <button type="button" data-filter="all" aria-pressed="true">All</button>
 <button type="button" data-filter="breaking" aria-pressed="false">Breaking</button>
 <button type="button" data-filter="deprecated" aria-pressed="false">Deprecated</button>
 <button type="button" data-filter="unverified" aria-pressed="false">Unverified</button>
-<input id="search" type="search" aria-label="Search file paths and change rules" placeholder="Search files or rules…">
+<input id="search" type="search" aria-label="Search packages and change rules" placeholder="Search packages or rules…">
 </div>
 <section aria-label="Dependency summary" class="summary">
 <p class="more safe">✓ Nothing to upgrade. No findings in the analyzed scope.</p>
 </section>
 <p id="empty-filter" class="notice" hidden>No findings match these filters.</p>
+<div class="section-label">
+<h2>02 / Findings</h2>
+<p>What reaches your code</p>
+</div>
 <details class="notes">
 <summary>Analysis notes · 2 notes</summary>
 <ul>
@@ -36,14 +74,14 @@ exports[`HTML report > renders clean from report JSON without requiring JS 1`] =
 </ul>
 </details>
 <section class="next">
-<h2>Next</h2>
+<h2>03 / Next</h2>
 <p class="muted">every site and reason</p>
-<div class="command">
+<div class="term command">
 <code>npx uptide check &lt;package&gt; --details --cwd /repo</code>
-<button type="button" data-copy hidden aria-label="Copy command">Copy</button>
+<button type="button" class="copy" data-copy hidden aria-label="Copy command">Copy</button>
 </div>
 </section>
-<footer>Local report · No network requests · Contains source excerpts from reported sites only. Review before sharing.</footer>
+<footer>Generic analysis is the default; verified means a migration pack is available.<br>Local report · No network requests · Contains file paths and source excerpts. Review before sharing.</footer>
 </main>
 </body>
 </html>"
@@ -54,29 +92,67 @@ exports[`HTML report > renders skipped from report JSON without requiring JS 1`]
 <html lang="en">
 <body>
 <main>
-<header>
-<div class="brand">UPTIDE / CHECK</div>
+<header class="hero dots">
+<div class="report-top">
+<div class="brand">
+<svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
+<path d="M3 23c4.5 0 6.8-2.6 8.6-6.4C13.6 12.2 16.2 8 21.2 8c3.9 0 6.8 2.6 6.8 5.8 0 2.4-1.8 4.1-4.1 4.1-1.9 0-3.1-1.2-3.1-2.8" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M3 27.5h26" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+</svg>
+<span>uptide</span>
+</div>
+<span class="label">Dependency check / local report</span>
+</div>
+<div class="label">Your upgrade, before you merge</div>
 <h1>demo</h1>
 <div class="meta">
 <span>pnpm</span>
-<span>2 workspaces analyzed</span>
-<time datetime="2026-10-02T12:00:00Z">Oct 2, 2026, 5:00 AM PDT</time>
+<time datetime="2026-10-02T12:00:00Z">Generated Oct 2, 2026, 5:00 AM PDT</time>
 <span>Uptide CLI 0.1.0</span>
-<span>25s</span>
 </div>
-<p class="muted">No confirmed breaking changes.</p>
 </header>
+<div class="stats" style="--stat-count:5">
+<div class="stat ">
+<strong>0</strong>
+<span class="label">Packages</span>
+</div>
+<div class="stat warn">
+<strong>0</strong>
+<span class="label">Breaking</span>
+</div>
+<div class="stat ">
+<strong>0</strong>
+<span class="label">Deprecated</span>
+</div>
+<div class="stat safe">
+<strong>0</strong>
+<span class="label">By rule</span>
+</div>
+<div class="stat ">
+<strong>0</strong>
+<span class="label">By agent</span>
+</div>
+</div>
+<p class="more">No confirmed breaking changes.</p>
+<div class="section-label">
+<h2>01 / Packages</h2>
+<p>Upgrade impact</p>
+</div>
 <div class="filters" hidden role="search" aria-label="Filter findings">
 <button type="button" data-filter="all" aria-pressed="true">All</button>
 <button type="button" data-filter="breaking" aria-pressed="false">Breaking</button>
 <button type="button" data-filter="deprecated" aria-pressed="false">Deprecated</button>
 <button type="button" data-filter="unverified" aria-pressed="false">Unverified</button>
-<input id="search" type="search" aria-label="Search file paths and change rules" placeholder="Search files or rules…">
+<input id="search" type="search" aria-label="Search packages and change rules" placeholder="Search packages or rules…">
 </div>
 <section aria-label="Dependency summary" class="summary">
 <p class="more safe">✓ Nothing to upgrade. No findings in the analyzed scope.</p>
 </section>
 <p id="empty-filter" class="notice" hidden>No findings match these filters.</p>
+<div class="section-label">
+<h2>02 / Findings</h2>
+<p>What reaches your code</p>
+</div>
 <section class="package" id="not-analyzed">
 <header>
 <h2>Not analyzed</h2>
@@ -92,14 +168,14 @@ exports[`HTML report > renders skipped from report JSON without requiring JS 1`]
 </ul>
 </details>
 <section class="next">
-<h2>Next</h2>
+<h2>03 / Next</h2>
 <p class="muted">every site and reason</p>
-<div class="command">
+<div class="term command">
 <code>npx uptide check &lt;package&gt; --details --cwd /repo</code>
-<button type="button" data-copy hidden aria-label="Copy command">Copy</button>
+<button type="button" class="copy" data-copy hidden aria-label="Copy command">Copy</button>
 </div>
 </section>
-<footer>Local report · No network requests · Contains source excerpts from reported sites only. Review before sharing.</footer>
+<footer>Generic analysis is the default; verified means a migration pack is available.<br>Local report · No network requests · Contains file paths and source excerpts. Review before sharing.</footer>
 </main>
 </body>
 </html>"
@@ -110,40 +186,80 @@ exports[`HTML report > renders stripe from report JSON without requiring JS 1`] 
 <html lang="en">
 <body>
 <main>
-<header>
-<div class="brand">UPTIDE / CHECK</div>
+<header class="hero dots">
+<div class="report-top">
+<div class="brand">
+<svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
+<path d="M3 23c4.5 0 6.8-2.6 8.6-6.4C13.6 12.2 16.2 8 21.2 8c3.9 0 6.8 2.6 6.8 5.8 0 2.4-1.8 4.1-4.1 4.1-1.9 0-3.1-1.2-3.1-2.8" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M3 27.5h26" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+</svg>
+<span>uptide</span>
+</div>
+<span class="label">Dependency check / local report</span>
+</div>
+<div class="label">Your upgrade, before you merge</div>
 <h1>demo</h1>
 <div class="meta">
 <span>pnpm</span>
-<span>3 workspaces analyzed</span>
-<time datetime="2026-10-02T12:00:00Z">Oct 2, 2026, 5:00 AM PDT</time>
+<time datetime="2026-10-02T12:00:00Z">Generated Oct 2, 2026, 5:00 AM PDT</time>
 <span>Uptide CLI 0.1.0</span>
-<span>25s</span>
 </div>
-<p class="muted">4 breaking changes in 3 files. 1 fixable by rule, 3 by agent.</p>
 </header>
+<div class="stats" style="--stat-count:5">
+<div class="stat ">
+<strong>1</strong>
+<span class="label">Packages</span>
+</div>
+<div class="stat warn">
+<strong>32</strong>
+<span class="label">Breaking</span>
+</div>
+<div class="stat ">
+<strong>15</strong>
+<span class="label">Deprecated</span>
+</div>
+<div class="stat safe">
+<strong>1</strong>
+<span class="label">By rule</span>
+</div>
+<div class="stat ">
+<strong>3</strong>
+<span class="label">By agent</span>
+</div>
+</div>
+<p class="more">4 breaking changes in 3 files. 1 fixable by rule, 3 by agent.</p>
+<div class="section-label">
+<h2>01 / Packages</h2>
+<p>Upgrade impact</p>
+</div>
 <div class="filters" hidden role="search" aria-label="Filter findings">
 <button type="button" data-filter="all" aria-pressed="true">All</button>
 <button type="button" data-filter="breaking" aria-pressed="false">Breaking</button>
 <button type="button" data-filter="deprecated" aria-pressed="false">Deprecated</button>
 <button type="button" data-filter="unverified" aria-pressed="false">Unverified</button>
-<input id="search" type="search" aria-label="Search file paths and change rules" placeholder="Search files or rules…">
+<input id="search" type="search" aria-label="Search packages and change rules" placeholder="Search packages or rules…">
 </div>
 <section aria-label="Dependency summary" class="summary">
 <a class="dep" href="#dependency-0" data-package="dependency-0">
 <div>
 <strong>stripe (packages/api)</strong>
-<span class="mono muted">14.25.0 → 23.0.0 · major · verified</span>
+<span class="mono muted">14.25.0 → 23.0.0 · major ×9 · <span class="verified">verified</span>
+</span>
 </div>
 <div class="breaking">✗ 4 breaking in 3 files<div class="muted">1 by rule · 3 by agent</div>
 </div>
 </a>
 </section>
 <p id="empty-filter" class="notice" hidden>No findings match these filters.</p>
+<div class="section-label">
+<h2>02 / Findings</h2>
+<p>What reaches your code</p>
+</div>
 <section class="package" id="dependency-0">
 <header>
 <h2>stripe (packages/api)</h2>
-<span class="mono muted">14.25.0 → 23.0.0 · verified</span>
+<span class="mono muted">14.25.0 → 23.0.0 · <span class="verified">verified</span>
+</span>
 </header>
 <details class="group" data-severity="breaking" data-rule="fixture-cast">
 <summary>
@@ -175,19 +291,19 @@ exports[`HTML report > renders stripe from report JSON without requiring JS 1`] 
 </ul>
 </details>
 <section class="next">
-<h2>Next</h2>
+<h2>03 / Next</h2>
 <p class="muted">migrate on a new branch, verify, no push</p>
-<div class="command">
+<div class="term command">
 <code>npx uptide fix stripe --cwd /repo</code>
-<button type="button" data-copy hidden aria-label="Copy command">Copy</button>
+<button type="button" class="copy" data-copy hidden aria-label="Copy command">Copy</button>
 </div>
 <p class="muted">every site and reason</p>
-<div class="command">
+<div class="term command">
 <code>npx uptide check stripe --details --cwd /repo</code>
-<button type="button" data-copy hidden aria-label="Copy command">Copy</button>
+<button type="button" class="copy" data-copy hidden aria-label="Copy command">Copy</button>
 </div>
 </section>
-<footer>Local report · No network requests · Contains source excerpts from reported sites only. Review before sharing.</footer>
+<footer>Generic analysis is the default; verified means a migration pack is available.<br>Local report · No network requests · Contains file paths and source excerpts. Review before sharing.</footer>
 </main>
 </body>
 </html>"
@@ -198,40 +314,80 @@ exports[`HTML report > renders zod from report JSON without requiring JS 1`] = `
 <html lang="en">
 <body>
 <main>
-<header>
-<div class="brand">UPTIDE / CHECK</div>
+<header class="hero dots">
+<div class="report-top">
+<div class="brand">
+<svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
+<path d="M3 23c4.5 0 6.8-2.6 8.6-6.4C13.6 12.2 16.2 8 21.2 8c3.9 0 6.8 2.6 6.8 5.8 0 2.4-1.8 4.1-4.1 4.1-1.9 0-3.1-1.2-3.1-2.8" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M3 27.5h26" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+</svg>
+<span>uptide</span>
+</div>
+<span class="label">Dependency check / local report</span>
+</div>
+<div class="label">Your upgrade, before you merge</div>
 <h1>demo</h1>
 <div class="meta">
 <span>pnpm</span>
-<span>3 workspaces analyzed</span>
-<time datetime="2026-10-02T12:00:00Z">Oct 2, 2026, 5:00 AM PDT</time>
+<time datetime="2026-10-02T12:00:00Z">Generated Oct 2, 2026, 5:00 AM PDT</time>
 <span>Uptide CLI 0.1.0</span>
-<span>25s</span>
 </div>
-<p class="muted">28 breaking changes in 7 files. 24 fixable by rule, 4 by agent. 15 deprecated calls (not blocking).</p>
 </header>
+<div class="stats" style="--stat-count:5">
+<div class="stat ">
+<strong>1</strong>
+<span class="label">Packages</span>
+</div>
+<div class="stat warn">
+<strong>32</strong>
+<span class="label">Breaking</span>
+</div>
+<div class="stat ">
+<strong>15</strong>
+<span class="label">Deprecated</span>
+</div>
+<div class="stat safe">
+<strong>24</strong>
+<span class="label">By rule</span>
+</div>
+<div class="stat ">
+<strong>4</strong>
+<span class="label">By agent</span>
+</div>
+</div>
+<p class="more">28 breaking changes in 7 files. 24 fixable by rule, 4 by agent. 15 deprecated calls (not blocking).</p>
+<div class="section-label">
+<h2>01 / Packages</h2>
+<p>Upgrade impact</p>
+</div>
 <div class="filters" hidden role="search" aria-label="Filter findings">
 <button type="button" data-filter="all" aria-pressed="true">All</button>
 <button type="button" data-filter="breaking" aria-pressed="false">Breaking</button>
 <button type="button" data-filter="deprecated" aria-pressed="false">Deprecated</button>
 <button type="button" data-filter="unverified" aria-pressed="false">Unverified</button>
-<input id="search" type="search" aria-label="Search file paths and change rules" placeholder="Search files or rules…">
+<input id="search" type="search" aria-label="Search packages and change rules" placeholder="Search packages or rules…">
 </div>
 <section aria-label="Dependency summary" class="summary">
 <a class="dep" href="#dependency-0" data-package="dependency-0">
 <div>
 <strong>zod</strong>
-<span class="mono muted">3.25.76 → 4.6.5 · major · verified</span>
+<span class="mono muted">3.25.76 → 4.6.5 · major · <span class="verified">verified</span>
+</span>
 </div>
 <div class="breaking">✗ 28 breaking in 7 files<div class="muted">24 by rule · 4 by agent</div>
 </div>
 </a>
 </section>
 <p id="empty-filter" class="notice" hidden>No findings match these filters.</p>
+<div class="section-label">
+<h2>02 / Findings</h2>
+<p>What reaches your code</p>
+</div>
 <section class="package" id="dependency-0">
 <header>
 <h2>zod</h2>
-<span class="mono muted">3.25.76 → 4.6.5 · verified</span>
+<span class="mono muted">3.25.76 → 4.6.5 · <span class="verified">verified</span>
+</span>
 </header>
 <details class="group" data-severity="breaking" data-rule="error-params">
 <summary>
@@ -282,19 +438,19 @@ exports[`HTML report > renders zod from report JSON without requiring JS 1`] = `
 </ul>
 </details>
 <section class="next">
-<h2>Next</h2>
+<h2>03 / Next</h2>
 <p class="muted">migrate on a new branch, verify, no push</p>
-<div class="command">
+<div class="term command">
 <code>npx uptide fix zod --cwd /repo</code>
-<button type="button" data-copy hidden aria-label="Copy command">Copy</button>
+<button type="button" class="copy" data-copy hidden aria-label="Copy command">Copy</button>
 </div>
 <p class="muted">every site and reason</p>
-<div class="command">
+<div class="term command">
 <code>npx uptide check zod --details --cwd /repo</code>
-<button type="button" data-copy hidden aria-label="Copy command">Copy</button>
+<button type="button" class="copy" data-copy hidden aria-label="Copy command">Copy</button>
 </div>
 </section>
-<footer>Local report · No network requests · Contains source excerpts from reported sites only. Review before sharing.</footer>
+<footer>Generic analysis is the default; verified means a migration pack is available.<br>Local report · No network requests · Contains file paths and source excerpts. Review before sharing.</footer>
 </main>
 </body>
 </html>"

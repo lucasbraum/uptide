@@ -128,6 +128,7 @@ export { detectStyle } from './fix/style.js';
 export type { Fixer, FixReport, FixRequest, FixResponse } from './fix/types.js';
 export {
   type ListedDependency,
+  type ListGroup,
   type ListOptions,
   type ListReport,
   listDependencies,

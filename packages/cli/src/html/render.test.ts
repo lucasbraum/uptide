@@ -18,6 +18,7 @@ const fixture = (name: string): CheckReport => {
 };
 const opts: HtmlOptions = {
   root: '/repo',
+  details: true,
   date: '2026-10-02T12:00:00Z',
   version: '0.1.0',
   timeZone: 'America/Los_Angeles',
@@ -69,9 +70,9 @@ describe('HTML report', () => {
     ).toHaveLength(1);
     expect(html).toContain('npx uptide');
     // The tier of every dependency, and the difference in one line.
-    expect(html).toContain('3.25.76 → 4.6.5 · major · verified');
-    expect(html).toContain('3.2.4 → 5.0.3 · major · generic');
-    expect(html.match(/verified: migration pack · generic: no pack/g)).toHaveLength(1);
+    expect(html).toContain('3.25.76 → 4.6.5 · major · <span class="verified">verified</span>');
+    expect(html).toContain('3.2.4 → 5.0.3 · major ×2');
+    expect(html).toContain('Generic analysis is the default');
     expect(html).toContain('Oct 2, 2026');
     expect(html).toContain('5:00 AM PDT');
     expect(html).toContain('Uptide CLI 0.1.0');
@@ -155,4 +156,30 @@ describe('HTML report', () => {
     });
     expect(html).toContain('--target 22.6.2 --cwd &#39;/repo/my app; echo BAD&#39;');
   });
+});
+
+it('keeps file paths, source excerpts, compiler text and path-bearing notes out of default check HTML', () => {
+  const report = fixture('stripe');
+  const p = report.packages[0];
+  assert(p);
+  p.notes.push('Local secret at /private/project/secret.ts');
+  const readExcerpt = () => ({ lines: [{ number: 1, text: 'PRIVATE_SOURCE_SENTINEL' }] });
+  const html = renderHtml(report, { ...opts, details: false, readExcerpt });
+  expect(html).not.toContain('/private/project/secret.ts');
+  expect(html).not.toContain('PRIVATE_SOURCE_SENTINEL');
+  expect(html).not.toContain('vscode://');
+  expect(html).not.toContain('--cwd');
+  for (const g of p.plan ?? [])
+    for (const location of g.locations) expect(html).not.toContain(location.file);
+});
+
+it('omits workspace paths from check rows by default and counts breaking fixes consistently', () => {
+  const report = JSON.parse(
+    readFileSync(join(import.meta.dirname, '../__fixtures__/storefront-check.json'), 'utf8'),
+  ) as CheckReport;
+  const html = renderHtml(report, { ...opts, details: false });
+  for (const workspace of report.workspaces.filter((w) => w !== '.'))
+    expect(html).not.toContain(workspace);
+  expect(html).toContain('<strong>25</strong><span class="label">By rule</span>');
+  expect(html).toContain('<strong>7</strong><span class="label">By agent</span>');
 });

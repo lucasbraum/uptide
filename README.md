@@ -56,13 +56,18 @@ Next
   npx uptide check zod stripe --details      every site and reason
 ```
 
-`list` reads manifests, lockfiles, source imports and registry metadata. Majors come first,
-then packages imported in the most files. Each row gives current → latest, upgrade kind,
-verified/generic tier, importing files, direct call/new/JSX sites, top symbols and workspaces.
-Minor/patch upgrades collapse into one line; `--all` expands them. `--json` gives every row.
-Declared packages with no source imports are separate: consider removing them, but check
-scripts and configuration first. Usage is syntactic: indirect aliases and reflection are
-not followed. With different locked versions, usage is shown across the repository.
+`list` reads manifests, lockfiles, source imports and registry metadata. Groups come first,
+with a command such as `uptide check --group nestjs` to check their members together.
+External peers are members labeled by the package that requires them. Each row gives current → latest, upgrade
+kind and major gap, verified/generic tier, importing files, calls, references and top symbols.
+Workspace columns appear only in workspaces. Top symbols require `--details`; terminal
+columns fit the available width, and only verified packages carry a tier tag. Minor/patch upgrades, tooling and possibly
+unused packages are collapsed; `--all` expands them. Tools used by scripts/configs, runtime
+types and required peers are classified separately from possibly unused packages.
+`--json` gives every row. `--html [--open]` creates a report styled like check, with copyable
+commands and no source code or file paths by default; `--details` adds file lists.
+Usage is syntactic: indirect aliases and reflection are not followed. With different locked
+versions, usage is shown across the repository.
 
 `check` requires names (`uptide check zod stripe`). With no names it points to `uptide list`
 and exits 2 before doing work. It retains tiers and partial results per named package.

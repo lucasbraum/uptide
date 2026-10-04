@@ -10,7 +10,7 @@ import {
 import pc from 'picocolors';
 import { formatCheckDetails } from './format-check-details.js';
 import { importerNotes } from './importers.js';
-import { elapsed } from './progress.js';
+import { alignedRows, terminalHeader } from './terminal.js';
 
 /** What the first line says about the run: `uptide check · shop (pnpm, 6 packages) · 25s`. */
 export interface CheckHeader {
@@ -23,6 +23,7 @@ export interface CheckHeader {
 
 export interface FormatCheckOptions {
   color?: boolean;
+  width?: number;
   /** Every site, reason, raw compiler message and note instead of one line per rule. */
   details?: boolean;
   /** With `details`: findings under 50% confidence too. */
@@ -72,7 +73,15 @@ function bump(installed: string, target: string): string {
   const parts = (v: string): number[] => (v.match(/\d+/g) ?? []).slice(0, 3).map(Number);
   const [a, b] = [parts(installed), parts(target)];
   if (a.length < 3 || b.length < 3) return '';
-  return a[0] !== b[0] ? 'major' : a[1] !== b[1] ? 'minor' : a[2] !== b[2] ? 'patch' : '';
+  return a[0] !== b[0]
+    ? (b[0] ?? 0) - (a[0] ?? 0) > 1
+      ? `major ×${(b[0] ?? 0) - (a[0] ?? 0)}`
+      : 'major'
+    : a[1] !== b[1]
+      ? 'minor'
+      : a[2] !== b[2]
+        ? 'patch'
+        : '';
 }
 
 /** `21 by rule · 4 by agent`: who migrates the sites, in the words `fix` reports them with. */
@@ -186,8 +195,6 @@ function rowOf(p: PackageReport, multi: boolean, colors: Colors): Row | undefine
 
 /** Color codes start with the escape character and take no column. */
 const COLOR = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g');
-const width = (text: string): number => text.replace(COLOR, '').length;
-const pad = (text: string, to: number): string => text + ' '.repeat(Math.max(0, to - width(text)));
 
 /** `.email, .uuid, .datetime, ...`: the three most used deprecated names. */
 function deprecatedNames(groups: PlanGroup[]): string {
@@ -390,15 +397,14 @@ export function checkRows(report: CheckReport, colors = pc.createColors(false)):
  * one line per change rule with who migrates it, and the commands to run next. Everything
  * else (sites, reasons, compiler messages, notes) is behind `--details`.
  */
+const width = (text: string): number => text.replace(COLOR, '').length;
+const pad = (text: string, to: number): string => text + ' '.repeat(Math.max(0, to - width(text)));
+
 export function formatCheck(report: CheckReport, opts: FormatCheckOptions = {}): string {
   const colors = pc.createColors(opts.color ?? true);
   const lines: string[] = [];
   if (opts.header) {
-    const dot = colors.dim('·');
-    lines.push(
-      `${colors.bold('uptide check')} ${dot} ${repoLine(opts.header)} ${dot} ${elapsed(opts.header.ms)}`,
-      '',
-    );
+    lines.push(terminalHeader('check', opts.header, opts.color ?? true), '');
   }
   const rows = checkRows(report, colors);
   if (opts.details) {
@@ -412,24 +418,23 @@ export function formatCheck(report: CheckReport, opts: FormatCheckOptions = {}):
     const quiet = rows.filter((r) => r.quiet);
     const folded = quiet.length > NO_IMPACT_ROWS ? quiet : [];
     const shown = rows.filter((r) => !folded.includes(r));
-    const col = (pick: (row: Row) => string): number =>
-      Math.max(...shown.map((r) => width(pick(r))), 0);
-    const tier = (row: Row): string => row.p.tier ?? '';
-    const [names, versions, bumps, tiers] = [
-      col((r) => r.name),
-      col((r) => r.versions),
-      col(move),
-      col(tier),
-    ];
-    // Only rows that say who migrates them set the width of the verdict column.
-    const verdicts = Math.max(...shown.filter((r) => r.by).map((r) => width(r.verdict)), 0);
-    // Reports from before tiers existed have none: the column is simply not there.
-    const tierCell = (row: Row): string =>
-      tiers > 0 ? `${pad(colors.dim(tier(row)), tiers)}   ` : '';
-    for (const row of shown)
-      lines.push(
-        `${pad(colors.bold(row.name), names)}  ${pad(row.versions, versions)}   ${pad(colors.dim(move(row)), bumps)}   ${tierCell(row)}${row.by ? `${pad(row.verdict, verdicts)}    ${colors.dim(row.by)}` : row.verdict}`,
-      );
+    lines.push(
+      ...alignedRows(
+        shown.map((row) => [
+          { text: row.name, tone: 'bold' as const },
+          { text: row.versions, alignAt: '→' },
+          {
+            text: move(row),
+            tone: row.bump.startsWith('major') ? ('yellow' as const) : ('dim' as const),
+          },
+          { text: row.p.tier === 'verified' ? 'verified' : '', tone: 'green' as const },
+          { text: row.verdict.replace(COLOR, '') },
+          { text: row.by, tone: 'dim' as const },
+        ]),
+        opts.width ?? 160,
+        opts.color ?? true,
+      ),
+    );
     if (folded.length > 0) {
       const named = folded.slice(0, 6).map((r) => r.p.name);
       lines.push(
