@@ -213,6 +213,19 @@ export function requireFixable(repo: Repo, only: string): void {
 }
 
 /** Not a failure: the migration still runs, with the rules alone. */
+/** `fix` for a package without a pack, and no agent to do the fixing: nothing happens. */
+export function noAgentForGeneric(only: string, disabled: boolean): CliError {
+  return new CliError(
+    `${only} has no migration pack, so every fix would come from the agent, and ${disabled ? 'assisted fixes are off (--no-llm)' : 'ANTHROPIC_API_KEY is not set'}`,
+    {
+      why: 'Without a pack there are no rules to apply. Nothing was changed: no clone, no branch, no install.',
+      next: disabled
+        ? `uptide check --only ${only} --details   (every site, to migrate by hand)`
+        : `export ANTHROPIC_API_KEY=<your key> && uptide fix --only ${only}`,
+    },
+  );
+}
+
 export function noApiKeyNote(only: string): string {
   return [
     'note: ANTHROPIC_API_KEY is not set, so assisted fixes are off.',

@@ -41,6 +41,17 @@ export function formatFixSummary(report: FixReport, opts: FormatFixOptions = {})
         ['Tests', cells.tests],
       ] as const
     ).map(([label, text]) => `  ${pad(label, 9)} ${plain(text)}`),
+    // Without a pack the reader is told once, here, what stands behind the edits.
+    ...(report.tier === 'generic'
+      ? [
+          `  ${pad('Tier', 9)} generic: no migration pack; every edit is the agent's, kept on the compiler's word. Review each one.`,
+        ]
+      : []),
+    ...(report.llm.costLimit
+      ? [
+          `  ${pad('Agent', 9)} stopped at $${report.llm.costLimit.limitUsd.toFixed(2)} (--max-cost): ${report.llm.costLimit.notAttempted} site${report.llm.costLimit.notAttempted === 1 ? '' : 's'} not attempted`,
+        ]
+      : []),
     '',
   ];
   const from = opts.cwd ?? report.source ?? report.repo;

@@ -10,6 +10,7 @@ import {
   ASSISTED_NOTE,
   isNetworkError,
   networkFailure,
+  noAgentForGeneric,
   noApiKeyNote,
   noNetwork,
   notADependency,
@@ -25,7 +26,13 @@ import { openHtml, writeHtml } from './html/write.js';
 import { type Io, type Ui, type UiFlags, uiOf } from './io.js';
 import { PRIVACY } from './privacy.js';
 import { createProgress, elapsed, type Progress } from './progress.js';
-import { collectStatus, declaredDependencies, formatStatus, locateDependencies } from './status.js';
+import {
+  collectStatus,
+  declaredDependencies,
+  formatStatus,
+  locateDependencies,
+  SUPPORTED as PACKED,
+} from './status.js';
 
 /** Replaced by the bundler with this package's version; tests and tsx run the source. */
 declare const __UPTIDE_VERSION__: string | undefined;
@@ -427,8 +434,11 @@ ${EXIT_CODES(
   shared(
     program
       .command('fix')
-      .description('Upgrade zod or stripe on a new branch and migrate your code, verified')
-      .requiredOption('--only <package>', 'zod or stripe')
+      .description('Upgrade one dependency on a new branch and migrate your code, verified')
+      .requiredOption(
+        '--only <package>',
+        'the dependency to upgrade: zod or stripe (verified), or any other (generic, agent only)',
+      )
       .option(
         '--target <spec>',
         'exact version, optionally `<package>@<version>` (default: latest on npm, as check uses)',
@@ -439,6 +449,10 @@ ${EXIT_CODES(
         "stripe only: no upgrade; write the installed SDK's default apiVersion on every client that omits it",
       )
       .option('--no-llm', 'rule-based fixes only: never send code to the LLM provider')
+      .option(
+        '--max-cost <usd>',
+        'stop asking the agent once its calls cost this much (default: 1 for a generic package, no limit otherwise)',
+      )
       .option(
         '--with-services',
         'also run tests that need a database, cache or queue; prints the targets, requires --yes',
@@ -466,8 +480,15 @@ What it does:
   for the remaining sites, and verifies with your TypeScript and your test scripts.
   Nothing is pushed without --pr --yes.
 
+Tiers:
+  ${TIER_LEGEND}
+  A generic package has no rules: every fix comes from the agent, under the same checks (an
+  edit is kept only if the site's compiler error disappears and no new one appears) and the
+  same publish gate. It needs ANTHROPIC_API_KEY, stops at --max-cost and says what it left.
+
 Examples:
   $ uptide fix --only zod
+  $ uptide fix --only express --max-cost 2    a generic package, with a budget for the agent
   $ uptide fix --only stripe --target 22.6.2
   $ uptide fix --only stripe --pin-current-api   the small PR: same SDK, apiVersion made explicit
   $ uptide fix --only zod --no-llm        no code leaves this machine
@@ -482,6 +503,7 @@ ${PRIVACY}`,
           includeDeprecated?: boolean;
           pinCurrentApi?: boolean;
           llm?: boolean;
+          maxCost?: string;
           withServices?: boolean;
           keep?: boolean;
           pr?: boolean;
@@ -495,10 +517,20 @@ ${PRIVACY}`,
             const started = io.now();
             const quiet = !flags.verbose;
             const only = flags.only;
-            if (only !== 'zod' && only !== 'stripe')
-              throw new CliError(`--only ${only}: fix supports zod and stripe`, {
-                next: 'uptide fix --only zod',
+            if (only.includes(','))
+              throw new CliError(`--only ${only}: fix upgrades one dependency at a time`, {
+                next: `uptide fix --only ${only.split(',')[0]}`,
               });
+            const maxCost = flags.maxCost !== undefined ? Number(flags.maxCost) : undefined;
+            if (maxCost !== undefined && (!Number.isFinite(maxCost) || maxCost <= 0))
+              throw new CliError(`--max-cost ${flags.maxCost}: expected an amount in USD`, {
+                next: `uptide fix --only ${only} --max-cost 2`,
+              });
+            // No pack, so no rule: without the agent there is nothing this command can do,
+            // and it says so before it touches anything.
+            const hasPack = (PACKED as readonly string[]).includes(only);
+            if (!hasPack && (flags.llm === false || !io.env.ANTHROPIC_API_KEY))
+              throw noAgentForGeneric(only, flags.llm === false);
             if (flags.pinCurrentApi && only !== 'stripe')
               throw new CliError('--pin-current-api applies to stripe only', {
                 next: 'uptide fix --only stripe --pin-current-api',
@@ -542,6 +574,10 @@ ${PRIVACY}`,
               );
             else if (!llm) io.err('assisted fixes off (--no-llm): no code leaves this machine\n');
             else io.err(io.env.ANTHROPIC_API_KEY ? ASSISTED_NOTE : noApiKeyNote(only));
+            if (!hasPack)
+              io.err(
+                `${only} has no migration pack (generic tier): every fix comes from the agent, up to $${(maxCost ?? 1).toFixed(2)} (--max-cost)\n`,
+              );
             const report = await progress.phase(
               flags.pinCurrentApi
                 ? 'Pin of the Stripe API version (scan, edits, verification)'
@@ -555,6 +591,7 @@ ${PRIVACY}`,
                     includeDeprecated: flags.includeDeprecated,
                     ...(flags.pinCurrentApi ? { pinCurrentApi: true } : {}),
                     llm,
+                    ...(maxCost !== undefined ? { maxCostUsd: maxCost } : {}),
                     withServices: flags.withServices,
                     ...(flags.keep ? { keep: true } : {}),
                     pr: flags.pr,

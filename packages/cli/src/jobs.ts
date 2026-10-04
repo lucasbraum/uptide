@@ -23,7 +23,9 @@ export type CheckRequest = Pick<
 
 export interface FixRequest {
   cwd: string;
-  only: 'zod' | 'stripe';
+  only: string;
+  /** `--max-cost`: where the agent stops, in USD. */
+  maxCostUsd?: number;
   target?: string;
   includeDeprecated?: boolean;
   /** `--pin-current-api`: stripe stays; the SDK's default apiVersion is written on every client. */
