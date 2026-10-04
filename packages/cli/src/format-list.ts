@@ -15,6 +15,8 @@ export interface FormatListOptions {
 const plural = (count: number, noun: string): string => `${count} ${noun}${count === 1 ? '' : 's'}`;
 const quote = (s: string): string =>
   /^[\w./@:=+-]+$/.test(s) ? s : `'${s.replaceAll("'", "'\"'\"'")}'`;
+const dependencyKey = (p: ListedDependency): string =>
+  JSON.stringify([p.name, p.registryName ?? p.name, p.current]);
 export const listCommand = (packages: ListedDependency[], opts: FormatListOptions): string =>
   `${opts.invocation ?? 'uptide'} check ${[...new Set(packages.map((p) => p.name))].map(quote).join(' ')}${opts.cwd ? ` --cwd ${quote(opts.cwd)}` : ''}`;
 export const listChange = (p: ListedDependency): string =>
@@ -54,7 +56,7 @@ export function listSections(report: ListReport): {
 } {
   // Groups containing source usage lead the report; tooling-only groups stay collapsed.
   const groups = report.groups.filter((g) => g.members.some((p) => p.classification === 'used'));
-  const key = (p: ListedDependency): string => `${p.name}@${p.current}`;
+  const key = dependencyKey;
   const grouped = new Set(groups.flatMap((g) => g.members.map(key)));
   const remaining = report.packages.filter((p) => !grouped.has(key(p)));
   const toolingKeys = new Set(remaining.filter((p) => p.classification === 'tooling').map(key));
@@ -74,16 +76,12 @@ export function listBlocks(
   packages: ListedDependency[],
   report: ListReport,
 ): { id?: string; name?: string; members: ListedDependency[] }[] {
-  const keys = new Set(packages.map((p) => `${p.name}@${p.current}`));
-  const groups = report.groups.filter((g) =>
-    g.members.every((p) => keys.has(`${p.name}@${p.current}`)),
-  );
-  const grouped = new Set(groups.flatMap((g) => g.members.map((p) => `${p.name}@${p.current}`)));
+  const keys = new Set(packages.map((p) => dependencyKey(p)));
+  const groups = report.groups.filter((g) => g.members.every((p) => keys.has(dependencyKey(p))));
+  const grouped = new Set(groups.flatMap((g) => g.members.map((p) => dependencyKey(p))));
   return [
     ...groups,
-    ...packages
-      .filter((p) => !grouped.has(`${p.name}@${p.current}`))
-      .map((p) => ({ members: [p] })),
+    ...packages.filter((p) => !grouped.has(dependencyKey(p))).map((p) => ({ members: [p] })),
   ];
 }
 /** Group only identical registry failures; HTML keeps a named row for every package. */
@@ -108,6 +106,16 @@ export function listFailureLines(report: ListReport, details = false): string[] 
       ];
     return members.map((f) => `? ${f.name}: ${f.reason}`);
   });
+}
+export function skippedSources(
+  report: ListReport,
+): { reason: string; members: NonNullable<ListReport['skipped']> }[] {
+  const groups = new Map<string, NonNullable<ListReport['skipped']>>();
+  for (const item of report.skipped ?? [])
+    groups.set(item.reason, [...(groups.get(item.reason) ?? []), item]);
+  return [...groups]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([reason, members]) => ({ reason, members }));
 }
 export function formatList(report: ListReport, opts: FormatListOptions = {}): string {
   const color = opts.color ?? false;
@@ -153,9 +161,9 @@ export function formatList(report: ListReport, opts: FormatListOptions = {}): st
     ...(opts.all ? [...tooling, ...unused] : []),
   ];
   const formatted = alignedRows(shown.map(cells), width, color, 2);
-  const rows = new Map(shown.map((p, i) => [`${p.name}@${p.current}`, formatted[i] as string]));
+  const rows = new Map(shown.map((p, i) => [dependencyKey(p), formatted[i] as string]));
   const row = (p: ListedDependency): void => {
-    lines.push(rows.get(`${p.name}@${p.current}`) ?? '');
+    lines.push(rows.get(dependencyKey(p)) ?? '');
     if (p.classification === 'tooling' || p.classification === 'possibly-unused')
       for (const reason of p.reasons) lines.push(c.dim(ellipsis(`    ${reason}`, width)));
     if (opts.details && listSymbols(p))
@@ -207,7 +215,25 @@ export function formatList(report: ListReport, opts: FormatListOptions = {}): st
       }
     lines.push('');
   }
-  if (!report.packages.length && !report.failures.length && !report.unknown?.length)
+  for (const group of skippedSources(report)) {
+    lines.push(
+      c.dim(
+        `${plural(group.members.length, 'package')} ${group.reason}${opts.all || opts.details ? '' : ' · --all'}`,
+      ),
+    );
+    if (opts.all || opts.details)
+      for (const item of group.members)
+        lines.push(
+          `  ${c.bold(item.name)}${showWorkspaces && opts.details ? c.dim(` · ${item.workspaces.join(', ')}`) : ''}`,
+        );
+  }
+  if (report.skipped?.length) lines.push('');
+  if (
+    !report.packages.length &&
+    !report.failures.length &&
+    !report.unknown?.length &&
+    !report.skipped?.length
+  )
     lines.push('Every direct dependency is up to date.', '');
   lines.push(...listFailureLines(report, opts.details));
   lines.push(

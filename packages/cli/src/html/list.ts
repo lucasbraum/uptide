@@ -73,7 +73,8 @@ ${report.unknown?.length ? `<p class="more">${report.unknown.length} not checked
 ${groups.length ? sectionLabel(nextSection(), 'Groups', 'Upgrade together') + groups.map(group).join('') : ''}
 ${used.length ? `${sectionLabel(nextSection(), 'Packages')}<section class="package">${used.map(standalone).join('')}</section>` : ''}
 ${collapsed('Tooling', tooling)}${collapsed('Possibly unused', unused)}
-${!report.packages.length && !report.failures.length && !report.unknown?.length ? '<p class="more safe">Every direct dependency is up to date.</p>' : ''}
+${report.skipped?.length ? `<details class="notes"><summary>${nextSection()} / Not checked / ${report.skipped.length} non-registry source${report.skipped.length === 1 ? '' : 's'}</summary>${report.skipped.map((p) => `<div class="source-row"><strong>${e(p.name)}</strong><span class="label">Skipped</span><span>${e(p.reason)}</span></div>`).join('')}</details>` : ''}
+${!report.packages.length && !report.failures.length && !report.unknown?.length && !report.skipped?.length ? '<p class="more safe">Every direct dependency is up to date.</p>' : ''}
 ${failures.length ? `<section class="notes">${sectionLabel(nextSection(), 'Incomplete discovery')}${failures.map((f) => `<div class="incomplete-row"><strong>${e(f.name)}</strong><span class="label">${report.unknown?.some((p) => p.name === f.name) ? 'Unknown' : 'Incomplete'}</span><span>${opts.details || f.kind === 'registry' ? e(f.reason) : 'metadata or current version unavailable; see terminal output'}</span></div>`).join('')}</section>` : ''}
 <footer>Usage is a syntax scan, no type analysis. Generic analysis is the default; verified means a migration pack is available.<br>Local report · No network requests · ${opts.details ? 'File lists included. No source code.' : 'No source code or file paths. Run commands from the named repository; --details adds file lists.'}</footer>`,
   );

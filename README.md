@@ -78,6 +78,13 @@ and HTML keeps one named row per incomplete package. Repeated failures are group
 reason (more than five network errors, or multiple access failures); `--details` lists names.
 Successful packages remain visible; incomplete discovery exits 2. Analysis commands retain
 their normal retry policy.
+
+Git/GitHub, local file/link/workspace dependencies and HTTP(S) sources are intentional skips,
+including `npm:` aliases pointing to those sources. They appear as collapsed “not checked:
+non-registry source (github)” lines (expand with `--all` or `--details`) and a collapsed HTML
+section; JSON keeps them in `skipped`. They do not make discovery incomplete or change exit 0.
+Registry aliases resolve the real package name, retaining their local dependency names for
+usage scanning and adding `registryName` to aliased upgrade rows in JSON.
 `--json` gives every row. `--html [--open]` creates a report styled like check, with copyable
 commands and no source code or file paths by default; `--details` adds file lists.
 Usage is syntactic: indirect aliases and reflection are not followed. With different locked

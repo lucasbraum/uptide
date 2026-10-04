@@ -13,3 +13,7 @@ Recognize package.json tooling fields, installed bins, AngularJS/gulp/Karma and 
 stylesheet imports and HTML node_modules assets before flagging possibly unused dependencies.
 Keep that section collapsed with cautious wording and per-package reasons. Number HTML
 sections sequentially according to the sections present.
+
+Classify non-registry declarations and aliases as intentional skips, with collapsed terminal/HTML
+reasons and no error exit. Resolve npm registry aliases by their real package names, preserve
+local import usage, and read the correct pnpm/Yarn alias versions from lockfiles.

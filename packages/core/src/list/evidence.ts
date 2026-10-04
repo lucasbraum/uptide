@@ -62,7 +62,9 @@ export function toolingReasons(
   const reasons: string[] = [];
   if (knownTool(name)) reasons.push('known configuration or build tool');
   const bins = metadata.flatMap((m) =>
-    typeof m.bin === 'string' ? [name.split('/').at(-1) as string] : Object.keys(m.bin ?? {}),
+    typeof m.bin === 'string'
+      ? [(m.name ?? name).split('/').at(-1) as string]
+      : Object.keys(m.bin ?? {}),
   );
   if (
     [name, ...bins].some((token) => mentions(scripts, token)) ||

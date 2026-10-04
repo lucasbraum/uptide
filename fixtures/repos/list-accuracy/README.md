@@ -32,7 +32,15 @@ attempt 10 seconds including stalled bodies, retry timeout/5xx once, keep failur
 and stop further requests to a host only after 401/403/405. A current/target metadata failure
 also cannot hide an already-known outdated package.
 
-Re-run: `pnpm --filter @uptide/core exec vitest run src/list/accuracy.test.ts src/list/registry.test.ts`.
+`dependency-sources` covers 22 intentional skips: GitHub protocol/shorthand, Git HTTPS/SSH,
+Git protocol/SCP, file/link/workspace, HTTP(S) tarballs, and npm aliases pointing to each source.
+It also checks three registry aliases (including scoped auth and tooling) plus a normal registry
+dependency whose lockfile contains a tarball URL. Non-registry specs never reach the registry;
+registry tarball URLs in lockfiles do not cause false skips. Additional tests cover pnpm/Yarn
+alias locks, different alias targets in workspaces, malformed declarations, exit codes, and
+collapsed terminal/HTML output without source URLs or local paths.
+
+Re-run: `pnpm --filter @uptide/core exec vitest run src/list/accuracy.test.ts src/list/registry.test.ts src/list/spec.test.ts`.
 
 ## Public registry runs
 
@@ -46,8 +54,17 @@ local syntax scan; npm metadata was fetched live without an Uptide registry cach
 | Same webpack checkout, after | 121 | 14 | 0 | 0 | 5.456 s |
 | webpack v5.50.0 (`400a0f94ab45ca20b10f219c8311e87d3d3f108c`), after | 93 | 73 (47 major / 20 minor / 6 patch) | 0 | 0 | 2.482 s |
 
-Both after-runs still exit 2 for one separate, pre-existing metadata limitation: npm alias
+At that stage, both after-runs exited 2 for one metadata limitation: npm alias
 `prettier-2` on current webpack, and the GitHub shorthand `tooling: webpack/tooling#v1.19.0`
 on v5.50.0. These are not network timeouts. The current checkout's reported 14 upgrades
-include the alias row, whose target is not reliable until alias resolution is supported.
-Neither alias nor GitHub shorthand resolution is changed by this timeout fix.
+include the alias row, whose target was unreliable before alias resolution.
+The follow-up source classification/alias fix resolves both issues. Re-running the same
+checkouts produces:
+
+| Public checkout | Outdated | Intentional skips | Unknown / failures | Time | Exit |
+| --- | --- | --- | --- | --- | --- |
+| webpack `62f7a27` | 14 | 0 | 0 / 0 | 5.028 s | 0 |
+| webpack v5.50.0 | 73 | 1 GitHub source | 0 / 0 | 2.422 s | 0 |
+
+`prettier-2` now resolves `prettier`, comparing 2.8.8 → 3.9.9. The GitHub `tooling`
+dependency is reported as “not checked: non-registry source (github)”.
