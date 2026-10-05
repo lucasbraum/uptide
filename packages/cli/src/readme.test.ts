@@ -68,6 +68,10 @@ describe('README', () => {
       /\*\*0\*\* nothing breaking, \*\*1\*\* breaking changes found,\n\*\*2\*\*/,
     );
     expect(readme).toContain('[Apache-2.0](LICENSE)');
+    // A badge, under the tagline, that states the license and links to the text itself.
+    expect(readme.split('\n').slice(0, 6)).toContain(
+      '[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)',
+    );
   });
 
   it('links only files that exist', () => {

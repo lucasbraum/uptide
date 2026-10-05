@@ -1,4 +1,6 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const root = new URL('../../../', import.meta.url);
@@ -32,6 +34,64 @@ describe('open source files', () => {
     expect(read('CONTRIBUTING.md')).toContain('[Apache License, Version 2.0](LICENSE)');
     // Already published, so still MIT: the change applies from the next minor on.
     expect(read('README.md')).toContain('up to and including 0.3.0 were published under the MIT');
+  });
+
+  it('states Apache-2.0 in every manifest in the repository, fixtures included', () => {
+    const tracked = execFileSync('git', ['ls-files', '*package.json'], {
+      cwd: fileURLToPath(root),
+      encoding: 'utf8',
+    })
+      .split('\n')
+      .filter(Boolean);
+    // Every manifest here is this repository's own file, so it states this repository's
+    // license — except a fixture that reproduces a real package's published manifest,
+    // where the license is a fact about that package and not ours to restate.
+    const realPackages = [
+      'fixtures/module-format/file-type-16/package.json',
+      'fixtures/module-format/file-type-22/package.json',
+      'fixtures/module-format/node-fetch-2/package.json',
+      'fixtures/module-format/node-fetch-3/package.json',
+      'fixtures/module-format/p-limit-3/package.json',
+      'fixtures/module-format/p-limit-6/package.json',
+    ];
+    expect(tracked.length).toBeGreaterThan(50);
+    const stated = (path: string) => JSON.parse(read(path)).license as string | undefined;
+    for (const path of tracked) {
+      const license = stated(path);
+      if (license === undefined) continue;
+      expect(license, path).toBe(realPackages.includes(path) ? 'MIT' : 'Apache-2.0');
+    }
+    // Each exception names a real npm package at a real published version.
+    for (const path of realPackages) {
+      const manifest = JSON.parse(read(path));
+      expect(path.startsWith(`fixtures/module-format/${manifest.name}-`), path).toBe(true);
+    }
+  });
+
+  it('states Apache-2.0 for its own packages in a fixture lockfile, and nothing else', () => {
+    for (const path of [
+      'packages/cli/smoke/fixtures/npm/package-lock.json',
+      'packages/cli/smoke/fixtures/npm-workspaces/package-lock.json',
+    ]) {
+      const entries = Object.entries(
+        JSON.parse(read(path)).packages as Record<
+          string,
+          { resolved?: string; link?: boolean; license?: string }
+        >,
+      );
+      // A local entry is one of ours; a resolved entry is what the registry says.
+      const local = entries.filter(([, entry]) => !entry.resolved && !entry.link);
+      expect(local.length, path).toBeGreaterThan(0);
+      for (const [key, entry] of local)
+        if (entry.license !== undefined) expect(entry.license, `${path} ${key}`).toBe('Apache-2.0');
+      // Untouched: real dependencies keep the license the registry published.
+      const registry = entries.filter(([, entry]) => entry.resolved && entry.license);
+      expect(registry.length, path).toBeGreaterThan(0);
+      expect(
+        registry.some(([, entry]) => entry.license === 'MIT'),
+        path,
+      ).toBe(true);
+    }
   });
 
   it('has a NOTICE naming the project, and pointing at the bundled notices', () => {

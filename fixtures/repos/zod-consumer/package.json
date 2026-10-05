@@ -7,5 +7,5 @@
   "dependencies": {
     "zod": "3.23.8"
   },
-  "license": "MIT"
+  "license": "Apache-2.0"
 }

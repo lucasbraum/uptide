@@ -4,7 +4,7 @@
   "private": true,
   "description": "Synthetic pnpm workspace on zod 3 and stripe 14, written for Uptide's fixtures and examples.",
   "packageManager": "pnpm@10.17.1",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "devDependencies": {
     "typescript": "5.9.3"
   }

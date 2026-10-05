@@ -2,5 +2,5 @@
   "name": "main-dir",
   "version": "1.0.0",
   "main": "lib/entry.js",
-  "license": "MIT"
+  "license": "Apache-2.0"
 }

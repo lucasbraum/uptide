@@ -3,5 +3,5 @@
   "version": "2.0.0",
   "main": "index.js",
   "types": "index.d.ts",
-  "license": "MIT"
+  "license": "Apache-2.0"
 }

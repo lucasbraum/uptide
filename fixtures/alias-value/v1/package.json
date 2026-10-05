@@ -2,5 +2,5 @@
   "name": "alias-value",
   "version": "1.0.0",
   "types": "./index.d.ts",
-  "license": "MIT"
+  "license": "Apache-2.0"
 }
