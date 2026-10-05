@@ -1,0 +1,43 @@
+name: DCO
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  signed-off:
+    runs-on: ubuntu-latest
+    steps:
+      # The checker runs from the pull request's own checkout, as the rest of CI does.
+      # Taking it from the base branch instead would buy nothing: for a `pull_request`
+      # event GitHub already reads the workflow definition from the pull request, so the
+      # step invoking the checker is the pull request's either way -- and the base branch
+      # does not have the checker at all until this lands. What does the work is the
+      # event: `pull_request`, never `pull_request_target`, so the job holds a read-only
+      # token and no secret, whoever opened it. The range below comes from this
+      # repository's own refs rather than from anything the branch says about itself.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Every commit is signed off
+        # Values from the event go through the environment, never into the script source.
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          # refs/pull/N/head is the complete pull request head as this repository sees it,
+          # for a branch and for a fork alike, and refs/heads/<base> is the base branch as
+          # it stands now. Both are fetched here rather than assumed, with full history, so
+          # the merge base -- and so the whole range the pull request adds -- resolves.
+          git fetch --no-tags origin \
+            "+refs/pull/${PR_NUMBER}/head:refs/uptide/pr-head" \
+            "+refs/heads/${BASE_REF}:refs/uptide/base"
+          # The refs above are CI's own bookkeeping: --base-name is the branch a
+          # contributor would actually rebase onto, for the failure message.
+          node scripts/dco.mjs refs/uptide/base refs/uptide/pr-head \
+            --base-name="origin/${BASE_REF}"

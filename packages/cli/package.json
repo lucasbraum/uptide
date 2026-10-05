@@ -2,13 +2,16 @@
   "name": "uptide",
   "version": "0.3.0",
   "description": "Uptide finds what a dependency upgrade breaks in your code, migrates it, and proves it with your compiler and tests.",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "type": "module",
   "bin": {
     "uptide": "./dist/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "!dist/metafile-*.json",
+    "NOTICE",
+    "THIRD-PARTY-NOTICES"
   ],
   "engines": {
     "node": ">=20"
@@ -33,7 +36,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && node scripts/third-party-notices.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "prepack": "node scripts/prepack.mjs",

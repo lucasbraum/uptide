@@ -4,17 +4,67 @@ import { describe, expect, it } from 'vitest';
 const root = new URL('../../../', import.meta.url);
 const read = (path: string): string => readFileSync(new URL(path, root), 'utf8');
 
+/** Every package in the workspace, so a new one cannot quietly state another license. */
+const workspaceManifests = (): string[] =>
+  readdirSync(new URL('packages/', root), { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => `packages/${entry.name}/package.json`)
+    .sort();
+
 describe('open source files', () => {
-  it('is MIT everywhere a license is stated', () => {
-    expect(read('LICENSE')).toMatch(/^MIT License\n/);
-    for (const manifest of [
-      'package.json',
-      'packages/cli/package.json',
-      'packages/core/package.json',
+  it('is Apache-2.0 everywhere a license is stated', () => {
+    // The license text as apache.org publishes it, unmodified.
+    const license = read('LICENSE');
+    expect(
+      license
+        .split('\n')
+        .slice(0, 3)
+        .map((line) => line.trim()),
+    ).toEqual(['', 'Apache License', 'Version 2.0, January 2004']);
+    expect(license).toContain('TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION');
+    expect(license).toContain('END OF TERMS AND CONDITIONS');
+    expect(license).toContain('APPENDIX: How to apply the Apache License to your work.');
+    expect(license).not.toContain('MIT');
+    // Every manifest in the workspace, published or not.
+    for (const manifest of ['package.json', ...workspaceManifests()])
+      expect(JSON.parse(read(manifest)).license, manifest).toBe('Apache-2.0');
+    expect(read('README.md')).toContain('[Apache-2.0](LICENSE)');
+    expect(read('CONTRIBUTING.md')).toContain('[Apache License, Version 2.0](LICENSE)');
+    // Already published, so still MIT: the change applies from the next minor on.
+    expect(read('README.md')).toContain('up to and including 0.3.0 were published under the MIT');
+  });
+
+  it('has a NOTICE naming the project, and pointing at the bundled notices', () => {
+    const notice = read('NOTICE');
+    expect(notice.split('\n').slice(0, 2)).toEqual([
+      'Uptide',
+      'Copyright 2026 Lucas Braum and the Uptide contributors',
+    ]);
+    expect(notice).toContain('THIRD-PARTY-NOTICES');
+  });
+
+  it('asks for a DCO sign-off and checks every commit for it', () => {
+    const contributing = read('CONTRIBUTING.md');
+    for (const fact of [
+      'Developer Certificate of Origin',
+      'git commit -s',
+      'Signed-off-by:',
+      'git rebase --signoff',
+      'Every commit in a pull request needs the line',
     ])
-      expect(JSON.parse(read(manifest)).license, manifest).toBe('MIT');
-    expect(read('README.md')).toContain('[MIT](LICENSE)');
-    expect(read('CONTRIBUTING.md')).toContain('[MIT license](LICENSE)');
+      expect(contributing, fact).toContain(fact);
+    const workflow = read('.github/workflows/dco.yml');
+    expect(workflow).toContain('scripts/dco.mjs');
+    // Read-only, and on the pull request event: the check never holds a write token.
+    expect(workflow).toContain('contents: read');
+    expect(workflow).not.toMatch(/^\s*pull_request_target:/m);
+    expect(workflow).toMatch(/^on:\n {2}pull_request:$/m);
+    // The whole range, from this repository's own refs rather than the branch's word.
+    expect(workflow).toMatch(/refs\/pull\/\$\{PR_NUMBER}\/head/);
+    expect(workflow).toContain('fetch-depth: 0');
+    // It runs the checker it checked out, with no `ref:` steering the checkout elsewhere:
+    // taking it from the base branch would fail on the very pull request that adds it.
+    expect(workflow).not.toMatch(/^\s+ref:/m);
   });
 
   it('tells a contributor how to set up, test, and what a pack is', () => {

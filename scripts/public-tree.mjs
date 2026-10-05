@@ -28,7 +28,7 @@ export function denylist(env = process.env) {
 /** Private planning and audit documents, whatever they are called next time. */
 const PRIVATE_DOC = /(^|\/)(plan|roadmap|privacy-audit|audit)[^/]*\.md$/i;
 const TEXT =
-  /\.(md|ts|tsx|mts|mjs|js|json|ya?ml|txt|snap|html|css|sh)$|(^|\/)\.[\w.-]+$|(^|\/)LICENSE$/;
+  /\.(md|ts|tsx|mts|mjs|js|json|ya?ml|txt|snap|html|css|sh)$|(^|\/)\.[\w.-]+$|(^|\/)(LICENSE|NOTICE)$/;
 
 /** Lowercase entries match in any case; an entry with an uppercase letter matches as written. */
 const matcher = (term) =>

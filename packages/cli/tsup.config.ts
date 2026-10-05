@@ -26,6 +26,8 @@ export default defineConfig({
     worker: fileURLToPath(import.meta.resolve('@uptide/core/worker')),
   },
   format: ['esm'],
+  // What scripts/third-party-notices.mjs reads: the record of every file in the bundle.
+  metafile: true,
   clean: true,
   target: 'node20',
   splitting: true,

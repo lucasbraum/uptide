@@ -2,6 +2,8 @@
 
 **Migrations you can merge.**
 
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+
 Uptide finds what a dependency upgrade breaks in your code, migrates it, and proves it with
 your compiler and tests. TypeScript repositories; verified migrations for **zod 3 → 4** and
 **stripe** today.
@@ -393,4 +395,9 @@ Compiler allocations are estimates; unexpected worker failures still preserve ot
 
 ## License
 
-[MIT](LICENSE).
+[Apache-2.0](LICENSE). Releases up to and including 0.3.0 were published under the MIT
+license; 0.4.0 and later are Apache-2.0.
+
+The published CLI is one bundle: it inlines its dependencies. The notice for every package
+in that bundle, with the full text of its license, ships in the npm package as
+`THIRD-PARTY-NOTICES` and is generated from the bundle itself at build time.
