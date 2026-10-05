@@ -282,7 +282,7 @@ describe('fix migrates the commit that is checked out, cloned from the local rep
     await expect(
       isolatedFix({ cwd: root, only: 'zod', pr: true, yes: true, tool: TOOL }, services),
     ).rejects.toThrow(
-      /^\w+ is 2 commits ahead of origin\/\w+\. Push it first \(`git push origin \w+`\) so the PR only contains the migration, or pass --base <branch>\.$/,
+      /^\w+ is 2 commits ahead of origin\/\w+\. Push it first \(`git push origin \w+`\) so the PR only contains the migration, or pass --base <branch>\. If you pushed from elsewhere, run `git fetch origin` and try again\.$/,
     );
     // No clone, no check (so no LLM call and no spend), nothing published.
     expect(readdirSync(runsRoot()).length).toBe(runs);
@@ -301,24 +301,39 @@ describe('fix migrates the commit that is checked out, cloned from the local rep
     expect(seen.published).toBe(1);
   }, 30000);
 
-  it('behind the upstream: migrates the local commit, says so, and --pr is allowed', async () => {
+  it('behind the upstream: migrates the local commit and says so; --pr warns about the older base', async () => {
     const { root, services } = zodFixture(scratch);
     withOrigin(root);
     const baseline = git(root, 'rev-parse', 'HEAD');
     commitFile(root, 'remote-has-it.txt');
     git(root, 'push', '--quiet', 'origin', 'HEAD');
     git(root, 'reset', '--quiet', '--hard', baseline);
+    const plain = await isolatedFix({ cwd: root, only: 'zod', tool: TOOL }, services);
+    expect(git(root, 'merge-base', BRANCH, 'HEAD')).toBe(baseline);
+    expect(git(root, 'ls-tree', '--name-only', BRANCH)).not.toContain('remote-has-it');
+    expect(plain.notes.join('\n')).toMatch(
+      /^\w+ is 1 commit behind origin\/\w+; migrating your local state$/m,
+    );
+    // With --pr it is a warning, said once and in the PR's terms, never a refusal.
+    git(root, 'branch', '-D', BRANCH);
     const seen = counted(services);
     const report = await isolatedFix(
       { cwd: root, only: 'zod', pr: true, yes: true, tool: TOOL },
       services,
     );
-    expect(git(root, 'merge-base', BRANCH, 'HEAD')).toBe(baseline);
-    expect(git(root, 'ls-tree', '--name-only', BRANCH)).not.toContain('remote-has-it');
-    expect(report.notes.join('\n')).toMatch(
-      /^\w+ is 1 commit behind origin\/\w+; migrating your local state$/m,
+    const behind = report.notes.filter((note) => note.includes('behind'));
+    expect(behind).toHaveLength(1);
+    expect(behind[0]).toMatch(
+      /^\w+ is 1 commit behind origin\/\w+; the PR will be based on an older commit\. Consider `git pull` first\.$/,
     );
     expect(seen.published).toBe(1);
+    // A caller that already showed the notes does not get them again in the report.
+    git(root, 'branch', '-D', BRANCH);
+    const shown = await isolatedFix(
+      { cwd: root, only: 'zod', tool: TOOL, preflightShown: true },
+      services,
+    );
+    expect(shown.notes.join('\n')).not.toContain('behind');
   }, 30000);
 
   it('no upstream: migrates the local commit without a word about the remote', async () => {

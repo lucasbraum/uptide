@@ -854,6 +854,7 @@ ${PRIVACY}`,
             if (quiet && !ui.interactive)
               io.err(`uptide fix · ${only} · ${repoLine(headerOf(repo, 0))}\n`);
             // Local commits the remote lacks, uncommitted files: said, or refused, before any work.
+            const preflightShown = engine.preflight !== undefined;
             if (engine.preflight) {
               let notes: string[];
               try {
@@ -922,6 +923,7 @@ ${PRIVACY}`,
                     pr: flags.pr,
                     ...(flags.base ? { base: flags.base } : {}),
                     ...(flags.allowDirty ? { allowDirty: true } : {}),
+                    ...(preflightShown ? { preflightShown: true } : {}),
                     yes: flags.yes,
                   },
                   progress.event,

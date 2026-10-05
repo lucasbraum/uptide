@@ -278,9 +278,9 @@ describe('uptide fix', () => {
     });
     const io = memoryIo({ cwd });
     expect(await run(['fix', 'zod'], io, engine)).toBe(0);
-    expect(io.stderr()).toContain(
-      'main is 23 commits ahead of origin/main; migrating your local state\n',
-    );
+    // Once: printed before the run, and the engine is told not to put it in the report again.
+    expect(io.stderr().split('migrating your local state')).toHaveLength(2);
+    expect(engine.calls.at(-1)).toMatchObject({ preflightShown: true });
     const refused = memoryIo({ cwd });
     const calls = engine.calls.length;
     expect(await run(['fix', 'zod', '--pr', '--yes'], refused, engine)).toBe(1);

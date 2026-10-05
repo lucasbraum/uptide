@@ -40,6 +40,8 @@ export interface FixRequest {
   base?: string;
   /** `--allow-dirty`: open the PR although the working tree has uncommitted changes. */
   allowDirty?: boolean;
+  /** The CLI printed the preflight notes before the run: the report does not repeat them. */
+  preflightShown?: boolean;
   yes?: boolean;
   /** False with `--no-llm`: no fixer is created, so no code can leave the machine. */
   llm: boolean;

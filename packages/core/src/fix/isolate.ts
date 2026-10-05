@@ -336,6 +336,8 @@ export interface PreflightOptions {
   base?: string;
   /** `--allow-dirty`: open the PR although the working tree has uncommitted changes. */
   allowDirty?: boolean;
+  /** The caller already ran the preflight and showed its notes: the run does not repeat them. */
+  preflightShown?: boolean;
 }
 
 const commits = (n: number): string => `${n} commit${n === 1 ? '' : 's'}`;
@@ -381,11 +383,13 @@ export function fixPreflight(
     );
   }
 
-  // ponytail: the remote as this repository last fetched it; no network here. Fetch first if it is stale.
-  if (options.pr) {
-    const base = options.base
+  // The remote as this repository last fetched it: no network here.
+  const base = !options.pr
+    ? undefined
+    : options.base
       ? { ref: `origin/${options.base}`, name: options.base }
       : remoteDefaultBranch(source);
+  if (options.pr) {
     if (
       options.base &&
       !tryGit(source, 'rev-parse', '--verify', '--quiet', `origin/${options.base}`)
@@ -394,11 +398,18 @@ export function fixPreflight(
         'PUBLICATION_REFUSED',
         `--base ${options.base}: origin/${options.base} is not known in this repository. Push or fetch it first.`,
       );
-    const ahead = base ? Number(tryGit(source, 'rev-list', '--count', `${base.ref}..${head}`)) : 0;
+    const count = (range: string): number =>
+      base ? Number(tryGit(source, 'rev-list', '--count', range)) || 0 : 0;
+    const ahead = count(`${base?.ref}..${head}`);
     if (base && ahead > 0)
       throw new UptideError(
         'PUBLICATION_REFUSED',
-        `${branch} is ${commits(ahead)} ahead of ${base.ref}. Push it first (\`git push origin ${name || 'HEAD:<branch>'}\`) so the PR only contains the migration, or pass --base <branch>.`,
+        `${branch} is ${commits(ahead)} ahead of ${base.ref}. Push it first (\`git push origin ${name || 'HEAD:<branch>'}\`) so the PR only contains the migration, or pass --base <branch>. If you pushed from elsewhere, run \`git fetch origin\` and try again.`,
+      );
+    const behind = count(`${head}..${base?.ref}`);
+    if (base && behind > 0)
+      notes.push(
+        `${branch} is ${commits(behind)} behind ${base.ref}; the PR will be based on an older commit. Consider \`git pull\` first.`,
       );
   }
 
@@ -409,7 +420,8 @@ export function fixPreflight(
     '--symbolic-full-name',
     '@{upstream}',
   );
-  if (upstream) {
+  // Against the PR's own base, the lines above already said it.
+  if (upstream && upstream !== base?.ref) {
     const [behind = 0, ahead = 0] = tryGit(
       source,
       'rev-list',
@@ -468,14 +480,14 @@ export async function isolatedFix(
   const before = snapshot(source);
   const base = options.base ?? remoteDefaultBranch(source)?.name;
   const clone = isolate(source, undefined, project);
-  const { keep, base: _base, allowDirty: _allowDirty, ...rest } = options;
+  const { keep, base: _base, allowDirty: _allowDirty, preflightShown, ...rest } = options;
   const report = await keeping(clone, async () => {
     // The migration starts from the commit the user has checked out, whatever the remote has.
     git(clone, 'switch', '--quiet', '--detach', preflight.head);
     // Publishing is not part of the run in the clone: it happens below, after the verified
     // run has landed in the user's repository, so a failed publish can be retried alone.
     const result = await fix({ ...rest, pr: false, cwd: join(clone, project), tool }, services);
-    result.notes.push(...preflight.notes);
+    if (!preflightShown) result.notes.push(...preflight.notes);
     return result;
   });
   const delivered = deliver(source, clone, report, before);

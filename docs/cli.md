@@ -233,7 +233,9 @@ Everything happens in a temporary clone of your repository, never in your checko
    line saying so. With `--pr` the run stops before any work when the base branch on `origin`
    does not contain that commit (push it first, or pass `--base <branch>`), and when the
    working tree has uncommitted changes (commit them, or pass `--allow-dirty`): the PR must
-   hold the migration and nothing else. It works on a
+   hold the migration and nothing else. A commit that is behind the base only gets a
+   warning. The remote is compared as last fetched: run `git fetch origin` if you pushed
+   from elsewhere. It works on a
    new branch `uptide/<package>-<version>`. Nothing is pushed unless you pass `--pr --yes`,
    or later run `uptide pr --branch <branch> --yes`, which loads the stored run, checks the
    branch is still at the verified commit (else `uptide verify`), prints which repository
