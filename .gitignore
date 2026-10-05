@@ -14,3 +14,4 @@ eval-out/
 *.tgz
 # Private planning never belongs in this repository (scripts/public-tree.mjs).
 /docs/plan-*.md
+graphify-out/
