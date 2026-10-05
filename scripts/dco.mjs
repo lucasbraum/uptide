@@ -2,10 +2,12 @@
 // sign-off (https://developercertificate.org/), which is how a contributor states they
 // have the right to send the patch under the project's license.
 //
-//   node scripts/dco.mjs <base-ref> <head-ref> [--json]
+//   node scripts/dco.mjs <base-ref> <head-ref> [--base-name=<name>] [--json]
 //
 // The range is everything on `head` since it left `base`, so a long-running branch is not
-// asked to account for commits it merely inherited.
+// asked to account for commits it merely inherited. CI passes the refs it fetched for
+// itself, which are not names a contributor could rebase onto, so `--base-name` sets what
+// the failure message tells them to use.
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -72,17 +74,21 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const args = process.argv.slice(2);
   const [base, head] = args.filter((arg) => !arg.startsWith('--'));
   if (!base || !head) {
-    console.error('usage: node scripts/dco.mjs <base-ref> <head-ref> [--json]');
+    console.error(
+      'usage: node scripts/dco.mjs <base-ref> <head-ref> [--base-name=<name>] [--json]',
+    );
     process.exit(2);
   }
   const list = commits(base, head);
   const found = problems(list);
+  // The ref CI fetched is not a name anyone can rebase onto; this says what to print.
+  const named = args.find((arg) => arg.startsWith('--base-name='))?.slice(12) || base;
   if (args.includes('--json')) {
     console.log(JSON.stringify({ commits: list.map((c) => c.sha), problems: found }, null, 2));
   } else {
-    console.log(`${list.length} commits on ${head} since ${base}`);
+    console.log(`${list.length} commits on ${head} since ${named}`);
     for (const line of found) console.log(`  ✗ ${line}`);
-    console.log(found.length ? `\n${howToFix(base)}` : 'every commit is signed off');
+    console.log(found.length ? `\n${howToFix(named)}` : 'every commit is signed off');
   }
   process.exit(found.length ? 1 : 0);
 }

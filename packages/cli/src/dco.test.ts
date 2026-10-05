@@ -149,6 +149,23 @@ describe('every commit in a pull request is signed off', () => {
     expect(run.stdout).toContain('CONTRIBUTING.md');
   });
 
+  it('names the branch CI tells it to, not the ref CI fetched for itself', () => {
+    const dir = repo([{ message: 'feat: forgotten\n' }]);
+    const git = (...args: string[]) => execFileSync('git', args, { cwd: dir, encoding: 'utf8' });
+    // What the workflow does: the range comes from refs it fetched, which nobody rebases
+    // onto, so the message has to name the base branch instead.
+    git('update-ref', 'refs/uptide/base', 'main');
+    git('update-ref', 'refs/uptide/pr-head', 'pr');
+    const run = spawnSync(
+      'node',
+      [script, 'refs/uptide/base', 'refs/uptide/pr-head', '--base-name=origin/main'],
+      { cwd: dir, encoding: 'utf8' },
+    );
+    expect(run.status).toBe(1);
+    expect(run.stdout).toContain('git rebase --signoff origin/main');
+    expect(run.stdout).not.toContain('refs/uptide/base');
+  });
+
   it('refuses to report success when it was given no range', () => {
     const run = spawnSync('node', [script], { cwd: root, encoding: 'utf8' });
     expect(run.status).toBe(2);

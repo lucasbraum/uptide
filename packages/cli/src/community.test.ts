@@ -117,7 +117,14 @@ describe('open source files', () => {
     expect(workflow).toContain('scripts/dco.mjs');
     // Read-only, and on the pull request event: the check never holds a write token.
     expect(workflow).toContain('contents: read');
-    expect(workflow).not.toContain('pull_request_target');
+    expect(workflow).not.toMatch(/^\s*pull_request_target:/m);
+    expect(workflow).toMatch(/^on:\n {2}pull_request:$/m);
+    // The whole range, from this repository's own refs rather than the branch's word.
+    expect(workflow).toMatch(/refs\/pull\/\$\{PR_NUMBER}\/head/);
+    expect(workflow).toContain('fetch-depth: 0');
+    // It runs the checker it checked out, with no `ref:` steering the checkout elsewhere:
+    // taking it from the base branch would fail on the very pull request that adds it.
+    expect(workflow).not.toMatch(/^\s+ref:/m);
   });
 
   it('tells a contributor how to set up, test, and what a pack is', () => {
