@@ -183,6 +183,8 @@ export interface FixReport {
   html?: string;
   /** The branch the user's checkout was on when the run started: what the migration branch is against. */
   base?: string;
+  /** `--base`: the branch the PR is opened against, when not the target repository's default. */
+  prBase?: string;
   prUrl?: string;
   /** Set when `--pr` was asked for and refused: why nothing was pushed. The branch stays local. */
   /** What the publish step printed (the plan, warnings): shown by the caller once nothing else is drawing. */

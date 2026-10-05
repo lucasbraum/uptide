@@ -103,8 +103,10 @@ export {
 export { loadRegistryConfig, type RegistryConfig } from './fetch/npmrc.js';
 export {
   cleanRuns,
+  fixPreflight,
   isolatedFix,
   isolatedVerify,
+  type PreflightOptions,
   removeRun,
   runsRoot,
   storedRunFile,

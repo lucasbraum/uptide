@@ -227,7 +227,13 @@ only the provider and a public model ID; private/custom model IDs become `custom
 
 Everything happens in a temporary clone of your repository, never in your checkout.
 
-1. **Starts clean.** It needs a git repository with a clean working tree, and works on a
+1. **Starts from your local commit.** The clone is made from your local repository at the
+   commit you have checked out, never from the remote. Uncommitted changes are left out and
+   listed. A branch that is ahead of or behind its upstream is migrated as it is, with one
+   line saying so. With `--pr` the run stops before any work when the base branch on `origin`
+   does not contain that commit (push it first, or pass `--base <branch>`), and when the
+   working tree has uncommitted changes (commit them, or pass `--allow-dirty`): the PR must
+   hold the migration and nothing else. It works on a
    new branch `uptide/<package>-<version>`. Nothing is pushed unless you pass `--pr --yes`,
    or later run `uptide pr --branch <branch> --yes`, which loads the stored run, checks the
    branch is still at the verified commit (else `uptide verify`), prints which repository
