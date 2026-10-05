@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { CheckReport, Finding } from '../domain/report.js';
 import { git } from './process.js';
@@ -210,4 +210,98 @@ export function stripeFixture(scratch: string) {
     },
   };
   return { root, services };
+}
+
+/**
+ * A pnpm workspace with the isolated node-linker: nothing is hoisted to the root, each
+ * package sees `@types/node` only through its own `node_modules` symlink into the store.
+ * The types declare a global no other `@types/node` has, so a program that picks up
+ * whatever the process's working directory offers fails here too. Each package also uses
+ * `greet` 1.0.0 (from the store, like everything else); `greet` 2.0.0 is in `greet-2.0.0/`
+ * at the root, for an upgrade to compile against: it makes `greet` take a second argument.
+ */
+export function isolatedPnpmWorkspace(scratch: string): string {
+  const root = mkdtempSync(join(scratch, 'isolated-'));
+  const write = (path: string, text: string): void => {
+    mkdirSync(join(root, path, '..'), { recursive: true });
+    writeFileSync(join(root, path), text);
+  };
+  write('package.json', JSON.stringify({ name: 'root', private: true }));
+  write('pnpm-workspace.yaml', "packages:\n  - 'packages/*'\n");
+  write('.npmrc', 'node-linker=isolated\n');
+  const importer = [
+    '    dependencies:',
+    '      greet:',
+    '        specifier: 1.0.0',
+    '        version: 1.0.0',
+    '    devDependencies:',
+    "      '@types/node':",
+    '        specifier: ^24.0.0',
+    '        version: 24.0.0',
+  ];
+  write(
+    'pnpm-lock.yaml',
+    [
+      "lockfileVersion: '9.0'",
+      'importers:',
+      '  .: {}',
+      '  packages/a:',
+      ...importer,
+      '  packages/b:',
+      ...importer,
+      '',
+    ].join('\n'),
+  );
+  const store = 'node_modules/.pnpm/@types+node@24.0.0/node_modules/@types/node';
+  write(`${store}/package.json`, JSON.stringify({ name: '@types/node', version: '24.0.0' }));
+  write(
+    `${store}/index.d.ts`,
+    [
+      'declare var __fixtureNodeTypes: true;',
+      'declare var Buffer: { from(text: string): { toString(encoding: string): string } };',
+      "declare module 'node:crypto' { export function createHash(algorithm: string): { digest(encoding: string): string } }",
+    ].join('\n'),
+  );
+  const greet = 'node_modules/.pnpm/greet@1.0.0/node_modules/greet';
+  for (const [dir, version, signature] of [
+    [greet, '1.0.0', 'name: string'],
+    ['greet-2.0.0', '2.0.0', 'name: string, greeting: string'],
+  ] as const) {
+    write(`${dir}/package.json`, JSON.stringify({ name: 'greet', version, types: 'index.d.ts' }));
+    write(`${dir}/index.d.ts`, `export declare function greet(${signature}): string;`);
+  }
+  const options = { strict: true, module: 'NodeNext', moduleResolution: 'NodeNext' };
+  write('tsconfig.base.json', JSON.stringify({ compilerOptions: { ...options, types: ['node'] } }));
+  // One package names its types; the other inherits them from the root's base config, where
+  // the root has no @types of its own to offer.
+  const configs = {
+    a: { compilerOptions: { ...options, types: ['node'] }, include: ['index.ts'] },
+    b: { extends: '../../tsconfig.base.json', include: ['index.ts'] },
+  };
+  for (const [name, config] of Object.entries(configs)) {
+    write(
+      `packages/${name}/package.json`,
+      JSON.stringify({
+        name,
+        dependencies: { greet: '1.0.0' },
+        devDependencies: { '@types/node': '^24.0.0' },
+      }),
+    );
+    write(`packages/${name}/tsconfig.json`, JSON.stringify(config));
+    write(
+      `packages/${name}/index.ts`,
+      [
+        "import { createHash } from 'node:crypto';",
+        'export const seen: true = __fixtureNodeTypes;',
+        "export const text: string = Buffer.from('x').toString('base64');",
+        "export const hash: string = createHash('sha256').digest('hex');",
+        "import { greet } from 'greet';",
+        "export const hello: string = greet('world');",
+      ].join('\n'),
+    );
+    mkdirSync(join(root, `packages/${name}/node_modules/@types`), { recursive: true });
+    symlinkSync(join(root, store), join(root, `packages/${name}/node_modules/@types/node`), 'dir');
+    symlinkSync(join(root, greet), join(root, `packages/${name}/node_modules/greet`), 'dir');
+  }
+  return root;
 }
