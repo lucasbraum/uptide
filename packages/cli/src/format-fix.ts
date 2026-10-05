@@ -42,7 +42,7 @@ export function formatFixSummary(report: FixReport, opts: FormatFixOptions = {})
       ] as const
     ).map(([label, text]) => `  ${pad(label, 9)} ${plain(text)}`),
     // Without a pack the reader is told once, here, what stands behind the edits.
-    ...(report.tier === 'generic'
+    ...(report.tier === 'generic' && report.sites.some((s) => s.outcome === 'agent')
       ? [
           `  ${pad('Tier', 9)} generic: no migration pack; every edit is the agent's, kept on the compiler's word. Review each one.`,
         ]

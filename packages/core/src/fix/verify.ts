@@ -223,7 +223,7 @@ export function diagnostics(root: string, workspaces: string[]): FixDiagnostic[]
 const RESOLUTION_CODES = new Set([2307, 2580, 2581, 2582, 2591, 2592, 2593, 2688, 2792]);
 
 /** The packages whose absence a diagnostic describes, by the names they could be installed under. */
-function missingPackages(d: FixDiagnostic): string[] {
+export function missingPackages(d: FixDiagnostic): string[] {
   if (!RESOLUTION_CODES.has(d.code)) return [];
   // "Cannot find name 'Buffer'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node`"
   const suggested = /@types\/[\w.-]+/.exec(d.message)?.[0];
@@ -235,7 +235,9 @@ function missingPackages(d: FixDiagnostic): string[] {
     .split('/')
     .slice(0, name.startsWith('@') ? 2 : 1)
     .join('/');
-  return [pkg, `@types/${pkg.startsWith('@') ? pkg.slice(1).replace('/', '__') : pkg}`];
+  const types = `@types/${pkg.startsWith('@') ? pkg.slice(1).replace('/', '__') : pkg}`;
+  // A type definition file is looked up under @types first; a module, under its own name.
+  return d.code === 2688 ? [types, pkg] : [pkg, types];
 }
 
 /**
