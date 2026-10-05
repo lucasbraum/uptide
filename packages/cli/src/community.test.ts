@@ -55,10 +55,10 @@ describe('open source files', () => {
       'fixtures/module-format/p-limit-6/package.json',
     ];
     expect(tracked.length).toBeGreaterThan(50);
-    const stated = (path: string) => JSON.parse(read(path)).license as string | undefined;
+    // Stating nothing is not an answer: a manifest with no license says nothing about
+    // the terms its code is under, and every manifest here is this repository's code.
     for (const path of tracked) {
-      const license = stated(path);
-      if (license === undefined) continue;
+      const license = JSON.parse(read(path)).license as string | undefined;
       expect(license, path).toBe(realPackages.includes(path) ? 'MIT' : 'Apache-2.0');
     }
     // Each exception names a real npm package at a real published version.

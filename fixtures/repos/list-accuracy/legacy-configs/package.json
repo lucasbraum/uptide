@@ -1,6 +1,7 @@
 {
   "name": "synthetic-legacy-configs",
   "private": true,
+  "license": "Apache-2.0",
   "dependencies": {
     "gulp": "1.0.0",
     "gulp-example": "1.0.0",
