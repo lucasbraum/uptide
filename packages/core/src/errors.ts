@@ -102,7 +102,8 @@ export type ErrorCode =
   | 'ERR_WORKER_OUT_OF_MEMORY'
   | 'ANALYSIS_STACK_OVERFLOW'
   | 'NO_FIXER'
-  | 'RUN_STALE';
+  | 'RUN_STALE'
+  | 'INVALID_WORKSPACE';
 /** Stable across rendering and worker serialization. Human wording is not an API. */
 export class UptideError extends Error {
   override readonly name = 'UptideError';

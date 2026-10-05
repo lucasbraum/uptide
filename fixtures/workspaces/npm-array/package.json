@@ -1,0 +1,8 @@
+{
+  "name": "workspace-npm-array",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}
