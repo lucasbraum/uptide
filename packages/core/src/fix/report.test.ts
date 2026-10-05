@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { commentSummary } from '../action/run.js';
 import type { CheckReport } from '../domain/report.js';
+import { GENERIC_NOTE } from '../packs/generic.js';
 import { stripePack } from '../packs/stripe/index.js';
 import {
   apiChangeSummary,
@@ -829,6 +830,8 @@ describe('a bump that needed no code changes', () => {
       package: 'vitest',
       tier: 'generic',
       sites: [],
+      // What the generic pack says of agent edits, recorded with the run: there were none.
+      notes: [GENERIC_NOTE('vitest')],
       verification: {
         ...base.verification,
         baseline: nodeTypes,
@@ -845,6 +848,13 @@ describe('a bump that needed no code changes', () => {
     expect(body).toContain('No code changes were needed; only versions and the lockfile changed.');
     expect(body).not.toContain('written by the agent');
     expect(body).not.toContain('### What changed');
+    expect(body).toContain('| **Changes** | none: versions and lockfile only |');
+    const clean = report();
+    clean.verification = { ...clean.verification, baseline: [], target: [], after: [] };
+    delete clean.behavior;
+    expect(prBody(clean)).toContain(
+      'No code changes were needed; only versions and the lockfile changed. Types compile and the tests pass.',
+    );
     expect(migrationRisk(report())).toEqual({
       level: 'Low',
       reason: 'no code changes; types and tests verified',

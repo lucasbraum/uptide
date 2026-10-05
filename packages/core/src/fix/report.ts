@@ -509,7 +509,9 @@ export function summaryCells(report: FixReport): {
     bs = schemas(report);
   const identical = bs.filter((b) => !unchecked(b) && !differs(b)).length;
   const tests = `${testsRow(report)}${lintCell(report)}`;
-  const changes = `${count(report.sites.length, 'site')} in ${new Set(report.sites.map((s) => s.finding.usage.file)).size} file${new Set(report.sites.map((s) => s.finding.usage.file)).size === 1 ? '' : 's'}${report.verificationPending ? ' · analysis only' : ` · ${c.mechanical} by rule · ${c.agent} by agent${c.manual ? ` · ${c.manual} manual` : ''}`}`;
+  const changes = !report.sites.length
+    ? 'none: versions and lockfile only'
+    : `${count(report.sites.length, 'site')} in ${new Set(report.sites.map((s) => s.finding.usage.file)).size} file${new Set(report.sites.map((s) => s.finding.usage.file)).size === 1 ? '' : 's'}${report.verificationPending ? ' · analysis only' : ` · ${c.mechanical} by rule · ${c.agent} by agent${c.manual ? ` · ${c.manual} manual` : ''}`}`;
   const messages = bs.flatMap((b) => b.messageChecks ?? []).filter((c) => c.status !== 'default');
   const messageSummary = messages.length
     ? ` · ${messages.filter((c) => c.status === 'identical').length}/${messages.length} custom-message assertions`
@@ -626,7 +628,9 @@ export function renderMigration(
           ? `Types compile, and the checked schemas behave the same as before on ${inputs.toLocaleString('en-US')} sampled inputs.`
           : additiveBumpOnly(report)
             ? 'Types compile.'
-            : 'Types compile; runtime behavior needs review.';
+            : !report.sites.length && migrationRisk(report).level === 'Low'
+              ? 'Types compile and the tests pass.'
+              : 'Types compile; runtime behavior needs review.';
     const what = report.sites.length
       ? `The code was migrated to ${report.package} ${from.split('.')[0] === report.target.split('.')[0] ? report.target : report.target.split('.')[0]}${workspaces.length ? ` in ${listed(workspaces)}` : ''}.`
       : 'No code changes were needed; only versions and the lockfile changed.';
@@ -930,7 +934,12 @@ function verificationDetails(report: FixReport): (string | Piece)[] {
         droppable(5, ['```text', t.output, '```'], `Test output (${t.status})`),
       );
   // What happened to the publish step is the terminal's news, not the description's.
-  const notes = report.notes.filter((n) => !/^(?:Publication plan printed|PR not opened:)/.test(n));
+  const agentEdits = report.sites.some((s) => s.outcome === 'agent');
+  const notes = report.notes.filter(
+    (n) =>
+      !/^(?:Publication plan printed|PR not opened:)/.test(n) &&
+      (agentEdits || n !== GENERIC_NOTE(report.package)),
+  );
   if (notes.length) lines.push('', '**Run notes**', '', ...notes.map((n) => `- ${n}`));
   for (const stored of report.reviewSections ?? []) {
     // Decisions are rendered once, in their own section above.
