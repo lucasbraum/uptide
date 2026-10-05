@@ -25,17 +25,26 @@ describe('published package', () => {
     expect(manifest.dependencies).toBeUndefined();
     expect(manifest.peerDependencies).toBeUndefined();
     expect(manifest.engines.node).toBe('>=20');
-    expect(manifest.files).toEqual(['dist']);
+    // The bundle, the legal assets that must travel with it, and nothing of the build.
+    expect(manifest.files).toEqual([
+      'dist',
+      '!dist/metafile-*.json',
+      'NOTICE',
+      'THIRD-PARTY-NOTICES',
+    ]);
   });
 
   // `turbo run test` builds first; a bare `vitest` on a fresh clone has no dist yet.
   it.skipIf(!existsSync(bin))('bundles the engine and its worker into dist', () => {
     const files = readdirSync(`${root}dist`);
+    const code = files.filter((f) => f.endsWith('.js'));
     // The engine resolves `./worker.js` relative to its own chunk: everything stays flat.
-    expect(files).toContain('worker.js');
-    expect(files).toContain('list-worker.js');
-    expect(files.every((f) => f.endsWith('.js'))).toBe(true);
-    const sources = files.map((f) => readFileSync(`${root}dist/${f}`, 'utf8')).join('\n');
+    expect(code).toContain('worker.js');
+    expect(code).toContain('list-worker.js');
+    // Beside the bundle, only the bundler's record of what went into it, which
+    // scripts/third-party-notices.mjs reads and `files` keeps out of the tarball.
+    expect(files.filter((f) => !f.endsWith('.js'))).toEqual(['metafile-esm.json']);
+    const sources = code.map((f) => readFileSync(`${root}dist/${f}`, 'utf8')).join('\n');
     expect(sources).not.toMatch(/from\s*["']@uptide\/core["']/);
     expect(sources).not.toMatch(
       /from\s*["'](ts-morph|commander|picocolors|semver|ignore|picomatch)["']/,

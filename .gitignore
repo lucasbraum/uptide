@@ -11,6 +11,9 @@ eval-out/
 # Copied in by packages/cli/scripts/prepack.mjs for the tarball only.
 /packages/cli/README.md
 /packages/cli/LICENSE
+/packages/cli/NOTICE
+# Generated from the bundle by packages/cli/scripts/third-party-notices.mjs.
+/packages/cli/THIRD-PARTY-NOTICES
 *.tgz
 # Private planning never belongs in this repository (scripts/public-tree.mjs).
 /docs/plan-*.md
