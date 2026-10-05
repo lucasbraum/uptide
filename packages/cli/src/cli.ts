@@ -13,7 +13,7 @@ import {
 import { Command, CommanderError } from 'commander';
 import { describeRepo, detectRepo, type Repo } from './detect.js';
 import { defaultEngine, type Engine } from './engine.js';
-import { CliError, EXIT, renderError } from './errors.js';
+import { CliError, EXIT, explain, renderError } from './errors.js';
 import {
   assistedNote,
   isNetworkError,
@@ -735,6 +735,14 @@ ${EXIT_CODES('a plan was made', 'not used', ';\n     or a dependency failed to a
       )
       .option('--pr', 'open a draft PR after verification passes; requires --yes')
       .option(
+        '--base <branch>',
+        'with --pr: the branch on origin the PR is opened against (default: its default branch)',
+      )
+      .option(
+        '--allow-dirty',
+        'with --pr: proceed although the working tree has uncommitted changes; they are left out',
+      )
+      .option(
         '--yes',
         'approve what was printed: the publication plan (--pr), the services (--with-services)',
       )
@@ -744,8 +752,10 @@ ${EXIT_CODES('a plan was made', 'not used', ';\n     or a dependency failed to a
       'after',
       `
 What it does:
-  Works in a temporary clone of your repository, never in your checkout: your branch, files,
-  git hooks and git config stay as they are. Install, build and test commands run with
+  Works in a temporary clone of your local repository at the commit you have checked out, never
+  in your checkout: your branch, files, git hooks and git config stay as they are. Uncommitted
+  changes are left out and listed. With --pr, the base branch on origin must already contain
+  that commit, so the PR holds the migration and nothing else. Install, build and test commands run with
   lifecycle scripts and git hooks disabled.
   Runs check, creates branch uptide/<package>-<version>, bumps the version and lockfile,
   applies rule-based fixes, then (with the selected provider's API key, unless --no-llm) assisted fixes
@@ -782,6 +792,8 @@ ${PRIVACY}`,
           withServices?: boolean;
           keep?: boolean;
           pr?: boolean;
+          base?: string;
+          allowDirty?: boolean;
           yes?: boolean;
           verbose?: boolean;
         },
@@ -841,11 +853,26 @@ ${PRIVACY}`,
             // Without a terminal there is no live line: say what started, then how long it took.
             if (quiet && !ui.interactive)
               io.err(`uptide fix · ${only} · ${repoLine(headerOf(repo, 0))}\n`);
+            // Local commits the remote lacks, uncommitted files: said, or refused, before any work.
+            const preflightShown = engine.preflight !== undefined;
+            if (engine.preflight) {
+              let notes: string[];
+              try {
+                ({ notes } = engine.preflight(repo.root, {
+                  ...(flags.pr ? { pr: true } : {}),
+                  ...(flags.base ? { base: flags.base } : {}),
+                  ...(flags.allowDirty ? { allowDirty: true } : {}),
+                }));
+              } catch (error) {
+                throw new CliError(explain(error), { exitCode: EXIT.breaking });
+              }
+              for (const note of notes) io.err(`${note}\n`);
+            }
             // --pr: GitHub and the target repository are settled before any clone is made.
             if (flags.pr && engine.publishTarget) {
               const target = await engine.publishTarget(repo.root);
               io.err(
-                `PR will be opened on ${target.nameWithOwner} (base ${target.base})${target.parent ? `, a fork of ${target.parent}; use \`uptide pr --repo ${target.parent}\` afterwards to open it there` : ''}\n`,
+                `PR will be opened on ${target.nameWithOwner} (base ${flags.base ?? target.base})${target.parent ? `, a fork of ${target.parent}; use \`uptide pr --repo ${target.parent}\` afterwards to open it there` : ''}\n`,
               );
             }
             // A pin run edits by rule alone: no assistant, so nothing to say about one.
@@ -894,6 +921,9 @@ ${PRIVACY}`,
                     withServices: flags.withServices,
                     ...(flags.keep ? { keep: true } : {}),
                     pr: flags.pr,
+                    ...(flags.base ? { base: flags.base } : {}),
+                    ...(flags.allowDirty ? { allowDirty: true } : {}),
+                    ...(preflightShown ? { preflightShown: true } : {}),
                     yes: flags.yes,
                   },
                   progress.event,

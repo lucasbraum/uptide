@@ -314,9 +314,8 @@ async function keeping<T>(clone: string, work: () => Promise<T>): Promise<T> {
  * stored run inside `.git`.
  */
 /**
- * The branch a migration is made against: the remote's default branch as the repository
- * last saw it (`origin/HEAD`, else `origin/main` or `origin/master`), never the local branch,
- * which may hold commits the remote does not. Undefined without a remote.
+ * The branch a migration's PR is opened against: the remote's default branch as the repository
+ * last saw it (`origin/HEAD`, else `origin/main` or `origin/master`). Undefined without a remote.
  */
 export function remoteDefaultBranch(root: string): { ref: string; name: string } | undefined {
   const head = tryGit(root, 'symbolic-ref', '--quiet', 'refs/remotes/origin/HEAD');
@@ -330,13 +329,123 @@ export function remoteDefaultBranch(root: string): { ref: string; name: string }
   return undefined;
 }
 
-/** Commits the local branch of that name has that the remote's does not: never part of a migration. */
-export function unpushedCommits(root: string, base: { ref: string; name: string }): number {
-  return Number(tryGit(root, 'rev-list', '--count', `${base.ref}..${base.name}`)) || 0;
+export interface PreflightOptions {
+  /** A PR will be opened: it must contain the migration and nothing else. */
+  pr?: boolean;
+  /** `--base`: the branch on `origin` the PR is opened against; default: the remote's default branch. */
+  base?: string;
+  /** `--allow-dirty`: open the PR although the working tree has uncommitted changes. */
+  allowDirty?: boolean;
+  /** The caller already ran the preflight and showed its notes: the run does not repeat them. */
+  preflightShown?: boolean;
+}
+
+const commits = (n: number): string => `${n} commit${n === 1 ? '' : 's'}`;
+
+/**
+ * What `fix` settles about the user's repository before any clone, install or LLM call. The
+ * migration is made from the commit that is checked out, never from the remote: uncommitted
+ * changes are left out and named, a branch that differs from its upstream is said to, and a
+ * `--pr` run is refused when the PR would carry more than the migration.
+ */
+export function fixPreflight(
+  cwd: string,
+  options: PreflightOptions = {},
+): { head: string; notes: string[] } {
+  const { top: source, project } = projectRoot(cwd);
+  const head = git(source, 'rev-parse', 'HEAD');
+  const at = head.slice(0, 12);
+  const name = tryGit(source, 'branch', '--show-current');
+  const branch = name || `detached HEAD ${at}`;
+  const notes: string[] = [];
+
+  const manifest = project === '.' ? 'package.json' : `${project}/package.json`;
+  if (!tryGit(source, 'cat-file', '-t', `${head}:${manifest}`))
+    throw new UptideError(
+      'NOT_REPOSITORY_ROOT',
+      `${manifest} is not in commit ${at} (${branch}) of ${source}. fix clones that commit from the local repository, so the file must be committed first.`,
+    );
+
+  // `git()` trims, so the first line may have lost a leading space of its status columns.
+  const dirty = git(source, 'status', '--porcelain', '--untracked-files=all')
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => line.replace(/^\s*\S{1,2}\s+/, ''));
+  if (dirty.length) {
+    const files = `${dirty.slice(0, 10).join(', ')}${dirty.length > 10 ? `, and ${dirty.length - 10} more` : ''}`;
+    if (options.pr && !options.allowDirty)
+      throw new UptideError(
+        'DIRTY_WORKING_TREE',
+        `The working tree has uncommitted changes, and the PR is made from commit ${at}: ${files}. Commit or stash them, or pass --allow-dirty to leave them out.`,
+      );
+    notes.push(
+      `Uncommitted changes are not part of the migration, made from commit ${at}: ${files}`,
+    );
+  }
+
+  // The remote as this repository last fetched it: no network here.
+  const base = !options.pr
+    ? undefined
+    : options.base
+      ? { ref: `origin/${options.base}`, name: options.base }
+      : remoteDefaultBranch(source);
+  if (options.pr) {
+    if (
+      options.base &&
+      !tryGit(source, 'rev-parse', '--verify', '--quiet', `origin/${options.base}`)
+    )
+      throw new UptideError(
+        'PUBLICATION_REFUSED',
+        `--base ${options.base}: origin/${options.base} is not known in this repository. Push or fetch it first.`,
+      );
+    const count = (range: string): number =>
+      base ? Number(tryGit(source, 'rev-list', '--count', range)) || 0 : 0;
+    const ahead = count(`${base?.ref}..${head}`);
+    if (base && ahead > 0)
+      throw new UptideError(
+        'PUBLICATION_REFUSED',
+        `${branch} is ${commits(ahead)} ahead of ${base.ref}. Push it first (\`git push origin ${name || 'HEAD:<branch>'}\`) so the PR only contains the migration, or pass --base <branch>. If you pushed from elsewhere, run \`git fetch origin\` and try again.`,
+      );
+    const behind = count(`${head}..${base?.ref}`);
+    if (base && behind > 0)
+      notes.push(
+        `${branch} is ${commits(behind)} behind ${base.ref}; the PR will be based on an older commit. Consider \`git pull\` first.`,
+      );
+  }
+
+  const upstream = tryGit(
+    source,
+    'rev-parse',
+    '--abbrev-ref',
+    '--symbolic-full-name',
+    '@{upstream}',
+  );
+  // Against the PR's own base, the lines above already said it.
+  if (upstream && upstream !== base?.ref) {
+    const [behind = 0, ahead = 0] = tryGit(
+      source,
+      'rev-list',
+      '--left-right',
+      '--count',
+      `${upstream}...${head}`,
+    )
+      .split(/\s+/)
+      .map(Number);
+    const how =
+      ahead && behind
+        ? `${commits(ahead)} ahead of ${upstream} and ${commits(behind)} behind it`
+        : ahead
+          ? `${commits(ahead)} ahead of ${upstream}`
+          : behind
+            ? `${commits(behind)} behind ${upstream}`
+            : '';
+    if (how) notes.push(`${branch} is ${how}; migrating your local state`);
+  }
+  return { head, notes };
 }
 
 export async function isolatedFix(
-  options: FixOptions & { keep?: boolean },
+  options: FixOptions & PreflightOptions & { keep?: boolean },
   services?: FixServices,
 ): Promise<FixReport> {
   const selected = selectLlm(options.cwd, options);
@@ -355,13 +464,12 @@ export async function isolatedFix(
       'NO_FIXER',
       `No agent available. Set the selected provider's key in one of: ${ACCEPTED_KEYS}. Rule-based packs also work with --no-llm.`,
     );
-  // Freeze selection before cloning: the remote base may have a different config.
+  // Freeze selection before cloning.
   options = { ...options, provider: selected.provider, model: selected.model };
   // The whole repository is cloned; the run works in the project inside it. Everything that
   // can refuse the run does so here, before a clone exists.
   const { top: source, project } = projectRoot(options.cwd);
-  if (git(source, 'status', '--porcelain', '--untracked-files=all'))
-    throw new UptideError('DIRTY_WORKING_TREE', 'uptide fix requires a clean working tree');
+  const preflight = fixPreflight(options.cwd, options);
   confirmServices(source, options);
   const tool = options.tool ?? uptideVersionInfo();
   if (options.pr && tool.uptideDirty)
@@ -370,24 +478,21 @@ export async function isolatedFix(
       `uptide fix --pr refuses to run from an Uptide checkout with uncommitted changes (at ${tool.uptideCommit.slice(0, 12)}); commit or stash them, rebuild, and run again`,
     );
   const before = snapshot(source);
-  const base = remoteDefaultBranch(source);
+  const base = options.base ?? remoteDefaultBranch(source)?.name;
   const clone = isolate(source, undefined, project);
-  const { keep, ...rest } = options;
+  const { keep, base: _base, allowDirty: _allowDirty, preflightShown, ...rest } = options;
   const report = await keeping(clone, async () => {
-    // The migration starts from what the remote has, not from whatever is checked out.
-    if (base) git(clone, 'switch', '--quiet', '--detach', base.ref);
+    // The migration starts from the commit the user has checked out, whatever the remote has.
+    git(clone, 'switch', '--quiet', '--detach', preflight.head);
     // Publishing is not part of the run in the clone: it happens below, after the verified
     // run has landed in the user's repository, so a failed publish can be retried alone.
     const result = await fix({ ...rest, pr: false, cwd: join(clone, project), tool }, services);
-    const unpushed = base ? unpushedCommits(source, base) : 0;
-    if (base && unpushed > 0)
-      result.notes.push(
-        `${base.name} has ${unpushed} commit${unpushed === 1 ? '' : 's'} not on ${base.ref}; the migration branches from ${base.ref} and does not include them.`,
-      );
+    if (!preflightShown) result.notes.push(...preflight.notes);
     return result;
   });
   const delivered = deliver(source, clone, report, before);
-  if (base) delivered.base = base.name;
+  if (base) delivered.base = base;
+  if (options.base) delivered.prBase = options.base;
   const landed = delivered.delivered;
   // The branch ref and the stored run are in the repository before anything is published.
   const result = finish(source, clone, delivered, { ...(keep ? { keep } : {}), pushed: false });

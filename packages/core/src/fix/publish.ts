@@ -262,7 +262,7 @@ export async function publish(
   const { defaultBranchRef, nameWithOwner } = target;
   if (!defaultBranchRef?.name || !nameWithOwner)
     throw new Error('target repository has no default branch');
-  const base = defaultBranchRef.name;
+  const base = report.prBase ?? defaultBranchRef.name;
   const headRef =
     own.nameWithOwner && own.nameWithOwner !== nameWithOwner
       ? `${own.nameWithOwner.split('/')[0]}:${branch}`

@@ -260,6 +260,43 @@ describe('uptide fix', () => {
     );
   });
 
+  it('says what differs from the remote before the run, and exits 1 when a --pr run must not start', async () => {
+    const cwd = pnpmGitRepo();
+    const seen: unknown[] = [];
+    const engine = fakeEngine({
+      preflight: (_cwd, options) => {
+        seen.push(options);
+        if (options.pr && !options.base)
+          throw new Error(
+            'main is 23 commits ahead of origin/main. Push it first (`git push origin main`) so the PR only contains the migration, or pass --base <branch>.',
+          );
+        return {
+          head: 'a'.repeat(40),
+          notes: ['main is 23 commits ahead of origin/main; migrating your local state'],
+        };
+      },
+    });
+    const io = memoryIo({ cwd });
+    expect(await run(['fix', 'zod'], io, engine)).toBe(0);
+    // Once: printed before the run, and the engine is told not to put it in the report again.
+    expect(io.stderr().split('migrating your local state')).toHaveLength(2);
+    expect(engine.calls.at(-1)).toMatchObject({ preflightShown: true });
+    const refused = memoryIo({ cwd });
+    const calls = engine.calls.length;
+    expect(await run(['fix', 'zod', '--pr', '--yes'], refused, engine)).toBe(1);
+    expect(refused.stderr()).toContain(
+      'error: main is 23 commits ahead of origin/main. Push it first',
+    );
+    expect(engine.calls.length).toBe(calls);
+    await run(
+      ['fix', 'zod', '--pr', '--yes', '--base', 'release', '--allow-dirty'],
+      memoryIo({ cwd }),
+      engine,
+    );
+    expect(seen.at(-1)).toEqual({ pr: true, base: 'release', allowDirty: true });
+    expect(engine.calls.at(-1)).toMatchObject({ pr: true, base: 'release', allowDirty: true });
+  });
+
   it('prints the FixReport with --json', async () => {
     const io = memoryIo({ cwd: pnpmGitRepo() });
     await run(['fix', '--only', 'zod', '--json', '--target', 'zod@4.6.5'], io, fakeEngine());

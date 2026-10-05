@@ -6,10 +6,12 @@ import {
   diffPackage,
   type ErrorCode,
   type FixReport,
+  fixPreflight,
   type ListOptions,
   type ListReport,
   listDependencies,
   openPr,
+  type PreflightOptions,
   type PrOptions,
   type ProgressEvent,
   type ProgressListener,
@@ -48,6 +50,8 @@ export interface Engine {
   clean?(days: number): { removed: string[]; kept: string[] };
   /** Verify the checked-out migration branch again and refresh its stored run. */
   verify?(request: VerifyRequest, onProgress?: ProgressListener): Promise<FixReport>;
+  /** What fix settles about the checkout before any work: throws when a `--pr` run must not start. */
+  preflight?(cwd: string, options: PreflightOptions): { head: string; notes: string[] };
   /** Where a `--pr` run will open its PR, resolved before any work: needs `gh` signed in. */
   publishTarget?(cwd: string, repo?: string): Promise<PublishTarget>;
   /** Push a finished run's branch and open its PR with the stored body. */
@@ -111,6 +115,7 @@ export function defaultEngine(): Engine {
     verify: (request, onProgress) => offThread<FixReport>({ kind: 'verify', request }, onProgress),
     clean: (days) => cleanRuns({ days }),
     pr: (request, print) => openPr(request, print),
+    preflight: fixPreflight,
     publishTarget: (cwd, repo) => publishTarget(cwd, repo),
     diff: (name, from, to) => diffPackage({ name, from, to }),
     latest: (name) => createNpmFetcher().resolve(name, 'latest'),

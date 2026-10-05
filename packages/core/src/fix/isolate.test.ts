@@ -118,38 +118,6 @@ describe('fix runs in a private clone', () => {
     expect(report.verification.passed).toBe(true);
   }, 30000);
 
-  it('branches from the remote default branch, never from unpushed local commits, and says so', async () => {
-    const { root, services } = zodFixture(scratch);
-    const origin = join(mkdtempSync(join(scratch, 'origin-')), 'origin.git');
-    git(root, 'init', '--bare', origin);
-    git(root, 'remote', 'add', 'origin', origin);
-    git(root, 'push', '--quiet', '-u', 'origin', 'HEAD');
-    git(root, 'remote', 'set-head', 'origin', '--auto');
-    const pushed = git(root, 'rev-parse', 'HEAD');
-    // A local commit the remote does not have: not part of the migration.
-    writeFileSync(join(root, 'local-only.txt'), 'x');
-    git(root, 'add', '.');
-    git(root, 'commit', '-q', '-m', 'local only');
-    const report = await isolatedFix({ cwd: root, only: 'zod', tool: TOOL }, services);
-    expect(report.base).toBe(git(root, 'branch', '--show-current'));
-    expect(git(root, 'merge-base', 'uptide/zod-4.6.5', 'HEAD')).toBe(pushed);
-    expect(git(root, 'show', 'uptide/zod-4.6.5', '--stat', '--format=')).not.toContain(
-      'local-only',
-    );
-    expect(report.notes.join('\n')).toMatch(
-      /has 1 commit not on origin\/\w+; the migration branches from origin\/\w+ and does not include them/,
-    );
-    // A --pr run from a dirty Uptide build is refused before any clone exists.
-    const runs = readdirSync(runsRoot()).length;
-    await expect(
-      isolatedFix(
-        { cwd: root, only: 'zod', pr: true, tool: { ...TOOL, uptideDirty: true } },
-        services,
-      ),
-    ).rejects.toThrow('refuses to run from an Uptide checkout with uncommitted changes');
-    expect(readdirSync(runsRoot()).length).toBe(runs);
-  }, 30000);
-
   it('lands the verified run before publishing, so a failed publish can be retried with `uptide pr`', async () => {
     const { root, services } = zodFixture(scratch);
     const origin = join(mkdtempSync(join(scratch, 'origin-')), 'origin.git');
@@ -245,12 +213,7 @@ describe('fix runs in a private clone', () => {
     ).rejects.toThrow(`run fix at the project root, ${project}`);
   }, 30000);
 
-  it('refuses a dirty checkout, and reports a checkout that changed during the run', async () => {
-    const dirty = zodFixture(scratch);
-    writeFileSync(join(dirty.root, 'wip.txt'), 'x');
-    await expect(isolatedFix({ cwd: dirty.root, only: 'zod' }, dirty.services)).rejects.toThrow(
-      'clean working tree',
-    );
+  it('reports a checkout that changed during the run', async () => {
     const { root, services } = zodFixture(scratch);
     const tests = services.tests;
     services.tests = async (dir, ...rest) => {
@@ -262,6 +225,178 @@ describe('fix runs in a private clone', () => {
     expect(report.sourceChanged).toEqual(['the working tree has different changes']);
     expect(report.notes.at(-1)).toMatch(/^Your checkout changed during the run/);
   }, 30000);
+});
+
+describe('fix migrates the commit that is checked out, cloned from the local repository', () => {
+  /** A bare `origin` holding the fixture's baseline, tracked as the upstream. */
+  const withOrigin = (root: string): void => {
+    const origin = join(mkdtempSync(join(scratch, 'origin-')), 'origin.git');
+    git(root, 'init', '--bare', origin);
+    git(root, 'remote', 'add', 'origin', origin);
+    git(root, 'push', '--quiet', '-u', 'origin', 'HEAD');
+    git(root, 'remote', 'set-head', 'origin', '--auto');
+  };
+  const commitFile = (root: string, name: string): string => {
+    writeFileSync(join(root, name), 'x');
+    git(root, 'add', name);
+    git(root, 'commit', '-q', '-m', name);
+    return git(root, 'rev-parse', 'HEAD');
+  };
+  /** The fixture's services, counting what a refused run must never reach. */
+  const counted = (services: ReturnType<typeof zodFixture>['services']) => {
+    const seen = { checks: 0, published: 0 };
+    const check = services.check;
+    services.check = async (options) => {
+      seen.checks++;
+      return check(options);
+    };
+    services.publish = async () => {
+      seen.published++;
+    };
+    return seen;
+  };
+  const BRANCH = 'uptide/zod-4.6.5';
+
+  it('ahead of the upstream: migrates the local commits and says so', async () => {
+    const { root, services } = zodFixture(scratch);
+    withOrigin(root);
+    const local = commitFile(root, 'local-only.txt');
+    const report = await isolatedFix({ cwd: root, only: 'zod', tool: TOOL }, services);
+    expect(report.verification.passed).toBe(true);
+    // The migration is on top of the local commit, not of what the remote has.
+    expect(git(root, 'merge-base', BRANCH, 'HEAD')).toBe(local);
+    expect(git(root, 'show', `${BRANCH}:local-only.txt`)).toBe('x');
+    expect(report.notes.join('\n')).toMatch(
+      /^\w+ is 1 commit ahead of origin\/\w+; migrating your local state$/m,
+    );
+  }, 30000);
+
+  it('ahead of the base with --pr: stops before any work, unless --base names a branch that has the commit', async () => {
+    const { root, services } = zodFixture(scratch);
+    withOrigin(root);
+    commitFile(root, 'local-only.txt');
+    commitFile(root, 'local-too.txt');
+    const seen = counted(services);
+    mkdirSync(runsRoot(), { recursive: true });
+    const runs = readdirSync(runsRoot()).length;
+    await expect(
+      isolatedFix({ cwd: root, only: 'zod', pr: true, yes: true, tool: TOOL }, services),
+    ).rejects.toThrow(
+      /^\w+ is 2 commits ahead of origin\/\w+\. Push it first \(`git push origin \w+`\) so the PR only contains the migration, or pass --base <branch>\. If you pushed from elsewhere, run `git fetch origin` and try again\.$/,
+    );
+    // No clone, no check (so no LLM call and no spend), nothing published.
+    expect(readdirSync(runsRoot()).length).toBe(runs);
+    expect(seen).toEqual({ checks: 0, published: 0 });
+    await expect(
+      isolatedFix({ cwd: root, only: 'zod', pr: true, base: 'nowhere', tool: TOOL }, services),
+    ).rejects.toThrow('--base nowhere: origin/nowhere is not known in this repository');
+    // The same commits on a branch of the remote: a PR against it holds only the migration.
+    git(root, 'push', '--quiet', 'origin', 'HEAD:feature');
+    const report = await isolatedFix(
+      { cwd: root, only: 'zod', pr: true, yes: true, base: 'feature', tool: TOOL },
+      services,
+    );
+    expect(report.verification.passed).toBe(true);
+    expect(report.prBase).toBe('feature');
+    expect(seen.published).toBe(1);
+  }, 30000);
+
+  it('behind the upstream: migrates the local commit and says so; --pr warns about the older base', async () => {
+    const { root, services } = zodFixture(scratch);
+    withOrigin(root);
+    const baseline = git(root, 'rev-parse', 'HEAD');
+    commitFile(root, 'remote-has-it.txt');
+    git(root, 'push', '--quiet', 'origin', 'HEAD');
+    git(root, 'reset', '--quiet', '--hard', baseline);
+    const plain = await isolatedFix({ cwd: root, only: 'zod', tool: TOOL }, services);
+    expect(git(root, 'merge-base', BRANCH, 'HEAD')).toBe(baseline);
+    expect(git(root, 'ls-tree', '--name-only', BRANCH)).not.toContain('remote-has-it');
+    expect(plain.notes.join('\n')).toMatch(
+      /^\w+ is 1 commit behind origin\/\w+; migrating your local state$/m,
+    );
+    // With --pr it is a warning, said once and in the PR's terms, never a refusal.
+    git(root, 'branch', '-D', BRANCH);
+    const seen = counted(services);
+    const report = await isolatedFix(
+      { cwd: root, only: 'zod', pr: true, yes: true, tool: TOOL },
+      services,
+    );
+    const behind = report.notes.filter((note) => note.includes('behind'));
+    expect(behind).toHaveLength(1);
+    expect(behind[0]).toMatch(
+      /^\w+ is 1 commit behind origin\/\w+; the PR will be based on an older commit\. Consider `git pull` first\.$/,
+    );
+    expect(seen.published).toBe(1);
+    // A caller that already showed the notes does not get them again in the report.
+    git(root, 'branch', '-D', BRANCH);
+    const shown = await isolatedFix(
+      { cwd: root, only: 'zod', tool: TOOL, preflightShown: true },
+      services,
+    );
+    expect(shown.notes.join('\n')).not.toContain('behind');
+  }, 30000);
+
+  it('no upstream: migrates the local commit without a word about the remote', async () => {
+    const { root, services } = zodFixture(scratch);
+    const local = commitFile(root, 'local-only.txt');
+    const seen = counted(services);
+    const report = await isolatedFix({ cwd: root, only: 'zod', tool: TOOL }, services);
+    expect(git(root, 'merge-base', BRANCH, 'HEAD')).toBe(local);
+    expect(report.notes.join('\n')).not.toMatch(/ahead|behind|migrating your local state/);
+    // With --pr there is no remote base to compare with: the publish step is what answers.
+    const again = zodFixture(scratch);
+    const published = counted(again.services);
+    await isolatedFix(
+      { cwd: again.root, only: 'zod', pr: true, yes: true, tool: TOOL },
+      again.services,
+    );
+    expect(published.published).toBe(1);
+    expect(seen.published).toBe(0);
+  }, 30000);
+
+  it('dirty tree: uses the committed state and names what is left out; --pr needs --allow-dirty', async () => {
+    const { root, services } = zodFixture(scratch);
+    writeFileSync(join(root, '.gitignore'), 'node_modules\ndist\n');
+    writeFileSync(join(root, 'wip.txt'), 'x');
+    const before = snapshot(root);
+    const head = git(root, 'rev-parse', 'HEAD');
+    const seen = counted(services);
+    await expect(
+      isolatedFix({ cwd: root, only: 'zod', pr: true, yes: true, tool: TOOL }, services),
+    ).rejects.toThrow(
+      `The working tree has uncommitted changes, and the PR is made from commit ${head.slice(0, 12)}: .gitignore, wip.txt. Commit or stash them, or pass --allow-dirty to leave them out.`,
+    );
+    expect(seen).toEqual({ checks: 0, published: 0 });
+    const report = await isolatedFix({ cwd: root, only: 'zod', tool: TOOL }, services);
+    expect(report.verification.passed).toBe(true);
+    expect(report.notes).toContain(
+      `Uncommitted changes are not part of the migration, made from commit ${head.slice(0, 12)}: .gitignore, wip.txt`,
+    );
+    // Neither file is in the migration, and the checkout still has both, untouched.
+    expect(git(root, 'ls-tree', '--name-only', BRANCH)).not.toContain('wip.txt');
+    expect(git(root, 'show', `${BRANCH}:.gitignore`)).toBe('node_modules');
+    expect(changedSince(root, before)).toEqual([]);
+    expect(report.sourceChanged).toBeUndefined();
+    git(root, 'branch', '-D', BRANCH);
+    await isolatedFix(
+      { cwd: root, only: 'zod', pr: true, yes: true, allowDirty: true, tool: TOOL },
+      services,
+    );
+    expect(seen.published).toBe(1);
+  }, 30000);
+
+  it('a package.json that is not committed: names the commit that would be cloned, and from where', async () => {
+    const { root, services } = zodFixture(scratch);
+    git(root, 'rm', '--quiet', '--cached', 'package.json');
+    git(root, 'commit', '-q', '-m', 'manifest left out');
+    const head = git(root, 'rev-parse', 'HEAD').slice(0, 12);
+    mkdirSync(runsRoot(), { recursive: true });
+    const runs = readdirSync(runsRoot()).length;
+    await expect(isolatedFix({ cwd: root, only: 'zod', tool: TOOL }, services)).rejects.toThrow(
+      `package.json is not in commit ${head} (${git(root, 'branch', '--show-current')}) of ${root}. fix clones that commit from the local repository, so the file must be committed first.`,
+    );
+    expect(readdirSync(runsRoot()).length).toBe(runs);
+  });
 });
 
 describe('verify runs in a private clone and only ever adds commits', () => {

@@ -36,6 +36,12 @@ export interface FixRequest {
   /** `--pin-current-api`: stripe stays; the SDK's default apiVersion is written on every client. */
   pinCurrentApi?: boolean;
   pr?: boolean;
+  /** `--base`: the branch on origin the PR is opened against. */
+  base?: string;
+  /** `--allow-dirty`: open the PR although the working tree has uncommitted changes. */
+  allowDirty?: boolean;
+  /** The CLI printed the preflight notes before the run: the report does not repeat them. */
+  preflightShown?: boolean;
   yes?: boolean;
   /** False with `--no-llm`: no fixer is created, so no code can leave the machine. */
   llm: boolean;
