@@ -1,7 +1,6 @@
 {
   "name": "synthetic-dependency-sources",
   "private": true,
-  "license": "Apache-2.0",
   "dependencies": {
     "github-protocol": "github:example/synthetic#v1.0.0",
     "github-shorthand": "example/synthetic#v1.0.0",

@@ -1,6 +1,5 @@
 {
   "name": "synthetic-legacy-lint-staged",
-  "license": "Apache-2.0",
   "dependencies": {
     "husky": "1.0.0",
     "lint-staged": "1.0.0",

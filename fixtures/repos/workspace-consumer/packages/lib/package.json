@@ -10,5 +10,5 @@
       "default": "./dist/index.js"
     }
   },
-  "license": "Apache-2.0"
+  "license": "MIT"
 }

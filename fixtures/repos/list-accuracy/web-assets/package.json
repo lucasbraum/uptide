@@ -1,7 +1,6 @@
 {
   "name": "synthetic-web-assets",
   "private": true,
-  "license": "Apache-2.0",
   "dependencies": {
     "scss-theme": "1.0.0",
     "sass-theme": "1.0.0",

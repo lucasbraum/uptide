@@ -1,7 +1,6 @@
 {
   "name": "synthetic-angular-karma",
   "private": true,
-  "license": "Apache-2.0",
   "scripts": {
     "test": "karma start"
   },

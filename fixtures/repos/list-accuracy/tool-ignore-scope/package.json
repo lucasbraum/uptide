@@ -1,6 +1,5 @@
 {
   "name": "synthetic-tool-ignore-scope",
-  "license": "Apache-2.0",
   "dependencies": {
     "nanoid": "1.0.0",
     "jquery": "1.0.0",

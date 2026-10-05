@@ -12,7 +12,7 @@
     "@types/node": "22.19.0",
     "typescript": "catalog:"
   },
-  "license": "Apache-2.0",
+  "license": "MIT",
   "scripts": {
     "preinstall": "node -e \"require('node:fs').writeFileSync('/tmp/UPTIDE_INSTALL_SCRIPT_RAN', 'bad')\""
   }

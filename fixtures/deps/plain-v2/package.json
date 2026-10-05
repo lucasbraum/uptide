@@ -2,5 +2,5 @@
   "name": "plain",
   "version": "2.0.0",
   "main": "index.js",
-  "license": "Apache-2.0"
+  "license": "MIT"
 }

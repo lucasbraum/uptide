@@ -1,7 +1,6 @@
 {
   "name": "synthetic-large-registry",
   "private": true,
-  "license": "Apache-2.0",
   "dependencies": {
     "synthetic-00": "1.0.0",
     "synthetic-01": "1.0.0",

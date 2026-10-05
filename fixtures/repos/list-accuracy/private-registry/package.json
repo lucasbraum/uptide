@@ -1,7 +1,6 @@
 {
   "name": "synthetic-private-registry",
   "private": true,
-  "license": "Apache-2.0",
   "dependencies": {
     "@example/one": "1.0.0",
     "@example/two": "1.0.0"

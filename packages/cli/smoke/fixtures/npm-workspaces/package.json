@@ -5,7 +5,7 @@
   "workspaces": [
     "packages/*"
   ],
-  "license": "Apache-2.0",
+  "license": "MIT",
   "scripts": {
     "preinstall": "node -e \"require('node:fs').writeFileSync('/tmp/UPTIDE_INSTALL_SCRIPT_RAN', 'bad')\""
   }
