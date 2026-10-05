@@ -67,7 +67,7 @@ describe('README', () => {
     expect(readme).toMatch(
       /\*\*0\*\* nothing breaking, \*\*1\*\* breaking changes found,\n\*\*2\*\*/,
     );
-    expect(readme).toContain('[MIT](LICENSE)');
+    expect(readme).toContain('[Apache-2.0](LICENSE)');
   });
 
   it('links only files that exist', () => {

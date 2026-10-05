@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "description": "Migrations you can merge.",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "type": "module",
   "packageManager": "pnpm@10.17.1",
   "engines": {

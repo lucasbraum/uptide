@@ -2,7 +2,7 @@
   "name": "uptide",
   "version": "0.3.0",
   "description": "Uptide finds what a dependency upgrade breaks in your code, migrates it, and proves it with your compiler and tests.",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "type": "module",
   "bin": {
     "uptide": "./dist/index.js"

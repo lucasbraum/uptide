@@ -1,0 +1,21 @@
+Uptide
+Copyright 2026 Lucas Braum and the Uptide contributors
+
+This product includes software developed as part of the Uptide project
+(https://github.com/uptide-dev/uptide), licensed under the Apache License,
+Version 2.0. A copy of the License is in the LICENSE file next to this one.
+
+Third-party notices
+-------------------
+
+The published `uptide` command-line package bundles its dependencies into
+packages/cli/dist. The notices for exactly those bundled packages -- name,
+version, SPDX license identifier, and the full license and NOTICE text of each
+-- are generated at build time into:
+
+    packages/cli/THIRD-PARTY-NOTICES
+
+That file is a build artifact: it is produced by
+`packages/cli/scripts/third-party-notices.mjs` from the bundler's own record of
+what went into dist, and it ships inside the npm tarball as
+`THIRD-PARTY-NOTICES`. Run `pnpm build` to generate it locally.

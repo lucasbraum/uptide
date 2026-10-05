@@ -1,0 +1,32 @@
+name: DCO
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  signed-off:
+    runs-on: ubuntu-latest
+    steps:
+      # The checker runs from the base branch, never from the pull request: a pull request
+      # cannot edit the check that gates it. Nothing from the pull request is executed.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Every commit is signed off
+        # Values from the event go through the environment, never into the script source.
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          # refs/pull/N/head is the complete pull request head as this repository sees it,
+          # for a branch and for a fork alike. Fetched with full history so the merge base
+          # with the base branch — and so the whole range the pull request adds — resolves.
+          git fetch --no-tags origin "+refs/pull/${PR_NUMBER}/head:refs/uptide/pr-head"
+          node scripts/dco.mjs "origin/${BASE_REF}" refs/uptide/pr-head

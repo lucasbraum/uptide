@@ -16,6 +16,11 @@ pnpm lint           # biome; `pnpm format` fixes formatting
 pnpm typecheck
 ```
 
+`pnpm build` also regenerates the notices for everything the CLI bundles
+(`packages/cli/scripts/third-party-notices.mjs`). It fails the build if a bundled package
+has no license text or a license outside the allowlist, so adding a dependency that the
+project cannot ship is caught there rather than at publish time.
+
 Run the CLI you just built against any repository:
 
 ```sh
@@ -89,9 +94,42 @@ one is not merged, whatever else it does.
   (`packages/cli/src/readme.test.ts` checks its flags and examples against the CLI).
 - Add a changeset for anything a user would notice: `pnpm changeset`.
 - `pnpm lint && pnpm typecheck && pnpm test` pass before you ask for review.
-- Commit messages follow `type(scope): what changed`, as in `git log`.
+- Commit messages follow `type(scope): what changed`, as in `git log`, and every commit is
+  signed off (see below).
 
-By contributing you agree that your contribution is licensed under the [MIT license](LICENSE).
+## Sign off your commits (DCO)
+
+Uptide uses the [Developer Certificate of Origin](https://developercertificate.org/). It is
+one line in each commit message saying you wrote the patch or have the right to send it:
+
+```
+Signed-off-by: Your Name <you@example.com>
+```
+
+`git commit -s` adds it from your `user.name` and `user.email`, so set those once and then
+commit as usual:
+
+```sh
+git config user.name "Your Name"
+git config user.email "you@example.com"
+git commit -s -m "fix(check): what changed"
+```
+
+Every commit in a pull request needs the line, not just the last one. If you forgot, add it
+to the commits you already made and force-push your branch:
+
+```sh
+git rebase --signoff origin/main   # or: git rebase --signoff -i HEAD~3
+git push --force-with-lease
+```
+
+The `DCO` workflow checks every commit in the pull request and names the ones that are
+missing it, with that command in the failure message.
+
+By contributing you agree that your contribution is licensed under the
+[Apache License, Version 2.0](LICENSE), the same license Uptide is released under: what
+comes in is what goes out. Sign-off is how you state that; no separate CLA is involved.
+Releases up to and including 0.3.0 were published under the MIT license.
 Everyone taking part is expected to follow the [code of conduct](CODE_OF_CONDUCT.md).
 Security problems go through [SECURITY.md](SECURITY.md), not public issues.
 

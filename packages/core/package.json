@@ -2,7 +2,7 @@
   "name": "@uptide/core",
   "version": "0.1.0",
   "description": "Contract diff engine: what a dependency upgrade changes in its public API.",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
