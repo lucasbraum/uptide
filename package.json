@@ -18,7 +18,7 @@
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "echo 'Releases are published by the Release workflow (manual trigger). See docs/releasing.md.' && exit 1",
-    "smoke": "turbo run build --filter=uptide && node packages/cli/smoke/run.mjs",
+    "smoke": "node packages/cli/smoke/run.mjs",
     "eval": "pnpm --filter @uptide/core build && tsx scripts/eval.ts",
     "test:network": "UPTIDE_NETWORK=1 turbo run test",
     "eval:check": "pnpm --filter @uptide/core build && tsx scripts/eval-check.ts",

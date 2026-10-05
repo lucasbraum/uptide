@@ -1,5 +1,14 @@
 # Package-manager smoke results
 
+`pnpm smoke` requires Docker and a running Docker daemon. It checks Docker before
+building or packing; if unavailable, it prints `Docker is required for pnpm smoke`
+and exits 1. Pass `20` or `22` to select the Node container (`22` is the default).
+
+Assertion failures appear in the container log and the GitHub Actions job summary.
+The host prints the saved `results.json` path, and reports container failures without
+an uncaught Node stack trace. Fast tests exercise the same header and major-gap
+assertions as Docker so terminal design changes cannot silently stale the smoke checks.
+
 Validated with `pnpm smoke 20` and `pnpm smoke 22`, using the packed CLI in clean Docker containers. All 20 fixes exited 0, produced verified branches, and added zero type errors. No lifecycle-script trap ran.
 
 Zod 3.23.8 → 4.6.5 uses mechanical rules (2 sites flat, 4 in workspaces). Stripe 14.25.0 → 22.6.2 uses a caller compatible with both SDKs; the API-pin and subscription-field examples still require assisted decisions and are tested separately by check. Both upgrades use `--no-llm`.

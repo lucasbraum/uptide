@@ -5,6 +5,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
+import { checkReportFailures } from './check-output.mjs';
 
 // Never send smoke-test usage, even when the release build contains a capture key.
 process.env.UPTIDE_TELEMETRY = '0';
@@ -144,17 +145,11 @@ for (const fixture of ['npm', 'npm-workspaces', 'pnpm', 'yarn', 'yarn-berry']) {
   has(`${manager} check`, check.err, 'done in ');
   expect(`${manager} check: no per-phase progress lines`, !check.err.includes('✔'), check.err);
   // The first screen: a row per dependency, a line per rule with who migrates it, the next commands.
-  has(`${manager} check`, check.out, `uptide check · smoke-${fixture} · ${manager} ·`);
+  failures.push(...checkReportFailures(check.out, fixture, manager));
   matches(
     `${manager} check`,
     check.out,
     /zod\s+3\.23\.8 → 4\.6\.5\s+major · (?:--target|latest on npm)\s+verified\s+✗ \d+ breaking/,
-  );
-  // In a workspace the row names the package that declares the dependency.
-  matches(
-    `${manager} check`,
-    check.out,
-    /stripe(?: \([^)]+\))?\s+14\.25\.0 → 22\.6\.2\s+major ×8 · (?:--target|latest on npm)\s+verified\s+✗ \d+ breaking/,
   );
   has(`${manager} check`, check.out, 'New error API (required_error → error)');
   has(`${manager} check`, check.out, 'by rule');
