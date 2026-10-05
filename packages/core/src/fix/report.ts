@@ -497,7 +497,9 @@ export function summaryCells(report: FixReport): {
     changes,
     types: report.verificationPending
       ? '⚠️ verification pending'
-      : `${report.verification.newErrors.length ? '❌' : '✅'} ${count(report.verification.target.length, 'error')} ${report.mode === 'pin' ? 'before' : 'after the bump'} → ${report.verification.after.length}${report.verification.baseline.length ? ` (${report.verification.baseline.length} pre-existing)` : ''}`,
+      : report.verification.typesUnverified
+        ? '⚠️ not verified (type resolution failed)'
+        : `${report.verification.newErrors.length ? '❌' : '✅'} ${count(report.verification.target.length, 'error')} ${report.mode === 'pin' ? 'before' : 'after the bump'} → ${report.verification.after.length}${report.verification.baseline.length ? ` (${report.verification.baseline.length} pre-existing)` : ''}`,
     behavior,
     tests: cell(report.verificationPending ? '⚠️ not run' : tests),
   };
@@ -783,7 +785,7 @@ function verificationDetails(report: FixReport): (string | Piece)[] {
   const bs = schemas(report);
   const checks = bs.flatMap((b) => b.messageChecks ?? []).filter((c) => c.status !== 'default');
   const lines: (string | Piece)[] = [
-    `Type errors: baseline ${v.baseline.length}; target ${v.target.length}; after ${v.after.length}; ${v.newErrors.length} new. Verification: ${v.passed ? 'PASS' : 'FAIL'}.`,
+    `Type errors: baseline ${v.baseline.length}; target ${v.target.length}; after ${v.after.length}; ${v.newErrors.length} new. Verification: ${v.passed ? 'PASS' : 'FAIL'}.${v.typesUnverified ? ` Types not verified (type resolution failed): ${v.typesUnverified}.` : ''}`,
     ...(report.generated?.length
       ? [
           '',
