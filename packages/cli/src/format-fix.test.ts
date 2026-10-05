@@ -28,7 +28,7 @@ describe('formatFixSummary', () => {
         'uptide fix · stripe 14.25.0 → 23.0.0 (latest on npm) · verification passed · 8m 37s',
         '',
         '  Risk      Medium: no tests',
-        '  Changes   0 sites in 0 files · 0 by rule · 0 by agent',
+        '  Changes   none: versions and lockfile only',
         '  Types     ✅ 0 errors after the bump → 0',
         '  Behavior  ⚠️ not checked',
         '  Tests     ⚠️ no tests ran',
