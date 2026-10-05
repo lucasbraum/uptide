@@ -6,7 +6,8 @@ import type { ProgressEvent } from '../domain/progress.js';
 import { zodPack } from '../packs/zod/index.js';
 import { version } from '../version.js';
 import { git } from './process.js';
-import { formatFix, prBody } from './report.js';
+import { publicationBlockers } from './publish.js';
+import { formatFix, prBody, summaryCells } from './report.js';
 import { reverify } from './reverify.js';
 import { fix } from './run.js';
 import { stripeFixture, zodFixture } from './test-fixture.js';
@@ -26,6 +27,31 @@ afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 const fixture = () => zodFixture(scratch);
 const CLEAN_TOOL = { uptideVersion: version, uptideCommit: 'a'.repeat(40), uptideDirty: false };
 describe('fix transaction', () => {
+  it('does not pass a run whose baseline cannot see a package the repository installs', async () => {
+    const { root, services } = fixture();
+    // The repository's own tsc sees zod; a compiler host that does not hides every zod error
+    // on both sides, so "0 new errors" would be blind.
+    const unseen = {
+      file: 'tsconfig.json',
+      line: 1,
+      column: 1,
+      code: 2688,
+      message: "Cannot find type definition file for 'zod'.",
+    };
+    const result = await fix(
+      { cwd: root, only: 'zod' },
+      { ...services, diagnostics: (r, w) => [unseen, ...services.diagnostics(r, w)] },
+    );
+    expect(result.verification.newErrors).toHaveLength(0);
+    expect(result.verification.typesUnverified).toBe(
+      '1 baseline error cannot see zod, which is declared and installed',
+    );
+    expect(result.verification.passed).toBe(false);
+    expect(summaryCells(result).types).toBe('⚠️ not verified (type resolution failed)');
+    expect(publicationBlockers(result, { uptideDirty: false })).toContain(
+      'verification failed: types not verified (type resolution failed: 1 baseline error cannot see zod, which is declared and installed)',
+    );
+  });
   it('checks, bumps, commits, fixes only the reported site, and verifies with a real TypeScript program', async () => {
     const { root, services } = fixture();
     const events: ProgressEvent[] = [];

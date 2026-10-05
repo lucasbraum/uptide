@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
+import { builtinModules, createRequire } from 'node:module';
 import { basename, dirname, join, relative } from 'node:path';
 import { Project, ts } from 'ts-morph';
 import { readInstalled } from '../adapters/typescript/repo.js';
@@ -128,7 +128,8 @@ export function diagnostics(root: string, workspaces: string[]): FixDiagnostic[]
     visited.add(workspace);
     const dir = join(root, workspace);
     const compiler = resolveCompiler(dir);
-    const config = compiler.readConfigFile(join(dir, 'tsconfig.json'), compiler.sys.readFile);
+    const tsconfig = join(dir, 'tsconfig.json');
+    const config = compiler.readConfigFile(tsconfig, compiler.sys.readFile);
     const parsed = compiler.parseJsonConfigFileContent(
       config.config ?? {
         include: ['**/*.ts', '**/*.tsx'],
@@ -136,6 +137,8 @@ export function diagnostics(root: string, workspaces: string[]): FixDiagnostic[]
       },
       compiler.sys,
       dir,
+      undefined,
+      config.config ? tsconfig : undefined,
     );
     const sources = workspaceSourceMap(dir, readInstalled(dir).installed);
     const fileNames = new Set(parsed.fileNames);
@@ -152,10 +155,14 @@ export function diagnostics(root: string, workspaces: string[]): FixDiagnostic[]
       for (const f of files) fileNames.add(f);
     }
     if (compiler === ts) parsed.options.ignoreDeprecations = '6.0';
+    const hostOptions = { ...parsed.options, noEmit: true, skipLibCheck: true };
+    const host =
+      compiler === ts ? bundledHost(hostOptions) : compiler.createCompilerHost(hostOptions);
+    // Type roots and `types` resolve from the workspace, as its own `tsc` would; from the
+    // process's directory, an isolated pnpm layout sees no @types at all.
+    host.getCurrentDirectory = () => dir;
     const program = compiler.createProgram({
-      ...(compiler === ts
-        ? { host: bundledHost({ ...parsed.options, noEmit: true, skipLibCheck: true }) }
-        : {}),
+      host,
       rootNames: [...fileNames],
       options: {
         ...parsed.options,
@@ -212,6 +219,64 @@ export function diagnostics(root: string, workspaces: string[]): FixDiagnostic[]
     (a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.column - b.column,
   );
 }
+/** "Cannot find type definition file / module / name": the codes a missing package produces. */
+const RESOLUTION_CODES = new Set([2307, 2580, 2581, 2582, 2591, 2592, 2593, 2688, 2792]);
+
+/** The packages whose absence a diagnostic describes, by the names they could be installed under. */
+export function missingPackages(d: FixDiagnostic): string[] {
+  if (!RESOLUTION_CODES.has(d.code)) return [];
+  // "Cannot find name 'Buffer'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node`"
+  const suggested = /@types\/[\w.-]+/.exec(d.message)?.[0];
+  if (suggested) return [suggested];
+  const name = /'([^']+)'/.exec(d.message)?.[1];
+  if (!name || name.startsWith('.') || name.startsWith('/')) return [];
+  if (name.startsWith('node:') || builtinModules.includes(name)) return ['@types/node'];
+  const pkg = name
+    .split('/')
+    .slice(0, name.startsWith('@') ? 2 : 1)
+    .join('/');
+  const types = `@types/${pkg.startsWith('@') ? pkg.slice(1).replace('/', '__') : pkg}`;
+  // A type definition file is looked up under @types first; a module, under its own name.
+  return d.code === 2688 ? [types, pkg] : [pkg, types];
+}
+
+/**
+ * Why the baseline's types cannot be trusted, if they cannot: errors that say a package is
+ * missing while the workspace declares it and has it installed. Those are the compiler not
+ * seeing the install (a resolution the repository's own `tsc` does not share), and every
+ * error that depends on the package is then hidden on both sides of the comparison.
+ */
+export function typeResolutionFailure(root: string, baseline: FixDiagnostic[]): string | undefined {
+  const seen = new Set<string>();
+  let errors = 0;
+  for (const d of baseline) {
+    const candidates = missingPackages(d);
+    if (candidates.length === 0) continue;
+    let declared = false;
+    let installed: string | undefined;
+    for (let dir = dirname(join(root, d.file)); ; dir = dirname(dir)) {
+      const manifest = existsSync(join(dir, 'package.json'))
+        ? (JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as Record<string, unknown>)
+        : {};
+      for (const name of candidates) {
+        declared ||= ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']
+          .map((field) => manifest[field] as Record<string, string> | undefined)
+          .some((deps) => deps?.[name] !== undefined);
+        if (!installed && existsSync(join(dir, 'node_modules', name, 'package.json')))
+          installed = name;
+      }
+      if (dir === root || dirname(dir) === dir) break;
+    }
+    if (declared && installed) {
+      errors++;
+      seen.add(installed);
+    }
+  }
+  if (errors === 0) return undefined;
+  const names = [...seen].sort();
+  return `${errors} baseline error${errors === 1 ? '' : 's'} cannot see ${names.join(', ')}, which ${names.length === 1 ? 'is' : 'are'} declared and installed`;
+}
+
 const key = (d: FixDiagnostic) => `${d.file}|${d.code}|${d.message.replace(/\s+/g, ' ')}`;
 /** Multiset subtraction ignores shifted lines but retains duplicate diagnostics. */
 export function newDiagnostics(

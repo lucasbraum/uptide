@@ -162,6 +162,8 @@ export interface FixReport {
     /** Formatters run on the edited files (`biome`, `prettier`), when any changed them. */
     formatted?: string[];
     passed: boolean;
+    /** Set when the baseline could not see packages the repository installs: no type verdict holds. */
+    typesUnverified?: string;
     workspaceTypes?: { workspace: string; errors: number }[];
   };
   llm: {

@@ -2,9 +2,11 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { commentSummary } from '../action/run.js';
 import type { CheckReport } from '../domain/report.js';
+import { GENERIC_NOTE } from '../packs/generic.js';
 import { stripePack } from '../packs/stripe/index.js';
 import {
   apiChangeSummary,
+  errorSummary,
   formatFix,
   migrationBody,
   migrationRisk,
@@ -801,4 +803,87 @@ it("keeps a PR description under GitHub's limit: what matters first, the rest co
   // The page has all of it.
   expect(full).toContain('ok line');
   expect(full).not.toContain('more not shown here');
+});
+
+describe('a bump that needed no code changes', () => {
+  const at = (code: number, message: string) => ({
+    file: 'packages/api/src/index.ts',
+    line: 1,
+    column: 1,
+    code,
+    message,
+  });
+  const nodeTypes = [
+    ...Array.from({ length: 40 }, () => at(2688, "Cannot find type definition file for 'node'.")),
+    ...Array.from({ length: 34 }, () =>
+      at(
+        2591,
+        "Cannot find name 'Buffer'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+      ),
+    ),
+    at(2322, "Type 'string' is not assignable to type 'number'."),
+  ];
+  const report = (): FixReport => {
+    const base = fixture('storefront-zod');
+    return {
+      ...base,
+      package: 'vitest',
+      tier: 'generic',
+      sites: [],
+      // What the generic pack says of agent edits, recorded with the run: there were none.
+      notes: [GENERIC_NOTE('vitest')],
+      verification: {
+        ...base.verification,
+        baseline: nodeTypes,
+        target: nodeTypes,
+        after: nodeTypes,
+        newErrors: [],
+        passed: true,
+      },
+    };
+  };
+
+  it('says only versions and the lockfile changed, and drops what speaks of edits', () => {
+    const body = prBody(report());
+    expect(body).toContain('No code changes were needed; only versions and the lockfile changed.');
+    expect(body).not.toContain('written by the agent');
+    expect(body).not.toContain('### What changed');
+    expect(body).toContain('| **Changes** | none: versions and lockfile only |');
+    const clean = report();
+    clean.verification = { ...clean.verification, baseline: [], target: [], after: [] };
+    delete clean.behavior;
+    expect(prBody(clean)).toContain(
+      'No code changes were needed; only versions and the lockfile changed. Types compile and the tests pass.',
+    );
+    expect(migrationRisk(report())).toEqual({
+      level: 'Low',
+      reason: 'no code changes; types and tests verified',
+    });
+  });
+
+  it('counts pre-existing errors by kind in one line, and lists at most ten', () => {
+    expect(errorSummary(nodeTypes, 'pre-existing error')).toBe(
+      '75 pre-existing errors (74 × TS2688/TS2591 missing Node types, 1 × TS2322)',
+    );
+    const body = prBody(report());
+    expect(body).toContain(
+      '**75 pre-existing errors (74 × TS2688/TS2591 missing Node types, 1 × TS2322)**',
+    );
+    expect(body).toContain('<details><summary>First 10 of 75</summary>');
+    expect(body).toContain('- … and 65 more');
+    expect(
+      body.split('\n').filter((l) => l.startsWith('- packages/api/src/index.ts:1')),
+    ).toHaveLength(10);
+  });
+
+  it('joins three workspaces with commas and one "and"', () => {
+    const base = fixture('storefront-zod');
+    const tests = ['apps/web', 'apps/worker', 'packages/api'].map((workspace) => ({
+      ...first(base.verification.tests),
+      workspace,
+      covers: [workspace],
+    }));
+    const body = prBody({ ...base, verification: { ...base.verification, tests } });
+    expect(body).toContain('in `web`, `worker` and `api`.');
+  });
 });

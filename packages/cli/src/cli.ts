@@ -1208,11 +1208,15 @@ ${EXIT_CODES('description rendered (and updated unless --preview)', 'not used')}
   }
   if (fixing)
     io.err(
-      fixSpend
-        ? `LLM spend: $${fixSpend.costUsd.toFixed(6)}${fixSpend.unreportedCostUsd ? `; up to $${fixSpend.unreportedCostUsd.toFixed(6)} reserved for calls without usage` : ''}\n`
-        : fixEngineStarted
+      fixSpend &&
+        (fixSpend.costUsd ||
+          fixSpend.unreportedCostUsd ||
+          fixSpend.inputTokens ||
+          fixSpend.outputTokens)
+        ? `LLM spend: $${fixSpend.costUsd.toFixed(2)}${fixSpend.unreportedCostUsd ? `; up to $${fixSpend.unreportedCostUsd.toFixed(2)} reserved for calls without usage` : ''}\n`
+        : fixEngineStarted && !fixSpend
           ? 'LLM spend: unavailable (the run ended before returning a usage report).\n'
-          : 'LLM spend: $0.000000 (no LLM calls).\n',
+          : 'LLM spend: no LLM calls.\n',
     );
   telemetry?.finish(code);
   return code;

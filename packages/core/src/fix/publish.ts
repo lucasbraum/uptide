@@ -22,6 +22,9 @@ export function publicationBlockers(
   else if (!v.passed) {
     const failed = (v.tests ?? []).filter((t) => t.status === 'failed' || t.status === 'timeout');
     const reasons = [
+      ...(v.typesUnverified
+        ? [`types not verified (type resolution failed: ${v.typesUnverified})`]
+        : []),
       ...(v.newErrors?.length ? [count(v.newErrors.length, 'new type error')] : []),
       ...(v.lint ?? [])
         .filter((l) => l.status === 'failed')

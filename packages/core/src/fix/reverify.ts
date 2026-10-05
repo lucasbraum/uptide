@@ -12,7 +12,13 @@ import { prBody } from './report.js';
 import { confirmServices } from './run.js';
 import { type Followed, settle } from './settle.js';
 import type { FixReport, LintResult, TestResult } from './types.js';
-import { diagnostics, newDiagnostics, type TestOptions, testWorkspaces } from './verify.js';
+import {
+  diagnostics,
+  newDiagnostics,
+  type TestOptions,
+  testWorkspaces,
+  typeResolutionFailure,
+} from './verify.js';
 
 export interface ReverifyOptions {
   cwd: string;
@@ -115,6 +121,7 @@ export async function reverify(
     .split('\n')
     .filter((line) => line.trim() !== '' && !line.slice(3).startsWith('.uptide/'));
   const newErrors = newDiagnostics(report.verification.baseline, after);
+  const unverified = typeResolutionFailure(root, report.verification.baseline);
   const rules = [...new Set(sites.map((s) => s.rule).filter((r): r is string => !!r))];
   const decisions = [
     ...new Set([
@@ -137,7 +144,9 @@ export async function reverify(
       tests,
       ...(lint.length ? { lint } : {}),
       ...(formatted.length ? { formatted } : {}),
+      ...(unverified ? { typesUnverified: unverified } : {}),
       passed:
+        !unverified &&
         newErrors.length === 0 &&
         left.length === 0 &&
         tests.every((t) => t.status === 'passed' || t.status === 'missing') &&
@@ -151,6 +160,8 @@ export async function reverify(
     prBody: join(root, '.uptide/pr-body.md'),
   };
   delete result.verificationPending;
+  // Judged again from the stored baseline: a reason recorded by an earlier build may not hold.
+  if (!unverified) delete result.verification.typesUnverified;
   delete result.publication;
   mkdirSync(dirname(result.prBody), { recursive: true });
   writeFileSync(result.prBody, prBody(result));

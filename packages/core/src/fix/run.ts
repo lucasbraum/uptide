@@ -35,6 +35,7 @@ import {
   newDiagnostics,
   type TestOptions,
   testWorkspaces,
+  typeResolutionFailure,
 } from './verify.js';
 import { bumpVersions, install, packageManager } from './versions.js';
 
@@ -432,6 +433,7 @@ export async function fix(
   const tests = markPreexisting(ran, baselineTests);
   const pending = git(root, 'status', '--porcelain', '--untracked-files=all');
   const newErrors = newDiagnostics(baseline, after);
+  const unverified = typeResolutionFailure(root, baseline);
   const result: FixReport = {
     ...(lockfile ? { lockfile } : {}),
     ...(generated.length ? { generated } : {}),
@@ -455,7 +457,9 @@ export async function fix(
       tests,
       ...(lint.length ? { lint } : {}),
       ...(formatted.length ? { formatted } : {}),
+      ...(unverified ? { typesUnverified: unverified } : {}),
       passed:
+        !unverified &&
         newErrors.length === 0 &&
         !pending &&
         tests.every((t) => t.status === 'passed' || t.status === 'missing' || t.preexisting) &&

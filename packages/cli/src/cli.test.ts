@@ -1,5 +1,6 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import type { FixReport } from '@uptide/core';
 import { describe, expect, it } from 'vitest';
 import { run } from './cli.js';
 import {
@@ -355,6 +356,18 @@ describe('uptide fix', () => {
           ...fixReport(true),
           package: 'react',
           tier: 'generic',
+          // One edit the agent made before the limit: the tier note is about its edits.
+          sites: [
+            {
+              outcome: 'agent',
+              rule: 'agent',
+              reason: 'compiler error resolved',
+              finding: {
+                usage: { file: 'src/app.tsx', line: 1 },
+                change: { from: '18.3.1', path: 'FC' },
+              },
+            } as unknown as FixReport['sites'][number],
+          ],
           llm: {
             available: true,
             inputTokens: 1,
@@ -377,6 +390,7 @@ describe('uptide fix', () => {
     expect(io.stdout()).toContain(
       '  Agent     stopped at $1.00 (--max-cost): 3 sites not completed',
     );
+    expect(io.stderr()).toContain('LLM spend: $0.60\n');
     // --max-cost reaches the engine; nonsense is refused.
     await run(
       ['fix', '--only', 'react', '--max-cost', '2.5'],
@@ -664,7 +678,7 @@ it('selects each provider from its key, passes model and the universal budget, a
     expect(await run(['fix', 'zod'], io, engine)).toBe(0);
     expect(engine.calls[0]).toMatchObject({ provider, model, maxCostUsd: 1 });
     expect(io.stderr()).toContain(`LLM: ${provider} / ${model}`);
-    expect(io.stderr()).toContain('LLM spend: $');
+    expect(io.stderr()).toContain('LLM spend: no LLM calls.');
     expect(io.stderr()).not.toContain('test-key');
   }
 });
@@ -703,5 +717,5 @@ it('rejects key-like repository config before the engine, even with --no-llm', a
   expect(io.stderr()).toContain('key-like setting');
   expect(io.stderr()).not.toContain('PRIVATE_CREDENTIAL');
   expect(engine.calls).toEqual([]);
-  expect(io.stderr()).toContain('LLM spend: $0.000000');
+  expect(io.stderr()).toContain('LLM spend: no LLM calls.');
 });

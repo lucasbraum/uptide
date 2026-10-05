@@ -8,6 +8,7 @@ import type { ProgressEvent } from '../domain/progress.js';
 import type { Finding, PackageReport } from '../domain/report.js';
 import type { ApiSurface } from '../domain/surface.js';
 import { UptideError } from '../errors.js';
+import { isolatedPnpmWorkspace } from '../fix/test-fixture.js';
 import {
   check,
   mergeAcrossWorkspaces,
@@ -955,4 +956,53 @@ it('turns recursive extraction failure into an explicit per-package failure', as
   });
   expect(result.packages[0]?.notes.join(' ')).toContain('No safety verdict');
   expect(result.summary.failed).toBe(1);
+});
+
+describe('check on a pnpm workspace with the isolated node-linker', () => {
+  it("compiles each workspace with its own @types: a baseline of 0, as the workspace's tsc has", async () => {
+    // Nothing hoisted: @types/node is only in each package's node_modules. Types read from the
+    // process's directory would make Buffer and node:crypto "pre-existing" errors here.
+    const root = isolatedPnpmWorkspace(mkdtempSync(join(tmpdir(), 'uptide-isolated-check-')));
+    const greetFetcher: PackageFetcher = {
+      async resolve(name, requested) {
+        if (name === 'greet') return requested === 'latest' ? '2.0.0' : requested;
+        throw new Error(`${name}: not found`);
+      },
+      async versions() {
+        return [];
+      },
+      async fetch(name, version) {
+        const dir = mkdtempSync(join(tmpdir(), 'uptide-greet-'));
+        cpSync(
+          join(
+            root,
+            version === '2.0.0'
+              ? 'greet-2.0.0'
+              : 'node_modules/.pnpm/greet@1.0.0/node_modules/greet',
+          ),
+          dir,
+          {
+            recursive: true,
+          },
+        );
+        return { name, version, dir };
+      },
+    };
+    const result = await check({
+      cwd: root,
+      only: ['greet'],
+      adapter,
+      fetcher: greetFetcher,
+      cache: memoryCache(),
+      runtime: false,
+    });
+    // One dependency at one version in both packages: one report, compiled per workspace.
+    const greet = result.packages.find((p) => p.name === 'greet') as PackageReport;
+    expect(greet.workspaces).toEqual(['packages/a', 'packages/b']);
+    expect(greet.compile?.skipped).toBeUndefined();
+    expect(greet.compile?.baselineErrors).toBe(0);
+    expect(
+      greet.findings.map((f) => `${f.usage.file}:${f.usage.line} ${f.severity}`).sort(),
+    ).toEqual(['packages/a/index.ts:6 breaking', 'packages/b/index.ts:6 breaking']);
+  });
 });

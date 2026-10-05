@@ -4,7 +4,8 @@ import { GENERIC_NOTE } from '../packs/generic.js';
 import { UPTIDE_COMMAND } from '../version.js';
 import type { BehaviorResult } from './behavior.js';
 import { fitPieces, must, type Piece } from './budget.js';
-import type { FixReport, FixSite, ReviewSection } from './types.js';
+import type { FixDiagnostic, FixReport, FixSite, ReviewSection } from './types.js';
+import { missingPackages } from './verify.js';
 
 export function fixCounts(report: FixReport) {
   return {
@@ -316,6 +317,13 @@ export function migrationRisk(report: FixReport): {
       : []),
   ];
   if (high.length) return { level: 'High', reason: high.join('; ') };
+  // Nothing edited and the repository's own tests pass: the bump alone, verified.
+  if (
+    report.sites.length === 0 &&
+    report.verification.tests.length > 0 &&
+    report.verification.tests.every((t) => t.status === 'passed')
+  )
+    return { level: 'Low', reason: 'no code changes; types and tests verified' };
   // No pack: nothing but the compiler vouches for the agent's edits. Never Low.
   if (report.tier === 'generic')
     return {
@@ -367,10 +375,31 @@ function validationScopes(report: FixReport): string[] {
     ...(/webhook/i.test(paths) ? ['webhooks'] : []),
   ];
 }
-const scopeList = (report: FixReport): string =>
-  validationScopes(report)
-    .join(', ')
-    .replace(/, ([^,]+)$/, ' and $1');
+/** `web, worker and api`. */
+const listed = (items: string[]): string =>
+  items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`;
+const scopeList = (report: FixReport): string => listed(validationScopes(report));
+/** `75 pre-existing errors (74 × TS2688/TS2591 missing Node types, 1 × TS2322)`. */
+export function errorSummary(diagnostics: FixDiagnostic[], what: string): string {
+  const byKind = new Map<string, { codes: Set<number>; n: number }>();
+  for (const d of diagnostics) {
+    const missing = missingPackages(d)[0];
+    const kind = missing
+      ? ` missing ${missing === '@types/node' ? 'Node types' : `\`${missing}\``}`
+      : `|${d.code}`;
+    const entry = byKind.get(kind) ?? { codes: new Set(), n: 0 };
+    entry.codes.add(d.code);
+    entry.n++;
+    byKind.set(kind, entry);
+  }
+  const parts = [...byKind]
+    .sort((a, b) => b[1].n - a[1].n)
+    .map(
+      ([kind, { codes, n }]) =>
+        `${n} × ${[...codes].map((c) => `TS${c}`).join('/')}${kind.startsWith('|') ? '' : kind}`,
+    );
+  return `${count(diagnostics.length, what)} (${parts.join(', ')})`;
+}
 const count = (n: number, one: string): string => `${n} ${one}${n === 1 ? '' : 's'}`;
 /** The repository's own lint on the edited files, appended to the Tests cell. */
 function lintCell(report: FixReport): string {
@@ -480,7 +509,9 @@ export function summaryCells(report: FixReport): {
     bs = schemas(report);
   const identical = bs.filter((b) => !unchecked(b) && !differs(b)).length;
   const tests = `${testsRow(report)}${lintCell(report)}`;
-  const changes = `${count(report.sites.length, 'site')} in ${new Set(report.sites.map((s) => s.finding.usage.file)).size} file${new Set(report.sites.map((s) => s.finding.usage.file)).size === 1 ? '' : 's'}${report.verificationPending ? ' · analysis only' : ` · ${c.mechanical} by rule · ${c.agent} by agent${c.manual ? ` · ${c.manual} manual` : ''}`}`;
+  const changes = !report.sites.length
+    ? 'none: versions and lockfile only'
+    : `${count(report.sites.length, 'site')} in ${new Set(report.sites.map((s) => s.finding.usage.file)).size} file${new Set(report.sites.map((s) => s.finding.usage.file)).size === 1 ? '' : 's'}${report.verificationPending ? ' · analysis only' : ` · ${c.mechanical} by rule · ${c.agent} by agent${c.manual ? ` · ${c.manual} manual` : ''}`}`;
   const messages = bs.flatMap((b) => b.messageChecks ?? []).filter((c) => c.status !== 'default');
   const messageSummary = messages.length
     ? ` · ${messages.filter((c) => c.status === 'identical').length}/${messages.length} custom-message assertions`
@@ -497,7 +528,9 @@ export function summaryCells(report: FixReport): {
     changes,
     types: report.verificationPending
       ? '⚠️ verification pending'
-      : `${report.verification.newErrors.length ? '❌' : '✅'} ${count(report.verification.target.length, 'error')} ${report.mode === 'pin' ? 'before' : 'after the bump'} → ${report.verification.after.length}${report.verification.baseline.length ? ` (${report.verification.baseline.length} pre-existing)` : ''}`,
+      : report.verification.typesUnverified
+        ? '⚠️ not verified (type resolution failed)'
+        : `${report.verification.newErrors.length ? '❌' : '✅'} ${count(report.verification.target.length, 'error')} ${report.mode === 'pin' ? 'before' : 'after the bump'} → ${report.verification.after.length}${report.verification.baseline.length ? ` (${report.verification.baseline.length} pre-existing)` : ''}`,
     behavior,
     tests: cell(report.verificationPending ? '⚠️ not run' : tests),
   };
@@ -586,8 +619,7 @@ export function renderMigration(
       ...new Set(report.verification.tests.flatMap((t) => t.covers ?? [t.workspace])),
     ]
       .filter((w) => w !== '.')
-      .map((w) => `\`${basename(w)}\``)
-      .join(' and ');
+      .map((w) => `\`${basename(w)}\``);
     const typeVerdict = report.verification.newErrors.length
       ? 'New type errors remain.'
       : report.verification.after.length
@@ -596,15 +628,23 @@ export function renderMigration(
           ? `Types compile, and the checked schemas behave the same as before on ${inputs.toLocaleString('en-US')} sampled inputs.`
           : additiveBumpOnly(report)
             ? 'Types compile.'
-            : 'Types compile; runtime behavior needs review.';
+            : !report.sites.length && migrationRisk(report).level === 'Low'
+              ? 'Types compile and the tests pass.'
+              : 'Types compile; runtime behavior needs review.';
+    const what = report.sites.length
+      ? `The code was migrated to ${report.package} ${from.split('.')[0] === report.target.split('.')[0] ? report.target : report.target.split('.')[0]}${workspaces.length ? ` in ${listed(workspaces)}` : ''}.`
+      : 'No code changes were needed; only versions and the lockfile changed.';
     lines.push(
-      `**${ready ? 'Ready for review.' : 'Review required before merging.'}** The code was migrated to ${report.package} ${from.split('.')[0] === report.target.split('.')[0] ? report.target : report.target.split('.')[0]}${workspaces ? ` in ${workspaces}` : ''}. ${typeVerdict}${report.apiChanges ? ` ${sentenceCase(apiChangeSummary(report.apiChanges))} between ${report.apiChanges.from} and ${report.apiChanges.to}.` : ''}`,
+      `**${ready ? 'Ready for review.' : 'Review required before merging.'}** ${what} ${typeVerdict}${report.apiChanges ? ` ${sentenceCase(apiChangeSummary(report.apiChanges))} between ${report.apiChanges.from} and ${report.apiChanges.to}.` : ''}`,
       '',
     );
   }
-  if (report.tier === 'generic') lines.push(`> ${GENERIC_NOTE(report.package)}`, '');
+  // The note vouches for agent edits; with none, it has nothing to say.
+  if (report.tier === 'generic' && report.sites.some((s) => s.outcome === 'agent'))
+    lines.push(`> ${GENERIC_NOTE(report.package)}`, '');
   if (report.llm.disabled) lines.push('Assisted fixes disabled (--no-llm).', '');
-  lines.push(...summaryRows(report), '', '### What changed', '');
+  lines.push(...summaryRows(report), '');
+  if (groups(report).length) lines.push('### What changed', '');
   groups(report).forEach((g, i) => {
     lines.push(heading(g, report, i));
     if (mode === 'compact') return;
@@ -657,7 +697,7 @@ export function renderMigration(
   const notChecked = schemas(report).filter(unchecked);
   if (notChecked.length)
     review.push(
-      `- ${notChecked.map((b) => `\`${b.schema}\``).join(' and ')}: behavior not checked${notChecked.every((b) => b.skipped?.includes('runtime import')) ? ' (they import another schema file)' : ''}.`,
+      `- ${listed(notChecked.map((b) => `\`${b.schema}\``))}: behavior not checked${notChecked.every((b) => b.skipped?.includes('runtime import')) ? ' (they import another schema file)' : ''}.`,
     );
   for (const b of schemas(report).filter(differs)) {
     for (const d of b.differences)
@@ -703,7 +743,7 @@ export function renderMigration(
     );
   if (report.llm.unreportedCostUsd)
     review.push(
-      `- Unreported API usage: $${report.llm.unreportedCostUsd.toFixed(6)} reserved against the budget (actual spend unknown).`,
+      `- Unreported API usage: $${report.llm.unreportedCostUsd.toFixed(2)} reserved against the budget (actual spend unknown).`,
     );
   if (report.llm.costLimit)
     review.push(
@@ -783,7 +823,7 @@ function verificationDetails(report: FixReport): (string | Piece)[] {
   const bs = schemas(report);
   const checks = bs.flatMap((b) => b.messageChecks ?? []).filter((c) => c.status !== 'default');
   const lines: (string | Piece)[] = [
-    `Type errors: baseline ${v.baseline.length}; target ${v.target.length}; after ${v.after.length}; ${v.newErrors.length} new. Verification: ${v.passed ? 'PASS' : 'FAIL'}.`,
+    `Type errors: baseline ${v.baseline.length}; target ${v.target.length}; after ${v.after.length}; ${v.newErrors.length} new. Verification: ${v.passed ? 'PASS' : 'FAIL'}.${v.typesUnverified ? ` Types not verified (type resolution failed): ${v.typesUnverified}.` : ''}`,
     ...(report.generated?.length
       ? [
           '',
@@ -826,21 +866,26 @@ function verificationDetails(report: FixReport): (string | Piece)[] {
     if (l.status !== 'passed' && l.output)
       lines.push(droppable(5, ['```text', l.output.trim(), '```'], `Lint output (${l.tool})`));
   }
-  for (const [label, diagnostics] of [
-    ['Pre-existing errors', v.baseline],
-    ['Remaining errors', v.newErrors],
-  ] as const)
-    if (diagnostics.length) {
-      const block = diagnostics.map((d) => `- ${d.file}:${d.line} TS${d.code}: ${d.message}`);
-      // What the migration left broken is never dropped; what was broken before may be.
-      lines.push(
-        '',
-        `**${label}**`,
-        ...(label === 'Remaining errors'
-          ? block
-          : [droppable(4, block, `${count(diagnostics.length, 'pre-existing error')}`)]),
-      );
-    }
+  const listing = (d: FixDiagnostic): string => `- ${d.file}:${d.line} TS${d.code}: ${d.message}`;
+  // What was broken before is one line of counts; the first few are there to look at.
+  if (v.baseline.length) {
+    const shown = v.baseline.slice(0, 10).map(listing);
+    const rest = v.baseline.length - shown.length;
+    lines.push(
+      '',
+      `**${errorSummary(v.baseline, 'pre-existing error')}**`,
+      droppable(
+        4,
+        collapse(rest ? `First 10 of ${v.baseline.length}` : 'List', [
+          ...shown,
+          ...(rest ? [`- … and ${rest} more`] : []),
+        ]),
+        'Pre-existing error list',
+      ),
+    );
+  }
+  // What the migration left broken is never dropped.
+  if (v.newErrors.length) lines.push('', '**Remaining errors**', ...v.newErrors.map(listing));
   if (v.workspaceTypes?.length)
     lines.push(
       '',
@@ -889,7 +934,12 @@ function verificationDetails(report: FixReport): (string | Piece)[] {
         droppable(5, ['```text', t.output, '```'], `Test output (${t.status})`),
       );
   // What happened to the publish step is the terminal's news, not the description's.
-  const notes = report.notes.filter((n) => !/^(?:Publication plan printed|PR not opened:)/.test(n));
+  const agentEdits = report.sites.some((s) => s.outcome === 'agent');
+  const notes = report.notes.filter(
+    (n) =>
+      !/^(?:Publication plan printed|PR not opened:)/.test(n) &&
+      (agentEdits || n !== GENERIC_NOTE(report.package)),
+  );
   if (notes.length) lines.push('', '**Run notes**', '', ...notes.map((n) => `- ${n}`));
   for (const stored of report.reviewSections ?? []) {
     // Decisions are rendered once, in their own section above.

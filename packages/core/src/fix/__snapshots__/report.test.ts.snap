@@ -120,8 +120,12 @@ Type errors: baseline 1; target 29; after 1; 0 new. Verification: PASS.
 - \`packages/api\`: the \`test\` script of packages/api — \`vitest run\` — 3 tests in 2 files passed
 - \`packages/shared\`: the \`test\` script of packages/shared — \`vitest run\` — 2 tests in 1 file passed
 
-**Pre-existing errors**
+**1 pre-existing error (1 × TS2322)**
+<details><summary>List</summary>
+
 - packages/shared/src/errors.ts:19 TS2322: Type 'string' is not assignable to type 'number'.
+
+</details>
 
 Samples: 1,800/1,800 identical across 11 schemas. Custom-message assertions: 21/21 identical.
 
