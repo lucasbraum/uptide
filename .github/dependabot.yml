@@ -1,0 +1,31 @@
+# Dependency updates. Minor and patch releases come as one pull request per ecosystem;
+# each major gets its own, since a major is the one that needs a migration.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    # fixtures/ is test data: outdated and vulnerable on purpose (see CONTRIBUTING.md).
+    # Neither version nor security updates may touch it.
+    exclude-paths:
+      - "fixtures/**"
+    groups:
+      npm-minor-and-patch:
+        update-types:
+          - minor
+          - patch
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps)"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "chore(deps)"

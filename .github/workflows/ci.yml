@@ -24,10 +24,27 @@ jobs:
       # No private planning document and no private identifier in the repository. The
       # identifiers are a secret: required on pushes and on pull requests from this
       # repository; a fork has no secrets, so there only the document names are checked.
+      # Dependabot's own pull requests get no repository secrets either, and are never given
+      # this one (CONTRIBUTING.md): with the opener GitHub records as dependabot[bot] (the
+      # same gate as the DCO exemption) and no denylist, the identifier scan is skipped with
+      # a notice. Whatever such a pull request brings is scanned with the secret on its
+      # push to main. Every other missing denylist still fails.
       - name: No private material
-        run: node scripts/public-tree.mjs . ${{ (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) && '--require-denylist' || '' }}
         env:
           UPTIDE_PRIVATE_DENYLIST: ${{ secrets.UPTIDE_PRIVATE_DENYLIST }}
+          EVENT: ${{ github.event_name }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPO: ${{ github.repository }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          if [ "$EVENT" = pull_request ] && [ "$HEAD_REPO" != "$REPO" ]; then
+            node scripts/public-tree.mjs .
+          elif [ "$EVENT" = pull_request ] && [ "$PR_AUTHOR" = 'dependabot[bot]' ] && [ -z "$UPTIDE_PRIVATE_DENYLIST" ]; then
+            echo "::notice title=No private material::Private identifier scan skipped: Dependabot pull requests get no repository secrets, and this one is never given to them. Document names are still checked; the merge to main is scanned with the denylist."
+            node scripts/public-tree.mjs .
+          else
+            node scripts/public-tree.mjs . --require-denylist
+          fi
       - run: pnpm build
       - run: pnpm typecheck
       - run: pnpm test

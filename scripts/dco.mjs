@@ -2,7 +2,7 @@
 // sign-off (https://developercertificate.org/), which is how a contributor states they
 // have the right to send the patch under the project's license.
 //
-//   node scripts/dco.mjs <base-ref> <head-ref> [--base-name=<name>] [--json]
+//   node scripts/dco.mjs <base-ref> <head-ref> [--base-name=<name>] [--pr-author=<login>] [--json]
 //
 // The range is everything on `head` since it left `base`, so a long-running branch is not
 // asked to account for commits it merely inherited. CI passes the refs it fetched for
@@ -11,6 +11,23 @@
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+/**
+ * Bots that cannot sign off, by login, with the noreply address GitHub gives each. A commit is
+ * exempt only when the pull request was opened by that bot (`--pr-author`, which GitHub sets
+ * and a contributor cannot) and the commit is authored by that same bot: an author address
+ * is just text in a commit, so on its own it would let anyone skip the sign-off.
+ */
+export const BOTS = {
+  'dependabot[bot]': '49699333+dependabot[bot]@users.noreply.github.com',
+  'github-actions[bot]': '41898282+github-actions[bot]@users.noreply.github.com',
+};
+
+/** The commits a bot's own pull request carries in its own name. */
+export function exempt(list, prAuthor) {
+  const bot = Object.hasOwn(BOTS, prAuthor ?? '') ? BOTS[prAuthor] : undefined;
+  return bot ? list.filter((c) => c.email.toLowerCase() === bot) : [];
+}
 
 /** A sign-off line: a name, then an address in angle brackets, as `git commit -s` writes. */
 const SIGN_OFF = /^[ \t]*Signed-off-by:[ \t]*(\S.*?)[ \t]*<([^<>\s]+@[^<>\s]+)>[ \t]*$/gim;
@@ -42,9 +59,12 @@ export function commits(base, head, cwd = process.cwd()) {
  * Everything missing, as sentences. A sign-off has to be the commit author's own: a line
  * naming somebody else certifies nothing about the person who wrote the patch.
  */
-export function problems(list) {
+export function problems(list, prAuthor) {
   const found = [];
-  for (const { sha, email, subject, message } of list) {
+  const skip = new Set(exempt(list, prAuthor));
+  for (const commit of list) {
+    if (skip.has(commit)) continue;
+    const { sha, email, subject, message } = commit;
     const short = sha.slice(0, 8);
     const signers = [...message.matchAll(SIGN_OFF)].map((match) => match[2].toLowerCase());
     if (!signers.length) found.push(`${short} has no Signed-off-by line: ${subject}`);
@@ -75,18 +95,28 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const [base, head] = args.filter((arg) => !arg.startsWith('--'));
   if (!base || !head) {
     console.error(
-      'usage: node scripts/dco.mjs <base-ref> <head-ref> [--base-name=<name>] [--json]',
+      'usage: node scripts/dco.mjs <base-ref> <head-ref> [--base-name=<name>] [--pr-author=<login>] [--json]',
     );
     process.exit(2);
   }
   const list = commits(base, head);
-  const found = problems(list);
+  const prAuthor = args.find((arg) => arg.startsWith('--pr-author='))?.slice(12);
+  const bots = exempt(list, prAuthor);
+  const found = problems(list, prAuthor);
   // The ref CI fetched is not a name anyone can rebase onto; this says what to print.
   const named = args.find((arg) => arg.startsWith('--base-name='))?.slice(12) || base;
   if (args.includes('--json')) {
-    console.log(JSON.stringify({ commits: list.map((c) => c.sha), problems: found }, null, 2));
+    console.log(
+      JSON.stringify(
+        { commits: list.map((c) => c.sha), exempt: bots.map((c) => c.sha), problems: found },
+        null,
+        2,
+      ),
+    );
   } else {
     console.log(`${list.length} commits on ${head} since ${named}`);
+    for (const c of bots)
+      console.log(`  · ${c.sha.slice(0, 8)} authored by ${prAuthor}, exempt: ${c.subject}`);
     for (const line of found) console.log(`  ✗ ${line}`);
     console.log(found.length ? `\n${howToFix(named)}` : 'every commit is signed off');
   }

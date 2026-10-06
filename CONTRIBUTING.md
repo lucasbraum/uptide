@@ -45,6 +45,25 @@ Other suites, when your change touches them:
 - `docs/architecture.md` and `docs/decisions/` explain why things are the way they are.
   Read the decision that covers the area you are changing.
 
+## Fixtures are pinned on purpose
+
+`fixtures/` is test data: repositories at old, sometimes vulnerable, versions, because that
+is what Uptide upgrades. Dependabot leaves it alone (`exclude-paths` in
+`.github/dependabot.yml`), for version and security updates alike. GitHub still raises
+Dependabot alerts for those manifests; dismiss them as “Vulnerable code is not actually used”.
+Never update a fixture to silence an alert: a fixture changes only together with the tests
+that rely on it.
+
+CI's private-material check scans for private identifiers from the `UPTIDE_PRIVATE_DENYLIST`
+secret. GitHub gives Dependabot's pull requests no repository secrets, and this one is
+deliberately **not** added to the Dependabot secrets: a dependency bump is exactly the code
+nobody has reviewed yet, and dependency code runs in that job before the check (the linter
+from `node_modules`, and install scripts if they are ever enabled) and can reach the steps after
+it (`$GITHUB_ENV`), so it could read the list. On a pull request opened by `dependabot[bot]`
+the identifier scan is skipped with a notice; document names are still checked, and the merge
+to `main` is scanned with the secret. Any other pull request from this repository without the
+secret fails.
+
 ## How packs work
 
 A migration pack (`packages/core/src/packs/<dependency>/`) owns the knowledge of one
@@ -124,7 +143,9 @@ git push --force-with-lease
 ```
 
 The `DCO` workflow checks every commit in the pull request and names the ones that are
-missing it, with that command in the failure message.
+missing it, with that command in the failure message. Bots that cannot sign off
+(`dependabot[bot]`, `github-actions[bot]`) are exempt for the commits they author in the pull
+requests they open; a person's commit pushed to such a pull request still needs the line.
 
 By contributing you agree that your contribution is licensed under the
 [Apache License, Version 2.0](LICENSE), the same license Uptide is released under: what
