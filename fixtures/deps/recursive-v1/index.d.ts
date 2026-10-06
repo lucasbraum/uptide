@@ -23,6 +23,7 @@ declare namespace logkit {
     level?: string;
   }
   export const levels: { info: number };
+  export const stdTimeFunctions: { epochTime: () => string; isoTime: () => string };
   export namespace ping {
     export import other = pong;
     export const name: 'ping';
@@ -35,6 +36,7 @@ declare namespace logkit {
   export function logkit(options?: Options): Logger;
   export namespace logkit {
     export const levels: { info: number };
+    export const stdTimeFunctions: { epochTime: () => string; isoTime: () => string };
   }
 }
 declare function logkit(options?: logkit.Options): logkit.Logger;

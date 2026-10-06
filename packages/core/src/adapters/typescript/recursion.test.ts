@@ -48,19 +48,39 @@ it('extracts self-referencing and mutually recursive declarations, cutting each 
   expect(v2.symbols.find((s) => s.path === 'logkit.Tree#children')?.signature).toBe('Tree[]');
 });
 
-it('diffs through a cut by what it stands for: only the real changes remain', async () => {
+it('diffs through a cut by what it stands for: name qualification hidden, type changes kept', async () => {
   for (const assignability of [false, true]) {
     const { changes } = await diffDirs(logkit(1), logkit(2), {
       adapter,
       cache: memoryCache(),
       assignability,
     });
-    // v1's nested `logkit.logkit` (with its own `levels`) is v2's `logkit` itself: neither
-    // `logkit.logkit` nor `logkit.logkit.levels` changed, though v2 never walks into them.
+    // v1's nested `logkit.logkit` (with its own `levels`) is v2's `logkit` itself: unchanged
+    // members do not diff, though v2 never walks into `logkit.logkit`.
     expect(changes.map((c) => `${c.kind} ${c.path}`)).toEqual([
+      'signature logkit',
       'removed logkit.Logger#parent',
       'added logkit.Options#timestamp',
+      'added logkit.Settings',
+      'added logkit.Settings#level',
       'added logkit.default',
+      'signature logkit.logkit',
+      'signature logkit.logkit.stdTimeFunctions#epochTime',
+      'signature logkit.stdTimeFunctions#epochTime',
+    ]);
+    // A real change reachable only through the cut is reported with both real types: the cut
+    // drops `logkit.` qualification, never a type.
+    const through = (path: string) => {
+      const c = changes.find((x) => x.path === path);
+      return [c?.before, c?.after].map((t) => t?.replace(/<[^>]*>/g, ''));
+    };
+    expect(through('logkit.logkit')).toEqual([
+      '(options?: Options): Logger',
+      '(options?: Settings): Logger',
+    ]);
+    expect(through('logkit.logkit.stdTimeFunctions#epochTime')).toEqual([
+      '() => string',
+      '() => number',
     ]);
   }
 });
