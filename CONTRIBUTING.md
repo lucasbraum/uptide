@@ -54,6 +54,16 @@ Dependabot alerts for those manifests; dismiss them as “Vulnerable code is not
 Never update a fixture to silence an alert: a fixture changes only together with the tests
 that rely on it.
 
+CI's private-material check scans for private identifiers from the `UPTIDE_PRIVATE_DENYLIST`
+secret. GitHub gives Dependabot's pull requests no repository secrets, and this one is
+deliberately **not** added to the Dependabot secrets: a dependency bump is exactly the code
+nobody has reviewed yet, and dependency code runs in that job before the check (the linter
+from `node_modules`, and install scripts if they are ever enabled) and can reach the steps after
+it (`$GITHUB_ENV`), so it could read the list. On a pull request opened by `dependabot[bot]`
+the identifier scan is skipped with a notice; document names are still checked, and the merge
+to `main` is scanned with the secret. Any other pull request from this repository without the
+secret fails.
+
 ## How packs work
 
 A migration pack (`packages/core/src/packs/<dependency>/`) owns the knowledge of one
