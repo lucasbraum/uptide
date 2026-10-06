@@ -1,0 +1,16 @@
+[
+  {
+    "repo": "supabase/supabase",
+    "commit": "53a637a359ece4777e699292b3bb83421f1d63ad",
+    "manager": "pnpm",
+    "commands": ["list"],
+    "why": "large pnpm monorepo (28 workspaces): packages at different versions per workspace, long scoped names, compilers imported by scripts"
+  },
+  {
+    "repo": "documenso/documenso",
+    "commit": "80823ede73a5889753c341f2a5a22d1459cd99b7",
+    "manager": "npm",
+    "commands": ["check pino"],
+    "why": "recursive declarations in pino's types overflowed the stack (uptide-dev/uptide#4, #31)"
+  }
+]

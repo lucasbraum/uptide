@@ -19,7 +19,8 @@ Decision records in `docs/decisions/`: [ts-morph over the compiler API](decision
   `src/adapters/typescript/`. Everything else operates only on `ApiSurface` and `Change`.
 - `packages/cli` (published as `uptide`, engine bundled in): thin shell over the engine. One command: `uptide diff`.
 - `fixtures/`: real package pairs (`pairs.json`) and a hand-written synthetic package used
-  by adapter tests.
+  by adapter tests. `corpus.json` lists public repositories, each at a pinned commit, that
+  uptide is validated against by hand (what each one exercises, and with which command).
 
 ## Pipeline
 
