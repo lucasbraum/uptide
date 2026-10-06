@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { parse } from 'ini';
-import { workspacePackagesOf } from '../workspaces.js';
+import { workspacePackagesOrRoot } from '../workspaces.js';
 
 export const DEFAULT_REGISTRY = 'https://registry.npmjs.org';
 export interface RegistryConfig {
@@ -80,7 +80,7 @@ function projectRoot(cwd: string): string {
       try {
         if (
           JSON.parse(readIfExists(join(dir, 'package.json'))).workspaces &&
-          workspacePackagesOf(dir).includes(relative(dir, nearest).replaceAll('\\', '/') || '.')
+          workspacePackagesOrRoot(dir).includes(relative(dir, nearest).replaceAll('\\', '/') || '.')
         )
           return dir;
       } catch {
@@ -90,7 +90,7 @@ function projectRoot(cwd: string): string {
     if (
       existsSync(join(dir, 'pnpm-workspace.yaml')) &&
       (!nearest ||
-        workspacePackagesOf(dir).includes(relative(dir, nearest).replaceAll('\\', '/') || '.'))
+        workspacePackagesOrRoot(dir).includes(relative(dir, nearest).replaceAll('\\', '/') || '.'))
     )
       return dir;
     if (dirname(dir) === dir) return nearest ?? cwd;

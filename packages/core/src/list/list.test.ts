@@ -333,3 +333,19 @@ it('recognizes package entry scripts and bin paths without confusing similarly n
   ]);
   expect(result.packages.find((p) => p.name === 'setup')?.classification).toBe('possibly-unused');
 });
+
+it.each([
+  ['invalid YAML', "packages: ['packages/*'\n"],
+  ['patterns that match nothing', "packages:\n  - 'libs/*'\n"],
+])('lists a repository below a parent whose pnpm-workspace.yaml has %s', async (_, yaml) => {
+  // Looking upward for the project's .npmrc is a probe: the parent's broken file is not
+  // this repository's, and the child is checked as what it is, a single package.
+  const parent = mkdtempSync(join(tmpdir(), 'uptide-parent-'));
+  roots.push(parent);
+  writeFileSync(join(parent, 'pnpm-workspace.yaml'), yaml);
+  const cwd = join(parent, 'child');
+  mkdirSync(cwd);
+  writeFileSync(join(cwd, 'package.json'), JSON.stringify({ name: 'child', dependencies: {} }));
+  const result = await listDependencies({ cwd, fetcher: { resolve: async () => '1.0.0' } });
+  expect(result.workspaces).toEqual(['.']);
+});
