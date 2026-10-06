@@ -19,6 +19,22 @@ it.each([['npm-array'], ['yarn-object']])('reads package.json "workspaces" as %s
   expect(workspacePackagesOf(at(form))).toEqual(['.', 'apps/web', 'packages/core']);
 });
 
+it('finds packages named like build output: packages/build, packages/dist, tools/out', () => {
+  expect(workspacePackagesOf(at('pnpm-build-names'))).toEqual([
+    '.',
+    'packages/build',
+    'packages/core',
+    'packages/dist',
+    'tools/out',
+  ]);
+});
+
+it('does not walk ** into node_modules or build output, though a build-named package matches', () => {
+  // packages/a/node_modules/dep, packages/a/dist/bundle and packages/build/fixtures/inner all
+  // have a package.json; only what is reached without entering those directories counts.
+  expect(workspacePackagesOf(at('pnpm-globstar'))).toEqual(['.', 'packages/a', 'packages/build']);
+});
+
 it('a pnpm-workspace.yaml that names only the root is a single-package repository, not an error', () => {
   expect(workspacePackagesOf(at('pnpm-root-only'))).toEqual(['.']);
 });
@@ -45,7 +61,7 @@ function repo(yaml: string, dirs: string[]): string {
   return root;
 }
 
-it('walks past node_modules, dot-directories and build output, but takes an exact path as written', () => {
+it('never matches node_modules, and matches but does not walk into dot-directories and build output', () => {
   const root = repo('packages: ["**", "tools/build"]\n', [
     'packages/a',
     'packages/a/node_modules/dep',
@@ -55,7 +71,7 @@ it('walks past node_modules, dot-directories and build output, but takes an exac
     'packages/.hidden',
     'tools/build',
   ]);
-  expect(workspacePackagesOf(root)).toEqual(['.', 'packages/a', 'tools/build']);
+  expect(workspacePackagesOf(root)).toEqual(['.', 'packages/.hidden', 'packages/a', 'tools/build']);
 });
 
 it('is an error for a workspace file that is not YAML, and the root alone for a probe', () => {

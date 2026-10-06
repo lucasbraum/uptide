@@ -63,8 +63,10 @@ export function globRegExp(glob: string): RegExp {
   return new RegExp(`^${re}$`);
 }
 
-/** Never a workspace package, and often huge: not descended into by a wildcard. */
-const SKIPPED = new Set(['node_modules', 'dist', 'build', 'coverage', 'out', 'bower_components']);
+/** Installed dependencies: never a workspace package (pnpm ignores them too), never walked. */
+const INSTALLED = new Set(['node_modules', 'bower_components']);
+/** Usually build output: a match when a pattern names one (`packages/build`), but not walked into. */
+const NOT_WALKED = new Set(['dist', 'build', 'coverage', 'out']);
 
 /**
  * The directories holding a package.json that one pattern matches. Only the pattern's static
@@ -87,10 +89,10 @@ function matchingDirs(root: string, pattern: string): string[] {
       return; // a missing or unreadable prefix matches nothing
     }
     for (const entry of entries) {
-      if (!entry.isDirectory() || entry.name.startsWith('.') || SKIPPED.has(entry.name)) continue;
+      if (!entry.isDirectory() || INSTALLED.has(entry.name)) continue;
       const dir = rel ? `${rel}/${entry.name}` : entry.name;
       if (re.test(dir) && existsSync(join(root, dir, 'package.json'))) found.push(dir);
-      walk(dir, depth - 1);
+      if (!entry.name.startsWith('.') && !NOT_WALKED.has(entry.name)) walk(dir, depth - 1);
     }
   };
   walk(
