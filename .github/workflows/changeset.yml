@@ -1,0 +1,35 @@
+name: Changeset
+
+# A pull request that changes packages/** carries a changeset, or the `no-changeset` label.
+# Dependabot and the release app (its Version Packages pull request consumes changesets)
+# are exempt, by the opener GitHub records. See scripts/changeset-required.mjs.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  changeset:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: packages/** changes come with a changeset
+        # Values from the event go through the environment, never into the script source.
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: |
+          git fetch --no-tags origin \
+            "+refs/pull/${PR_NUMBER}/head:refs/uptide/pr-head" \
+            "+refs/heads/${BASE_REF}:refs/uptide/base"
+          node scripts/changeset-required.mjs refs/uptide/base refs/uptide/pr-head

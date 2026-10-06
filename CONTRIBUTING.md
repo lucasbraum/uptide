@@ -62,7 +62,9 @@ from `node_modules`, and install scripts if they are ever enabled) and can reach
 it (`$GITHUB_ENV`), so it could read the list. On a pull request opened by `dependabot[bot]`
 the identifier scan is skipped with a notice; document names are still checked, and the merge
 to `main` is scanned with the secret. Any other pull request from this repository without the
-secret fails.
+secret fails. The release app's Version Packages pull request gets the secret like any other
+from this repository, so it is scanned in full. Which scan runs when:
+`scripts/private-material.mjs`.
 
 ## How packs work
 
@@ -111,10 +113,26 @@ one is not merged, whatever else it does.
 - Ask in an issue before adding a dependency.
 - Keep the README honest: if behavior changes, the README changes in the same pull request
   (`packages/cli/src/readme.test.ts` checks its flags and examples against the CLI).
-- Add a changeset for anything a user would notice: `pnpm changeset`.
+- Add a changeset for anything a user would notice: `pnpm changeset`. The **Changeset**
+  check fails a pull request that changes `packages/**` without one; when nothing a user
+  would notice changed (tests, an internal refactor), add the `no-changeset` label instead.
 - `pnpm lint && pnpm typecheck && pnpm test` pass before you ask for review.
 - Commit messages follow `type(scope): what changed`, as in `git log`, and every commit is
   signed off (see below).
+
+## How releases work
+
+You do not release anything by hand. Every push to `main` runs the **Release** workflow:
+
+- while changesets are pending, it keeps a **Version Packages** pull request open (the next
+  version and its CHANGELOG entry) and publishes a snapshot of `main` under the `next`
+  dist-tag (`npx uptide@next`);
+- merging the Version Packages pull request publishes that version under `latest`, with npm
+  provenance, after the full test suite, the packed-CLI smoke test and the tarball checks,
+  then tags it and creates its GitHub Release from the CHANGELOG.
+
+Your part is the changeset in your pull request. The details, the emergency dry run and the
+one-time setup are in [docs/releasing.md](docs/releasing.md).
 
 ## Sign off your commits (DCO)
 
@@ -144,8 +162,10 @@ git push --force-with-lease
 
 The `DCO` workflow checks every commit in the pull request and names the ones that are
 missing it, with that command in the failure message. Bots that cannot sign off
-(`dependabot[bot]`, `github-actions[bot]`) are exempt for the commits they author in the pull
-requests they open; a person's commit pushed to such a pull request still needs the line.
+(`dependabot[bot]`, `github-actions[bot]`, and `uptide-release[bot]`, the app that opens the
+Version Packages pull request; see `scripts/bots.mjs`) are exempt for the commits they author
+in the pull requests they open; a person's commit pushed to such a pull request still needs
+the line.
 
 By contributing you agree that your contribution is licensed under the
 [Apache License, Version 2.0](LICENSE), the same license Uptide is released under: what

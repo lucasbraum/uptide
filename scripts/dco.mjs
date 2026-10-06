@@ -11,22 +11,23 @@
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { BOTS } from './bots.mjs';
 
 /**
- * Bots that cannot sign off, by login, with the noreply address GitHub gives each. A commit is
- * exempt only when the pull request was opened by that bot (`--pr-author`, which GitHub sets
- * and a contributor cannot) and the commit is authored by that same bot: an author address
- * is just text in a commit, so on its own it would let anyone skip the sign-off.
+ * Bots that cannot sign off, by login, with the noreply address GitHub gives each
+ * (scripts/bots.mjs). A commit is exempt only when the pull request was opened by that bot
+ * (`--pr-author`, which GitHub sets and a contributor cannot) and the commit is authored by
+ * that same bot: an author address is just text in a commit, so on its own it would let
+ * anyone skip the sign-off.
  */
-export const BOTS = {
-  'dependabot[bot]': '49699333+dependabot[bot]@users.noreply.github.com',
-  'github-actions[bot]': '41898282+github-actions[bot]@users.noreply.github.com',
-};
+export { BOTS };
 
 /** The commits a bot's own pull request carries in its own name. */
 export function exempt(list, prAuthor) {
   const bot = Object.hasOwn(BOTS, prAuthor ?? '') ? BOTS[prAuthor] : undefined;
-  return bot ? list.filter((c) => c.email.toLowerCase() === bot) : [];
+  if (!bot) return [];
+  const own = (email) => (bot instanceof RegExp ? bot.test(email) : email === bot);
+  return list.filter((c) => own(c.email.toLowerCase()));
 }
 
 /** A sign-off line: a name, then an address in angle brackets, as `git commit -s` writes. */
