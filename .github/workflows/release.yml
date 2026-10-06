@@ -183,6 +183,7 @@ jobs:
         run: node scripts/check-build-stamp.mjs
       # Only the CLI is published: the engine is bundled into it. `changeset publish` is
       # deliberately not used, it would publish every public workspace package.
+      # An absolute path: npm reads a relative `dir/file.tgz` as a GitHub `owner/repo`.
       - name: Pack the CLI
         id: pack
         run: |

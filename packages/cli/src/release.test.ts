@@ -103,6 +103,10 @@ describe('the Release workflow', () => {
     expect(publish.if).toBe("${{ needs.plan.outputs.channel != '' }}");
     expect(publish.permissions).toEqual({ contents: 'read', 'id-token': 'write' });
     expect(publish.env?.UPTIDE_BUILD_CLEAN).toBe('1');
+    // The tarball path is absolute: npm reads a relative `dir/file.tgz` as `owner/repo` on GitHub.
+    expect(publish.steps[runs(publish, 'pnpm --filter uptide pack')]?.run).toContain(
+      'echo "tarball=$(ls "$RUNNER_TEMP"/pack/uptide-*.tgz)"',
+    );
     const step = publish.steps[runs(publish, 'npm publish')];
     expect(step?.run).toContain(
       'npm publish "$TARBALL" --tag "$CHANNEL" --access public --provenance',
