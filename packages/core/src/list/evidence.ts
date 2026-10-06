@@ -49,6 +49,24 @@ export const knownTool = (name: string): boolean =>
     '@nestjs/schematics',
   ].includes(name);
 
+const COMPILER = 'compiler major: check build and tsconfig';
+const BUNDLER = 'bundler major: check build config';
+/**
+ * Compilers and bundlers are tooling even when a script imports them (`import ts from
+ * 'typescript'` in a codegen script), and a new major of one is worth a look at the build.
+ */
+export const BUILD_TOOLS: Record<string, string> = {
+  typescript: COMPILER,
+  '@swc/core': COMPILER,
+  esbuild: COMPILER,
+  '@babel/core': COMPILER,
+  vite: BUNDLER,
+  webpack: BUNDLER,
+};
+/** Why a major on this build tool needs a look, or undefined. */
+export const buildToolMajor = (p: { name: string; change: string }): string | undefined =>
+  p.change === 'major' ? BUILD_TOOLS[p.name] : undefined;
+
 /** Match whole package/bin tokens, including subpaths, without matching e.g. foo in foo-bar. */
 export function mentions(text: string, token: string): boolean {
   const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -64,7 +82,7 @@ export function toolingReasons(
   tasks: TaskCommands[] = [],
 ): string[] {
   const reasons: string[] = [];
-  if (knownTool(name)) reasons.push('known configuration or build tool');
+  if (knownTool(name) || BUILD_TOOLS[name]) reasons.push('known configuration or build tool');
   const bins = metadata.flatMap((m) =>
     typeof m.bin === 'string'
       ? [(m.name ?? name).split('/').at(-1) as string]

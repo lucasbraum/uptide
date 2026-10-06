@@ -80,7 +80,7 @@ export { x } from 'reexport';
   expect(scan.get('reexport')?.files).toEqual(['other.cts']);
 });
 
-it('deduplicates names across workspaces, skips internal names and keeps distinct current versions', async () => {
+it('deduplicates names across workspaces, skips internal names and keeps one row per package', async () => {
   const cwd = fixture();
   mkdirSync(join(cwd, 'packages/a'), { recursive: true });
   writeFileSync(
@@ -100,8 +100,18 @@ it('deduplicates names across workspaces, skips internal names and keeps distinc
   const result = await listDependencies({ cwd, fetcher: { resolve } });
   expect(resolve).toHaveBeenCalledTimes(1);
   expect(result.failures).toEqual([]);
-  expect(result.packages.map((p) => p.current)).toEqual(['3.24.0', '3.25.76']);
+  expect(result.packages).toHaveLength(1);
+  expect(result.packages[0]).toMatchObject({
+    current: '3.24.0',
+    versions: [
+      { version: '3.24.0', workspaces: ['packages/a'] },
+      { version: '3.25.76', workspaces: ['.'] },
+    ],
+    workspaces: ['.', 'packages/a'],
+  });
   expect(result.packages[0]?.usage.workspaces).toEqual(['.', 'packages/a']);
+  // Same major everywhere: no drift.
+  expect(result.packages[0]?.signals?.drift).toBeUndefined();
 });
 
 const nestRoot = new URL('../../../../fixtures/repos/nest-discovery/', import.meta.url);
@@ -354,4 +364,42 @@ it.each([
   writeFileSync(join(cwd, 'package.json'), JSON.stringify({ name: 'child', dependencies: {} }));
   const result = await listDependencies({ cwd, fetcher: { resolve: async () => '1.0.0' } });
   expect(result.workspaces).toEqual(['.']);
+});
+
+it('flags majors that drift across workspaces, and keeps an imported compiler as tooling', async () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'uptide-discovery-'));
+  roots.push(cwd);
+  const write = (path: string, content: unknown): void => {
+    mkdirSync(join(cwd, path, '..'), { recursive: true });
+    writeFileSync(join(cwd, path), typeof content === 'string' ? content : JSON.stringify(content));
+  };
+  write('package.json', { name: 'root', workspaces: ['apps/*'] });
+  write('apps/a/package.json', {
+    name: 'a',
+    dependencies: { ai: '5.0.52' },
+    devDependencies: { typescript: '5.9.3' },
+  });
+  write('apps/b/package.json', { name: 'b', dependencies: { ai: '7.0.59' } });
+  write('apps/c/package.json', { name: 'c', dependencies: { ai: '7.0.59' } });
+  write('apps/a/use.ts', "import { generateText } from 'ai'; generateText();");
+  write('apps/b/use.ts', "import { generateText } from 'ai'; generateText();");
+  write('apps/a/scripts/codegen.ts', "import ts from 'typescript'; ts.createProgram([], {});");
+  const latest: Record<string, string> = { ai: '7.0.128', typescript: '6.0.2' };
+  const result = await listDependencies({
+    cwd,
+    fetcher: { resolve: async (name) => latest[name] as string },
+  });
+  const ai = result.packages.find((p) => p.name === 'ai');
+  expect(result.packages.filter((p) => p.name === 'ai')).toHaveLength(1);
+  expect(ai).toMatchObject({ current: '5.0.52', majorGap: 2, usage: { files: 2, callSites: 2 } });
+  expect(ai?.signals?.drift).toEqual({ majors: [5, 7], workspaces: 3 });
+  expect(result.priorities?.find((p) => p.name === 'ai')).toMatchObject({
+    signal: 'drift',
+    tier: 'planning',
+    reason: 'version drift: 5.x and 7.x across 3 workspaces',
+  });
+  expect(result.packages.find((p) => p.name === 'typescript')).toMatchObject({
+    classification: 'tooling',
+    usage: { files: 1 },
+  });
 });

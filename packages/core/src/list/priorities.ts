@@ -12,10 +12,17 @@ export const URGENCY = {
   security: 5,
   deprecated: 4,
   unsupported: 3,
+  drift: 2.5,
   blocking: 2,
   behind: 1,
 } as const;
 export type Signal = keyof typeof URGENCY;
+/**
+ * PRIORITIES shows two tiers: `urgent` (an advisory, a deprecation) to act on now, and
+ * `planning` (an unsupported line, version drift, a blocking peer, majors behind).
+ */
+export const tierOfSignal = (signal: Signal): 'urgent' | 'planning' =>
+  signal === 'security' || signal === 'deprecated' ? 'urgent' : 'planning';
 
 const SEVERITIES = ['critical', 'high', 'moderate', 'low'] as const;
 export type Severity = (typeof SEVERITIES)[number];
@@ -42,6 +49,11 @@ export interface PackageSignals {
   deprecated?: string;
   /** The installed major line has had no release since this month (`YYYY-MM`) while a newer major exists. */
   unsupported?: { since: string };
+  /**
+   * Workspaces declare different majors of it (`5.x` and `7.x`): aligning them is a cheap
+   * consolidation win, whatever the latest is.
+   */
+  drift?: { majors: number[]; workspaces: number };
   /** Outdated packages this one's installed peer range holds back (`react 19`). */
   blocks?: string[];
   /** Outdated packages it must move with (a peer link or a shared pin). */
@@ -66,14 +78,24 @@ const stable = (v: string): boolean => {
   return !!parsed && !parsed.pre;
 };
 
-/** Advisories affecting the installed version, their worst severity and the first fixed version. */
+/**
+ * Advisories affecting the installed version, their worst severity and the first fixed
+ * version. With several installed versions (one per workspace), the advisories of any of
+ * them, and the first version above all of them that none covers.
+ */
 export function securitySignal(
-  current: string,
+  installed: string | string[],
   advisories: Advisory[],
   versions: string[],
 ): PackageSignals['security'] {
-  const hits = advisories.filter((a) => inRange(current, a.vulnerable_versions));
+  const currents = [installed].flat();
+  const hits = advisories.filter((a) => currents.some((v) => inRange(v, a.vulnerable_versions)));
   if (!hits.length) return undefined;
+  const affected = currents
+    .filter((v) => hits.some((a) => inRange(v, a.vulnerable_versions)))
+    .sort(compareVersions);
+  const current = affected[0] as string;
+  const highest = currents.sort(compareVersions).at(-1) as string;
   const severity = (a: Advisory): Severity =>
     (SEVERITIES as readonly string[]).includes(a.severity) ? (a.severity as Severity) : 'low';
   const counts: Partial<Record<Severity, number>> = {};
@@ -82,7 +104,7 @@ export function securitySignal(
     .filter(
       (v) =>
         stable(v) &&
-        compareVersions(v, current) > 0 &&
+        compareVersions(v, highest) > 0 &&
         !hits.some((a) => inRange(v, a.vulnerable_versions)),
     )
     .sort(compareVersions)[0];
@@ -163,6 +185,7 @@ export function urgencyOf(s: PackageSignals): { signal: Signal; urgency: number 
     };
   if (s.deprecated) return { signal: 'deprecated', urgency: URGENCY.deprecated };
   if (s.unsupported) return { signal: 'unsupported', urgency: URGENCY.unsupported };
+  if (s.drift) return { signal: 'drift', urgency: URGENCY.drift };
   if (s.blocks?.length || s.movesWith?.length)
     return { signal: 'blocking', urgency: URGENCY.blocking };
   // One major behind is the normal state of an outdated package; two is a signal of its own.
@@ -199,6 +222,10 @@ function signalText(s: PackageSignals, current: string, usageFiles: number): str
       return `deprecated: ${truncate(s.deprecated as string, 60)}`;
     case 'unsupported':
       return `${parseVersion(current)?.major}.x line unsupported since ${s.unsupported?.since}${touch}`;
+    case 'drift': {
+      const majors = (s.drift?.majors ?? []).map((m) => `${m}.x`);
+      return `version drift: ${majors.slice(0, -1).join(', ')} and ${majors.at(-1)} across ${s.drift?.workspaces} workspaces`;
+    }
     case 'blocking':
       return s.blocks?.length
         ? `blocks ${s.blocks.join(', ')}`
@@ -218,6 +245,8 @@ export interface Priority {
   /** The packages the row upgrades. */
   packages: string[];
   signal: Signal;
+  /** `urgent`: an advisory or a deprecation; `planning`: everything else (tierOfSignal). */
+  tier: 'urgent' | 'planning';
   urgency: number;
   effort: number;
   reason: string;
@@ -322,6 +351,7 @@ export function prioritize(
       group: g.id,
       packages: [...new Set(g.members.map((p) => p.name))],
       signal: best.u.signal,
+      tier: tierOfSignal(best.u.signal),
       urgency: best.u.urgency,
       effort: g.members.reduce((n, p) => n + (p.signals?.effort ?? 0), 0),
       // A member other than the lead is named before its reason, after any `dev · `.
@@ -342,6 +372,7 @@ export function prioritize(
       name: p.name,
       packages: [p.name],
       signal: u.signal,
+      tier: tierOfSignal(u.signal),
       urgency: u.urgency,
       effort: p.signals.effort,
       reason: reasonOf(p.signals, p.current, p.usage.files),

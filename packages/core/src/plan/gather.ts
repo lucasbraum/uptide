@@ -3,7 +3,7 @@ import { dirname, join, resolve } from 'node:path';
 import type { CheckOptions, CheckResult } from '../check/check.js';
 import { summarize } from '../check/check.js';
 import { mapWithLimit } from '../check/pool.js';
-import { majorsBehind } from '../check/version.js';
+import { compareVersions, majorsBehind } from '../check/version.js';
 import type { PackageFetcher } from '../domain/io.js';
 import type { CheckReport, PackageReport } from '../domain/report.js';
 import { createNpmFetcher } from '../fetch/npm-fetcher.js';
@@ -32,7 +32,13 @@ export async function upgradePlan(
   const saved = opts.checkResults;
   if (saved && (!Array.isArray(saved.packages) || resolve(saved.repo) !== resolve(opts.cwd)))
     throw new Error('--results must be a check report for this repository');
-  const packages: PackageReport[] = discovery.packages.map((p) => {
+  // A plan row is one installed version: workspaces on different versions upgrade apart.
+  const byVersion = discovery.packages.flatMap((p) =>
+    (p.versions ?? [{ version: p.current, workspaces: p.workspaces }])
+      .filter((v) => compareVersions(p.latest, v.version) > 0)
+      .map((v) => ({ ...p, current: v.version, workspaces: v.workspaces })),
+  );
+  const packages: PackageReport[] = byVersion.map((p) => {
     const existing = saved?.packages.find(
       (s) =>
         s.name === p.name &&
@@ -122,8 +128,8 @@ export async function upgradePlan(
     'Based on discovery and matching saved check results; unknown effort requires uptide check <package>.',
     'Saved results describe the source at check time; rerun check after source changes.',
   ];
-  for (const name of new Set(discovery.packages.map((p) => p.name))) {
-    const versions = discovery.packages.filter((p) => p.name === name);
+  for (const name of new Set(byVersion.map((p) => p.name))) {
+    const versions = byVersion.filter((p) => p.name === name);
     if (versions.length > 1)
       plan.notes.push(
         `${name}: current versions ${versions.map((p) => `${p.current} (${p.workspaces.join(', ')})`).join('; ')}; one target for all, highest estimated effort shown.`,

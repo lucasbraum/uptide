@@ -101,6 +101,7 @@ it('checks a priority at its smallest fix, and says advisories were not checked 
           name: 'moment',
           packages: ['moment'],
           signal: 'security',
+          tier: 'urgent',
           urgency: 5.3,
           effort: 1,
           reason: '2 advisories (2 high), fixed in 2.29.4 (patch, same major)',
@@ -147,7 +148,7 @@ it('prints singular usage, references, major gaps, groups and workspace columns 
   const text = formatList(JSON.parse(JSON.stringify(grouped)));
   expect(text).toMatch(/@nestjs\/\* +2 packages/);
   expect(text.match(/@nestjs\/common +10/g)).toHaveLength(1);
-  expect(text).toMatch(/major ×2 +1 file +1 ref +verified/);
+  expect(text).toMatch(/2 majors behind +1 file +1 ref +verified/);
   expect(text).not.toContain('0 call sites');
   expect(text).not.toContain('notUsed');
   expect(text).not.toContain('src/main.ts');
@@ -221,4 +222,156 @@ it('names each target major when a group reaches several, a family once', () => 
   expect(
     groupVersions(group([member('@nestjs/core', '12.0.0'), member('@nestjs/common', '12.1.0')])),
   ).toBe('→ 12.x');
+  // Two majors of one family would both read `@supabase/*`: the majors alone say more.
+  expect(
+    groupVersions(
+      group([
+        member('@supabase/supabase-js', '2.117.2'),
+        member('@supabase/auth-js', '2.117.2'),
+        member('@supabase/config', '0.11.1'),
+        member('@supabase/sql-to-rest', '0.1.8'),
+      ]),
+    ),
+  ).toBe('→ 2.x · 0.x');
+});
+
+const pkg = (
+  name: string,
+  over: Partial<ListReport['packages'][number]> = {},
+): ListReport['packages'][number] => ({
+  name,
+  current: '1.0.0',
+  latest: '2.0.0',
+  change: 'major',
+  tier: 'generic',
+  classification: 'used',
+  majorGap: 1,
+  reasons: [],
+  workspaces: ['apps/a'],
+  usage: { files: 3, callSites: 4, references: 0, topSymbols: [], workspaces: ['apps/a'] },
+  ...over,
+});
+const monorepo = (packages: ListReport['packages']): ListReport => ({
+  repo: '/repo',
+  groups: [],
+  workspaces: ['apps/a', 'apps/b', 'apps/c'],
+  packages,
+  failures: [],
+  timing: { totalMs: 1 },
+});
+
+it('shows a package installed at several versions once, with where they are', () => {
+  const ai = pkg('ai', {
+    current: '5.0.52',
+    latest: '7.0.128',
+    majorGap: 2,
+    versions: [
+      { version: '5.0.52', workspaces: ['apps/a'] },
+      { version: '7.0.59', workspaces: ['apps/b', 'apps/c'] },
+    ],
+    workspaces: ['apps/a', 'apps/b', 'apps/c'],
+  });
+  const text = formatList(monorepo([ai]), { width: 160 });
+  expect(text.match(/^ {2}ai /gm)).toHaveLength(1);
+  expect(text).toMatch(
+    /ai +5\.0\.52, 7\.0\.59 → 7\.0\.128 +2 majors behind +3 files +4 calls +2 versions in 3 workspaces\n/,
+  );
+  // Too narrow for the last column: the spread goes under the row instead of away.
+  expect(formatList(monorepo([ai]), { width: 64 })).toMatch(
+    /ai +5\.0\.52, 7\.0\.59 → 7\.0\.128 +2 majors behind[^\n]*\n {4}2 versions in 3 workspaces\n/,
+  );
+  const shiki = pkg('shiki', {
+    versions: ['1.6.0', '3.13.0', '4.0.1'].map((version) => ({ version, workspaces: [version] })),
+  });
+  expect(formatList(monorepo([shiki]), { width: 160 })).toContain('1.6.0 … 4.0.1 → 2.0.0');
+});
+
+it('never truncates a name: the row narrows from the right, a name past the cap wraps', () => {
+  const long = '@graphql-codegen/typescript-react-apollo-operations-plugin'; // 58 characters
+  const text = formatList(
+    monorepo([pkg('@graphql-codegen/typescript-operations'), pkg(long), pkg('zod')]),
+    { width: 80 },
+  );
+  expect(text).not.toMatch(/@graphql\S*…/);
+  // The column fits the longest name up to the cap; trailing columns go first.
+  expect(text).toMatch(
+    / {2}@graphql-codegen\/typescript-operations {10}1\.0\.0 → 2\.0\.0 {3}major\n/,
+  );
+  // The long name alone on its line, the row under it at the name column's width.
+  expect(text).toContain(`  ${long}\n${' '.repeat(2 + 45 + 3)}1.0.0 → 2.0.0`);
+});
+
+it('splits priorities into urgent, and worth planning collapsed to its count', () => {
+  const rows: NonNullable<ListReport['priorities']> = [
+    {
+      name: 'lodash',
+      packages: ['lodash'],
+      signal: 'security',
+      tier: 'urgent',
+      urgency: 5.3,
+      effort: 1,
+      reason: '1 advisory (1 high), fixed in 4.18.0 (minor, same major)',
+    },
+    {
+      name: 'request',
+      packages: ['request'],
+      signal: 'deprecated',
+      tier: 'urgent',
+      urgency: 4,
+      effort: 1,
+      reason: 'deprecated: request has been deprecated',
+    },
+    {
+      name: 'ai',
+      packages: ['ai'],
+      signal: 'drift',
+      tier: 'planning',
+      urgency: 2.5,
+      effort: 3,
+      reason: 'version drift: 5.x and 7.x across 3 workspaces',
+    },
+  ];
+  const text = formatList(
+    { ...monorepo([pkg('lodash'), pkg('request'), pkg('ai')]), priorities: rows },
+    { width: 160 },
+  );
+  expect(text).toContain('  Urgent  2 · advisories, deprecations\n    lodash ');
+  expect(text).toContain('    request ');
+  expect(text).toContain(
+    '  Worth planning  1 · unsupported, drift, blocking, majors behind · --all\n',
+  );
+  expect(text).not.toContain('version drift');
+  const all = formatList(
+    { ...monorepo([pkg('lodash'), pkg('request'), pkg('ai')]), priorities: rows },
+    { width: 160, all: true },
+  );
+  expect(all).toMatch(
+    /Worth planning {2}1 · [^\n]*\n {4}ai +version drift: 5\.x and 7\.x across 3 workspaces/,
+  );
+});
+
+it('shows a compiler or bundler major under a collapsed TOOLING, with why', () => {
+  const text = formatList(
+    monorepo([
+      pkg('typescript', {
+        classification: 'tooling',
+        reasons: ['known configuration or build tool'],
+        current: '5.9.0',
+        latest: '6.0.2',
+      }),
+      pkg('esbuild', {
+        classification: 'tooling',
+        reasons: ['known configuration or build tool'],
+        current: '0.25.0',
+        latest: '0.27.0',
+        change: 'minor',
+        majorGap: 0,
+      }),
+    ]),
+    { width: 120 },
+  );
+  expect(text).toMatch(
+    /TOOLING {2}2 packages[^\n]*--all\n {2}typescript +5\.9\.0 → 6\.0\.2 +major[^\n]*\n {4}compiler major: check build and tsconfig\n/,
+  );
+  expect(text).not.toMatch(/^ {2}esbuild/m);
 });

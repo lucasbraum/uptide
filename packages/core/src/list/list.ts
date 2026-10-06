@@ -14,6 +14,7 @@ import { stripePack } from '../packs/stripe/index.js';
 import { zodPack } from '../packs/zod/index.js';
 import type { TaskCommands } from './config.js';
 import {
+  BUILD_TOOLS,
   installedManifest,
   knownTool,
   type Manifest,
@@ -47,7 +48,13 @@ export interface ListedDependency {
   name: string;
   /** The real registry name when the manifest uses an npm alias. */
   registryName?: string;
+  /** The oldest outdated installed version: `change`, `majorGap` and `tier` describe it. */
   current: string;
+  /**
+   * Every installed version, oldest first, when workspaces declare more than one (outdated
+   * or not). One row per package either way.
+   */
+  versions?: { version: string; workspaces: string[] }[];
   latest: string;
   change: 'major' | 'minor' | 'patch';
   tier: Tier;
@@ -62,6 +69,7 @@ export interface ListedDependency {
   reasons: string[];
   /** What makes it worth upgrading first; see priorities.ts. */
   signals?: PackageSignals;
+  /** Workspaces on an outdated version. */
   workspaces: string[];
   usage: {
     files: number;
@@ -470,49 +478,58 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
     .flatMap((name): ListedDependency[] => {
       const latest = latestVersions.get(name);
       if (!latest) return [];
-      return [...(declared.get(name) ?? [])]
-        .filter(([current]) => compareVersions(latest, current) > 0)
-        .map(([current, declaredWorkspaces]) => {
-          const from = parseVersion(current) ?? { major: 0, minor: 0, patch: 0 };
-          const to = parseVersion(latest) ?? { major: 0, minor: 0, patch: 0 };
-          const scanned = usage.get(localName(name));
-          return {
-            name: localName(name),
-            ...(registryName(name) !== localName(name) ? { registryName: registryName(name) } : {}),
-            current,
-            latest,
-            change: to.major > from.major ? 'major' : to.minor > from.minor ? 'minor' : 'patch',
-            majorGap: Math.max(0, to.major - from.major),
-            classification: scanned?.files.length
+      // One row per package: workspaces on different versions are one upgrade, and usage
+      // is counted once across the repo.
+      const all = [...(declared.get(name) ?? [])].sort(([a], [b]) => compareVersions(a, b));
+      const outdated = all.filter(([version]) => compareVersions(latest, version) > 0);
+      if (!outdated.length) return [];
+      const [current] = outdated[0] as [string, string[]];
+      const from = parseVersion(current) ?? { major: 0, minor: 0, patch: 0 };
+      const to = parseVersion(latest) ?? { major: 0, minor: 0, patch: 0 };
+      const scanned = usage.get(localName(name));
+      return [
+        {
+          name: localName(name),
+          ...(registryName(name) !== localName(name) ? { registryName: registryName(name) } : {}),
+          current,
+          ...(all.length > 1
+            ? { versions: all.map(([version, workspaces]) => ({ version, workspaces })) }
+            : {}),
+          latest,
+          change: to.major > from.major ? 'major' : to.minor > from.minor ? 'minor' : 'patch',
+          majorGap: Math.max(0, to.major - from.major),
+          // A compiler or bundler is tooling even when a script imports it.
+          classification:
+            scanned?.files.length && !BUILD_TOOLS[localName(name)]
               ? 'used'
               : reasons.get(name)?.length
                 ? 'tooling'
                 : 'possibly-unused',
-            reasons:
-              !scanned?.files.length && !reasons.get(name)?.length
-                ? [
-                    UNUSED_REASON,
-                    ...(failures.some((f) => f.name === localName(name))
-                      ? ['tooling/peer metadata incomplete; install dependencies and scan again']
-                      : []),
-                  ]
-                : (reasons.get(name) ?? []),
-            tier: tierOf([zodPack, stripePack], localName(name), current, latest),
-            workspaces: declaredWorkspaces,
-            usage: {
-              files: scanned?.files.length ?? 0,
-              callSites: scanned?.callSites ?? 0,
-              references: scanned?.references ?? 0,
-              ...(opts.details ? { fileList: scanned?.files ?? [] } : {}),
-              workspaces: scanned?.workspaces.sort() ?? [],
-              topSymbols: Object.entries(scanned?.symbols ?? {})
-                .filter(([, count]) => count > 0)
-                .sort(([a, ac], [b, bc]) => bc - ac || compareText(a, b))
-                .slice(0, 5)
-                .map(([name, count]) => ({ name, count })),
-            },
-          };
-        });
+          reasons:
+            !scanned?.files.length && !reasons.get(name)?.length
+              ? [
+                  UNUSED_REASON,
+                  ...(failures.some((f) => f.name === localName(name))
+                    ? ['tooling/peer metadata incomplete; install dependencies and scan again']
+                    : []),
+                ]
+              : (reasons.get(name) ?? []),
+          tier: tierOf([zodPack, stripePack], localName(name), current, latest),
+          workspaces: [...new Set(outdated.flatMap(([, w]) => w))].sort(),
+          usage: {
+            files: scanned?.files.length ?? 0,
+            callSites: scanned?.callSites ?? 0,
+            references: scanned?.references ?? 0,
+            ...(opts.details ? { fileList: scanned?.files ?? [] } : {}),
+            workspaces: scanned?.workspaces.sort() ?? [],
+            topSymbols: Object.entries(scanned?.symbols ?? {})
+              .filter(([, count]) => count > 0)
+              .sort(([a, ac], [b, bc]) => bc - ac || compareText(a, b))
+              .slice(0, 5)
+              .map(([name, count]) => ({ name, count })),
+          },
+        },
+      ];
     });
   packages.sort(
     (a, b) =>
@@ -552,12 +569,17 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
     const together = groups.find(
       (g) => g.reason && !g.reason.endsWith(' family') && g.members.includes(p),
     );
+    const installed = p.versions?.map((v) => v.version) ?? [p.current];
+    const outdated = installed.filter((v) => compareVersions(p.latest, v) > 0);
     const security = securitySignal(
-      p.current,
+      outdated,
       advisories[p.registryName ?? p.name] ?? [],
       allVersions.get(key) ?? [],
     );
-    const deprecated = deprecatedSignal(deprecations.get(JSON.stringify([key, p.current])));
+    const deprecated = deprecatedSignal(
+      outdated.map((v) => deprecations.get(JSON.stringify([key, v]))).find(Boolean),
+    );
+    const majors = [...new Set(installed.map((v) => parseVersion(v)?.major ?? 0))];
     const time = published.get(key);
     const unsupported = time ? unsupportedSignal(p.current, p.latest, time, now) : undefined;
     p.kind =
@@ -568,6 +590,14 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
       ...(security ? { security } : {}),
       ...(deprecated ? { deprecated } : {}),
       ...(unsupported ? { unsupported } : {}),
+      ...(majors.length > 1
+        ? {
+            drift: {
+              majors,
+              workspaces: new Set(p.versions?.flatMap((v) => v.workspaces)).size,
+            },
+          }
+        : {}),
       ...(blocks.get(p.name)?.length ? { blocks: blocks.get(p.name) } : {}),
       ...(together
         ? {

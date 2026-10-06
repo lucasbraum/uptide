@@ -14,7 +14,12 @@ export interface Cell {
   span?: 'rest';
   alignAt?: string;
 }
-/** Measure plain text before styling. Narrow terminals sacrifice trailing columns before wrapping. */
+/** Names wider than this wrap: the name alone on its line, the rest of the row under it. */
+export const NAME_CAP = 45;
+/**
+ * Measure plain text before styling. The first column is a name and is never truncated:
+ * narrow terminals sacrifice trailing columns, then shorten the second.
+ */
 export function alignedRows(rows: Cell[][], width: number, color: boolean, indent = 0): string[] {
   const colors = pc.createColors(color);
   rows = rows.map((row) =>
@@ -37,16 +42,23 @@ export function alignedRows(rows: Cell[][], width: number, color: boolean, inden
   while (lengths.at(-1) === 0) lengths.pop();
   const total = (): number =>
     lengths.reduce((a, b) => a + b, 0) + Math.max(0, lengths.length - 1) * 3 + indent;
-  if (lengths[0]) lengths[0] = Math.max(12, lengths[0] - Math.max(0, total() - width));
+  if (lengths[0]) lengths[0] = Math.min(NAME_CAP, Math.max(12, lengths[0]));
   while (total() > width && lengths.length > 2) lengths.pop();
-  if (lengths[0]) lengths[0] = Math.max(1, lengths[0] - Math.max(0, total() - width));
   if (total() > width && lengths[1]) lengths[1] = Math.max(1, lengths[1] - (total() - width));
   return rows.map((row) => {
     const cells: string[] = [];
     let consumed = indent;
+    let wrapped = '';
     for (const [i, length] of lengths.entries()) {
       const cell = row[i];
       const available = cell?.span ? width - consumed : length;
+      if (i === 0 && cell && textWidth(cell.text) > length) {
+        // A name past the cap gets its own line; the row continues under it.
+        wrapped = `${' '.repeat(indent)}${cell.tone ? colors[cell.tone](cell.text) : cell.text}\n`;
+        cells.push(' '.repeat(length));
+        consumed += length + 3;
+        continue;
+      }
       const text = ellipsis(cell?.text ?? '', Math.max(1, available));
       const styled = cell?.tone ? colors[cell.tone](text) : text;
       cells.push(
@@ -58,7 +70,7 @@ export function alignedRows(rows: Cell[][], width: number, color: boolean, inden
       consumed += length + 3;
       if (cell?.span) break;
     }
-    return (' '.repeat(indent) + cells.join('   ')).trimEnd();
+    return wrapped + (' '.repeat(indent) + cells.join('   ')).trimEnd();
   });
 }
 export const terminalHeader = (
