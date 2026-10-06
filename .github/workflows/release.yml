@@ -41,11 +41,11 @@ jobs:
         run: |
           echo "::error::next is published only from main."
           exit 1
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: The version matches the committed CLI manifest
         run: node scripts/check-release-version.mjs
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
