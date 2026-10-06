@@ -1,8 +1,14 @@
-import type { ListedDependency, ListGroup, ListReport, Priority } from '@uptide/core';
+import {
+  buildToolMajor,
+  type ListedDependency,
+  type ListGroup,
+  type ListReport,
+  type Priority,
+} from '@uptide/core';
 import pc from 'picocolors';
 import type { CheckHeader } from './format-check.js';
 import { INVOCATION } from './invocation.js';
-import { alignedRows, type Cell, ellipsis, terminalHeader } from './terminal.js';
+import { alignedRows, type Cell, ellipsis, terminalHeader, textWidth } from './terminal.js';
 
 export interface FormatListOptions {
   all?: boolean;
@@ -22,7 +28,21 @@ const dependencyKey = (p: ListedDependency): string =>
 export const listCommand = (packages: ListedDependency[], opts: FormatListOptions): string =>
   `${opts.invocation ?? INVOCATION} check ${[...new Set(packages.map((p) => p.name))].map(quote).join(' ')}${opts.cwd ? ` --cwd ${quote(opts.cwd)}` : ''}`;
 export const listChange = (p: ListedDependency): string =>
-  p.majorGap > 1 ? `major ×${p.majorGap}` : p.change;
+  p.majorGap > 1 ? `${p.majorGap} majors behind` : p.change;
+/**
+ * `5.0.52, 7.0.59 → 7.0.128`: the outdated installed versions, then the latest; past two,
+ * the oldest and newest (`1.6.0 … 4.2.0`), the spread saying how many.
+ */
+export const listVersions = (p: ListedDependency): string => {
+  const outdated = p.versions?.map((v) => v.version).filter((v) => v !== p.latest) ?? [p.current];
+  const shown = outdated.length > 2 ? `${outdated[0]} … ${outdated.at(-1)}` : outdated.join(', ');
+  return `${shown} → ${p.latest}`;
+};
+/** `2 versions in 3 workspaces`, when workspaces disagree on the installed version. */
+export const listSpread = (p: ListedDependency): string =>
+  p.versions
+    ? `${p.versions.length} versions in ${plural(new Set(p.versions.flatMap((v) => v.workspaces)).size, 'workspace')}`
+    : '';
 export const groupCommand = (group: ListGroup, opts: FormatListOptions): string =>
   `${opts.invocation ?? INVOCATION} check --group ${quote(group.id)}${opts.cwd ? ` --cwd ${quote(opts.cwd)}` : ''}`;
 /** The command that starts on a priority: its group or package, at its smallest fix when it has one. */
@@ -75,10 +95,14 @@ export function groupVersions(group: ListGroup): string {
       ? `${scope}/*`
       : names.join(', ');
   };
-  return `→ ${[...byMajor]
-    .sort(([a], [b]) => b - a)
-    .map(([major, names]) => `${label(names)} ${major}`)
-    .join(' · ')}`;
+  const majors = [...byMajor].sort(([a], [b]) => b - a);
+  const labels = majors.map(([, names]) => label(names));
+  const named = majors.map(([major], i) => `${labels[i]} ${major}`).join(' · ');
+  // Names say what reaches each major, until two read the same (`@supabase/*` twice) or the
+  // heading would run long (64 characters); then the majors alone.
+  return new Set(labels).size === labels.length && named.length <= 64
+    ? `→ ${named}`
+    : `→ ${majors.map(([major]) => `${major}.x`).join(' · ')}`;
 }
 export const UNUSED_HINT = "no usage found by Uptide's scan; verify before removing";
 export const listReasons = (p: ListedDependency): string[] =>
@@ -280,34 +304,49 @@ export function formatList(report: ListReport, opts: FormatListOptions = {}): st
         : signal === 'deprecated' || signal === 'unsupported'
           ? 'yellow'
           : undefined;
-    const top = priorities.slice(0, opts.all ? priorities.length : PRIORITY_ROWS);
+    const urgent = priorities.filter((p) => p.tier === 'urgent');
+    const planning = priorities.filter((p) => p.tier !== 'urgent');
+    const top = urgent.slice(0, opts.all ? urgent.length : PRIORITY_ROWS);
+    const shownRows = [...top, ...(opts.all ? planning : [])];
     const longest = (texts: string[]): number => Math.max(0, ...texts.map((t) => t.length));
     // The command is the point of a row: on the same line when all of it fits, otherwise
     // under the name and reason, never clipped.
     const oneLine =
-      2 +
-        longest(top.map((p) => p.name)) +
+      4 +
+        longest(shownRows.map((p) => p.name)) +
         3 +
-        longest(top.map((p) => p.reason)) +
+        longest(shownRows.map((p) => p.reason)) +
         3 +
-        longest(top.map((p) => priorityCommand(p, opts))) <=
+        longest(shownRows.map((p) => priorityCommand(p, opts))) <=
       width;
-    const reasons = alignedRows(
-      top.map((p) => [
+    const formatted = alignedRows(
+      shownRows.map((p) => [
         { text: p.name, tone: 'bold' },
         { text: p.reason, ...(tone(p.signal) ? { tone: tone(p.signal) } : {}) },
         ...(oneLine ? [{ text: priorityCommand(p, opts), tone: 'dim' as const }] : []),
       ]),
       width,
       color,
-      2,
+      4,
     );
-    top.forEach((p, i) => {
-      lines.push(reasons[i] as string);
-      if (!oneLine) lines.push(c.dim(`    ${priorityCommand(p, opts)}`));
-    });
-    if (top.length < priorities.length)
-      lines.push(c.dim(`  + ${priorities.length - top.length} more · --all`));
+    const tierRows = (rows: Priority[], offset: number): void =>
+      rows.forEach((p, i) => {
+        lines.push(formatted[offset + i] as string);
+        if (!oneLine) lines.push(c.dim(`      ${priorityCommand(p, opts)}`));
+      });
+    // Two tiers: what to act on now, then what to plan for, collapsed to its count.
+    if (priorities.length) {
+      lines.push(
+        `  ${c.bold('Urgent')}  ${urgent.length}${c.dim(urgent.length ? ' · advisories, deprecations' : ' · no advisories or deprecations')}`,
+      );
+      tierRows(top, 0);
+      if (top.length < urgent.length)
+        lines.push(c.dim(`    + ${urgent.length - top.length} more · --all`));
+      lines.push(
+        `  ${c.bold('Worth planning')}  ${planning.length}${c.dim(` · unsupported, drift, blocking, majors behind${opts.all || !planning.length ? '' : ' · --all'}`)}`,
+      );
+      if (opts.all) tierRows(planning, top.length);
+    }
     if (!priorities.length) {
       lines.push(
         `  Nothing urgent: no advisories, deprecations, unsupported lines or blocking peers.`,
@@ -335,7 +374,7 @@ export function formatList(report: ListReport, opts: FormatListOptions = {}): st
   const showWorkspaces = report.workspaces.some((w) => w !== '.');
   const cells = (p: ListedDependency): Cell[] => [
     { text: p.name, tone: 'bold' },
-    { text: `${p.current} → ${p.latest}`, alignAt: '→' },
+    { text: listVersions(p), alignAt: '→' },
     { text: listChange(p), tone: p.change === 'major' ? 'yellow' : 'dim' },
     {
       text: p.peerOf ? `peer of ${p.peerOf.join(', ')}` : plural(p.usage.files, 'file'),
@@ -344,18 +383,28 @@ export function formatList(report: ListReport, opts: FormatListOptions = {}): st
     { text: !p.peerOf && p.usage.callSites ? plural(p.usage.callSites, 'call') : '' },
     { text: !p.peerOf && p.usage.references ? plural(p.usage.references, 'ref') : '' },
     { text: p.tier === 'verified' ? 'verified' : '', tone: 'green' },
-    ...(showWorkspaces ? [{ text: p.workspaces.join(', '), tone: 'dim' as const }] : []),
+    // Where it is installed: its workspaces, or how many versions in how many.
+    ...(showWorkspaces
+      ? [{ text: p.versions ? listSpread(p) : p.workspaces.join(', '), tone: 'dim' as const }]
+      : []),
   ];
+  // A compiler or bundler major is shown under TOOLING even when the section is collapsed.
+  const buildMajors = tooling.filter((p) => buildToolMajor(p));
   const shown = [
     ...groups.flatMap((g) => g.members),
     ...used.filter((p) => opts.all || p.change === 'major'),
-    ...(opts.all ? [...tooling, ...unused] : []),
+    ...(opts.all ? [...tooling, ...unused] : buildMajors),
   ];
   const formatted = alignedRows(shown.map(cells), width, color, 2);
   const rows = new Map(shown.map((p, i) => [dependencyKey(p), formatted[i] as string]));
   const row = (p: ListedDependency): void => {
-    lines.push(rows.get(dependencyKey(p)) ?? '');
-    if (p.classification === 'tooling' || p.classification === 'possibly-unused')
+    const rendered = rows.get(dependencyKey(p)) ?? '';
+    lines.push(rendered);
+    // The spread is the last column; when the width drops it, it goes under the row.
+    if (p.versions && !rendered.includes(listSpread(p))) lines.push(c.dim(`    ${listSpread(p)}`));
+    const build = buildToolMajor(p);
+    if (build) lines.push(c.yellow(`    ${build}`));
+    else if (p.classification === 'tooling' || p.classification === 'possibly-unused')
       for (const reason of listReasons(p)) lines.push(c.dim(ellipsis(`    ${reason}`, width)));
     if (opts.details && listSymbols(p))
       lines.push(c.dim(ellipsis(`    symbols  ${listSymbols(p)}`, width)));
@@ -363,20 +412,12 @@ export function formatList(report: ListReport, opts: FormatListOptions = {}): st
       for (const file of p.usage.fileList) lines.push(c.dim(ellipsis(`    ${file}`, width)));
   };
   const group = (g: ListGroup): void => {
-    lines.push(
-      ...alignedRows(
-        [
-          [
-            { text: g.name, tone: 'bold' },
-            { text: groupCount(g) },
-            { text: groupVersions(g) },
-            { text: groupCommand(g, opts), tone: 'dim' },
-          ],
-        ],
-        width,
-        color,
-      ),
-    );
+    const command = groupCommand(g, opts);
+    // Name, size and target always; the command on the same line when it fits, else under it.
+    const head = `${c.bold(g.name)}${' '.repeat(Math.max(0, 12 - g.name.length))}   ${groupCount(g)}   ${groupVersions(g)}`;
+    const fits = textWidth(head) + 3 + command.length <= width;
+    lines.push(fits ? `${head}   ${c.dim(command)}` : head);
+    if (!fits) lines.push(c.dim(`    ${command}`));
     for (const p of g.members) row(p);
   };
   if (groups.length) {
@@ -399,6 +440,7 @@ export function formatList(report: ListReport, opts: FormatListOptions = {}): st
     lines.push(
       `${c.bold(label)}  ${c.dim(`${plural(packages.length, 'package')}, ${hint}${opts.all ? '' : ' · --all'}`)}`,
     );
+    if (!opts.all && label === 'TOOLING') for (const p of buildMajors) row(p);
     if (opts.all)
       for (const block of listBlocks(packages, report)) {
         if (block.name) group(block as ListGroup);
@@ -447,6 +489,8 @@ export function formatList(report: ListReport, opts: FormatListOptions = {}): st
   if (nextCommand) lines.push(`${c.bold('Next')}  ${nextCommand}`);
   // Hints and headings also obey the terminal width; never emit a wrapped table row.
   return `${lines
+    .join('\n')
+    .split('\n')
     .map((line) => {
       // Preserve ANSI while clipping the plain portions of long headings.
       let visible = 0;

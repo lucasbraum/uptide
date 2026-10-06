@@ -24,9 +24,9 @@ Next
 exports[`formatCheck, the first screen > summarizes a real workspace: a row per dependency, a line per rule, the next commands 1`] = `
 "uptide check · storefront · pnpm · 25s
 
-zod                     3.25.76 → 4.6.5    major · latest on npm      verified   ✗ 28 breaking in 7 files     24 auto-fixable · 4 need the agent (LLM)
-stripe (packages/api)   14.25.0 → 23.0.0   major ×9 · latest on npm   verified   ✗ 4 breaking in 3 files      1 auto-fixable · 3 need the agent (LLM)
-vitest                    3.2.4 → 5.0.3    major ×2 · latest on npm              ✓ no impact (9 call sites)
+zod                     3.25.76 → 4.6.5    major · latest on npm             verified   ✗ 28 breaking in 7 files     24 auto-fixable · 4 need the agent (LLM)
+stripe (packages/api)   14.25.0 → 23.0.0   9 majors behind · latest on npm   verified   ✗ 4 breaking in 3 files      1 auto-fixable · 3 need the agent (LLM)
+vitest                    3.2.4 → 5.0.3    2 majors behind · latest on npm              ✓ no impact (9 call sites)
 
 verified: migration pack · generic: no pack, breaking only if the compiler or the runtime probe confirms it
 

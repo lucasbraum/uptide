@@ -35,7 +35,7 @@ $ npx uptide check zod stripe
 uptide check · storefront · pnpm · 8.5s
 
 zod                     3.25.76 → 4.6.5    major · latest on npm      verified   ✗ 28 breaking in 7 files   24 auto-fixable · 4 need the agent (LLM)
-stripe (packages/api)   14.25.0 → 23.0.0   major ×9 · latest on npm   verified   ✗ 4 breaking in 3 files    1 auto-fixable · 3 need the agent (LLM)
+stripe (packages/api)   14.25.0 → 23.0.0   9 majors behind · latest on npm   verified   ✗ 4 breaking in 3 files    1 auto-fixable · 3 need the agent (LLM)
 
 zod   28 breaking · compiled against 4.6.5: 28 new type errors
   ✗ New error API (required_error → error)   24 sites          auto-fixable

@@ -1,0 +1,5 @@
+{
+  "drift-sdk": { "latest": "7.1.0" },
+  "@drift/core": { "latest": "3.0.0" },
+  "@drift/react": { "latest": "3.0.0" }
+}

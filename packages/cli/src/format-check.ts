@@ -77,7 +77,7 @@ function bump(installed: string, target: string): string {
   if (a.length < 3 || b.length < 3) return '';
   return a[0] !== b[0]
     ? (b[0] ?? 0) - (a[0] ?? 0) > 1
-      ? `major ×${(b[0] ?? 0) - (a[0] ?? 0)}`
+      ? `${(b[0] ?? 0) - (a[0] ?? 0)} majors behind`
       : 'major'
     : a[1] !== b[1]
       ? 'minor'

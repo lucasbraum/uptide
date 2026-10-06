@@ -1,5 +1,11 @@
 import { basename } from 'node:path';
-import type { ListedDependency, ListGroup, ListReport } from '@uptide/core';
+import {
+  buildToolMajor,
+  type ListedDependency,
+  type ListGroup,
+  type ListReport,
+  type Priority,
+} from '@uptide/core';
 import {
   advisoryStatus,
   cheapBatchCommand,
@@ -13,8 +19,10 @@ import {
   listCommand,
   listReasons,
   listSections,
+  listSpread,
   listSymbols,
   listUsage,
+  listVersions,
   notCheckedLabel,
   priorityCommand,
   UNUSED_HINT,
@@ -47,14 +55,23 @@ export function renderListHtml(report: ListReport, opts: ListHtmlOptions): strin
   const urgent = new Set(priorities.flatMap((p) => p.packages));
   // Every package is one row, in exactly one section: a tile's count is the rows it shows.
   const row = (p: ListedDependency, where: Section, command?: string): string =>
-    `<article class="member-grid${command ? ' has-command' : ''}" data-change="${p.change}" data-section="${where}"${urgent.has(p.name) ? ' data-priority' : ''}${p.tier === 'verified' ? ' data-verified' : ''}><div class="pkg-name">${e(p.name)}${p.tier === 'verified' ? '<span class="verified">verified</span>' : ''}</div><div class="versions">${e(p.current)} → ${e(p.latest)}</div><div class="gap">${e(listChange(p))}</div><div class="usage${p.peerOf ? ' muted' : ''}">${p.peerOf ? `peer of ${e(p.peerOf.join(', '))}` : e(listUsage(p))}</div>${command ? reportCopyButton(command) : ''}${(p.classification === 'tooling' || p.classification === 'possibly-unused') && listReasons(p).length ? `<div class="details-line">${listReasons(p).map(e).join(' · ')}</div>` : ''}${opts.details && listSymbols(p) ? `<div class="details-line">Top symbols: ${e(listSymbols(p))}</div>` : ''}${opts.details && p.usage.fileList?.length ? `<details class="details-line"><summary>Files</summary><ul>${p.usage.fileList.map((file) => `<li>${e(file)}</li>`).join('')}</ul></details>` : ''}</article>`;
+    `<article class="member-grid${command ? ' has-command' : ''}" data-change="${p.change}" data-section="${where}"${urgent.has(p.name) ? ' data-priority' : ''}${p.tier === 'verified' ? ' data-verified' : ''}><div class="pkg-name">${e(p.name)}${p.tier === 'verified' ? '<span class="verified">verified</span>' : ''}</div><div class="versions">${e(listVersions(p))}${p.versions ? `<div class="muted">${e(listSpread(p))}</div>` : ''}</div><div class="gap">${e(listChange(p))}</div><div class="usage${p.peerOf ? ' muted' : ''}">${p.peerOf ? `peer of ${e(p.peerOf.join(', '))}` : e(listUsage(p))}</div>${command ? reportCopyButton(command) : ''}${buildToolMajor(p) ? `<div class="details-line deprecated">${e(buildToolMajor(p) as string)}</div>` : ''}${(p.classification === 'tooling' || p.classification === 'possibly-unused') && listReasons(p).length ? `<div class="details-line">${listReasons(p).map(e).join(' · ')}</div>` : ''}${opts.details && listSymbols(p) ? `<div class="details-line">Top symbols: ${e(listSymbols(p))}</div>` : ''}${opts.details && p.usage.fileList?.length ? `<details class="details-line"><summary>Files</summary><ul>${p.usage.fileList.map((file) => `<li>${e(file)}</li>`).join('')}</ul></details>` : ''}</article>`;
   const group = (g: ListGroup, where: Section): string =>
     `<section class="package"${where === 'group' ? ' data-group' : ''}><header><h2>${e(g.name)}</h2><div class="meta"><span>${e(groupCount(g))}</span><span>${e(groupVersions(g))}</span>${g.reason ? `<span>${e(g.reason)}</span>` : ''}</div>${reportCommand(groupCommand(g, commands))}</header>${g.members.map((p) => row(p, where)).join('')}</section>`;
   const standalone = (p: ListedDependency, where: Section): string =>
     row(p, where, listCommand([p], commands));
   const collapsed = (label: string, packages: ListedDependency[], where: Section): string =>
     packages.length
-      ? `<details class="notes" data-block><summary>${nextSection()} / ${label} / ${packages.length} package${packages.length === 1 ? '' : 's'}</summary>${label === 'Possibly unused' ? `<p class="more">${e(UNUSED_HINT)}</p>` : ''}${listBlocks(
+      ? `<details class="notes" data-block><summary>${nextSection()} / ${label} / ${packages.length} package${packages.length === 1 ? '' : 's'}${
+          packages.some((p) => buildToolMajor(p))
+            ? ` · <span class="deprecated">${e(
+                packages
+                  .filter((p) => buildToolMajor(p))
+                  .map((p) => p.name)
+                  .join(', '),
+              )}: build tool major</span>`
+            : ''
+        }</summary>${label === 'Possibly unused' ? `<p class="more">${e(UNUSED_HINT)}</p>` : ''}${listBlocks(
           packages,
           report,
         )
@@ -67,13 +84,22 @@ export function renderListHtml(report: ListReport, opts: ListHtmlOptions): strin
       : '';
   const priorityBlock = (): string => {
     if (!report.packages.length) return '';
+    const list = (rows: Priority[]): string =>
+      `<ol class="priority-list">${rows
+        .map(
+          (p) =>
+            `<li class="priority-row signal-${p.signal}"><div class="pkg-name">${e(p.name)}</div><div class="reason">${e(p.reason)}</div>${reportCommand(priorityCommand(p, commands))}</li>`,
+        )
+        .join('')}</ol>`;
+    const urgentRows = priorities.filter((p) => p.tier === 'urgent');
+    const planning = priorities.filter((p) => p.tier !== 'urgent');
+    // Two tiers: urgent open, worth planning collapsed to its count.
     const rows = priorities.length
-      ? `<ol class="priority-list">${priorities
-          .map(
-            (p) =>
-              `<li class="priority-row signal-${p.signal}"><div class="pkg-name">${e(p.name)}</div><div class="reason">${e(p.reason)}</div>${reportCommand(priorityCommand(p, commands))}</li>`,
-          )
-          .join('')}</ol>`
+      ? `<p class="more"><strong>Urgent · ${urgentRows.length}</strong> <span class="muted">advisories, deprecations</span></p>${urgentRows.length ? list(urgentRows) : ''}${
+          planning.length
+            ? `<details class="notes"><summary>Worth planning · ${planning.length} <span class="muted">unsupported, drift, blocking, majors behind</span></summary>${list(planning)}</details>`
+            : ''
+        }`
       : `<p class="more">Nothing urgent: no advisories, deprecations, unsupported lines or blocking peers.</p>${
           report.cheapBatch?.length
             ? `<ol class="priority-list"><li class="priority-row"><div class="pkg-name">Cheap batch</div><div class="reason">${e(cheapBatchLabel(report.cheapBatch, 8))}: minor/patch, few files, one PR</div>${reportCommand(cheapBatchCommand(report.cheapBatch, commands))}</li></ol>`

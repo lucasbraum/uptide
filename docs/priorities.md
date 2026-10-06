@@ -13,6 +13,7 @@ Each outdated direct dependency gets these signals (JSON: `packages[].signals`).
 | security | a known advisory covers the **installed** version | one POST to npm's `/-/npm/v1/security/advisories/bulk` for every public package; packages from a private registry or scope are never sent; off with `--no-advisories` or `"advisories": false` in `uptide.config.json` |
 | deprecated | the registry marks the installed version deprecated | the abbreviated packument discovery already fetches |
 | unsupported | a newer major exists and the installed major line's last release is 12 months old or more | the registry's `time` map, fetched only for packages with a newer major |
+| drift | workspaces declare different majors of it (`5.x` and `7.x`): aligning them is a cheap consolidation win | lockfile versions |
 | blocking | its installed peer range holds back another outdated package (`blocks react 19`) | installed manifests |
 | behind | two or more majors behind (one is the normal state of an outdated package) | versions |
 | effort | files to touch + call sites / 10, halved by a verified migration pack | the usage scan |
@@ -61,8 +62,16 @@ A package is ranked by its most urgent signal:
 | 5 (+0.4 critical, +0.3 high, +0.2 moderate, +0.1 low; −0.1 for dev) | security | `2 advisories (1 high), fixed in 3.1.2 (patch, same major)` |
 | 4 | deprecated | `deprecated: <registry message, truncated to 60 characters>` |
 | 3 | unsupported | `4.x line unsupported since 2025-03, 37 files to touch` |
+| 2.5 | drift | `version drift: 5.x and 7.x across 3 workspaces` |
 | 2 | blocking | `blocks ai 7` |
 | 1 | behind | `3 majors behind, 2 files to touch` |
+
+PRIORITIES shows two tiers (JSON: `priorities[].tier`). **Urgent** is security and deprecated,
+with a count and up to five rows (all with `--all`). **Worth planning** is everything else,
+collapsed to its count until `--all`.
+
+A package installed at several versions across workspaces is one row: its advisories are those
+of any installed version, and its smallest fix is the first clean version above all of them.
 
 The dev step is applied before ranking (a dev critical ranks 5.3). Among equal urgencies:
 runtime before dev, then a same-major fix before a major-only one, then the cheaper upgrade

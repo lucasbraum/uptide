@@ -71,7 +71,7 @@ describe('HTML report', () => {
     expect(html).toContain('npx uptide');
     // The tier of every dependency, and the difference in one line.
     expect(html).toContain('3.25.76 → 4.6.5 · major · <span class="verified">verified</span>');
-    expect(html).toContain('3.2.4 → 5.0.3 · major ×2');
+    expect(html).toContain('3.2.4 → 5.0.3 · 2 majors behind');
     expect(html).toContain('Generic analysis is the default');
     expect(html).toContain('Oct 2, 2026');
     expect(html).toContain('5:00 AM PDT');

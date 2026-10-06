@@ -5,7 +5,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
-import { checkReportFailures } from './check-output.mjs';
+import { checkReportFailures, listReportFailures } from './check-output.mjs';
 
 // Never send smoke-test usage, even when the release build contains a capture key.
 process.env.UPTIDE_TELEMETRY = '0';
@@ -111,12 +111,7 @@ for (const fixture of ['npm', 'npm-workspaces', 'pnpm', 'yarn', 'yarn-berry']) {
 
   const inventory = uptide(repo, 'list', '--json');
   expect(`${manager} list exits 0`, inventory.code === 0, inventory.err);
-  const listed = JSON.parse(inventory.out);
-  expect(
-    `${manager} list includes zod usage`,
-    listed.packages.some((p) => p.name === 'zod' && p.usage.files > 0),
-    inventory.out,
-  );
+  failures.push(...listReportFailures(JSON.parse(inventory.out), manager));
   const unnamed = uptide(repo, 'check');
   expect(
     `${manager} check requires names`,

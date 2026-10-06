@@ -130,6 +130,7 @@ export { type ReverifyOptions, reverify } from './fix/reverify.js';
 export { type FixOptions, fix } from './fix/run.js';
 export { detectStyle } from './fix/style.js';
 export type { Fixer, FixReport, FixRequest, FixResponse } from './fix/types.js';
+export { buildToolMajor } from './list/evidence.js';
 export {
   type ListedDependency,
   type ListGroup,

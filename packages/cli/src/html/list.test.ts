@@ -92,7 +92,7 @@ it('renders the Nest report with shared check styling, groups first, copy comman
   expect(html.indexOf('01 / Priorities')).toBeLessThan(html.indexOf('<h2>@nestjs/*</h2>'));
   expect(html.indexOf('<h2>@nestjs/*</h2>')).toBeLessThan(html.indexOf('03 / Packages'));
   expect(html.match(/class="pkg-name">@nestjs\/common</g)).toHaveLength(1);
-  expect(html).toContain('10.4.0 → 12.0.0</div><div class="gap">major ×2');
+  expect(html).toContain('10.4.0 → 12.0.0</div><div class="gap">2 majors behind');
   expect(html).toContain('1 file · 1 reference');
   expect(html).toContain('peer of @nestjs/platform-fastify');
   expect(html).not.toContain('referenced ·');
@@ -194,6 +194,7 @@ it('gives every tile the count of rows its filter shows, and every package exact
       group: 'nestjs',
       packages: ['@nestjs/common', second.name],
       signal: 'deprecated',
+      tier: 'urgent',
       urgency: 4,
       effort: 1,
       reason: 'deprecated: use v12',

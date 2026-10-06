@@ -243,7 +243,7 @@ exports[`HTML report > renders stripe from report JSON without requiring JS 1`] 
 <a class="dep" href="#dependency-0" data-package="dependency-0">
 <div>
 <strong>stripe (packages/api)</strong>
-<span class="mono muted">14.25.0 → 23.0.0 · major ×9 · <span class="verified">verified</span>
+<span class="mono muted">14.25.0 → 23.0.0 · 9 majors behind · <span class="verified">verified</span>
 </span>
 </div>
 <div class="breaking">✗ 4 breaking in 3 files<div class="muted">1 auto-fixable · 3 need the agent (LLM)</div>

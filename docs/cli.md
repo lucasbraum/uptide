@@ -7,14 +7,18 @@ cannot show.
 
 Fast discovery with no compile, install, tarball downloads or execution of repository code.
 Requires a lockfile (exact manifest versions also work once the repository is detected).
-Shows every outdated direct dependency, current → latest, major/minor/patch (including
-`major ×2` for 10 → 12), verified/generic tier, importing files, calls and references,
-and nonzero top symbols. Workspace columns appear only in workspace repositories.
-PRIORITIES come first: at most five rows (all with `--all`), most urgent first, each with a
-one-line reason and the command to run: known advisories for the installed version, with its
-smallest fix (`fixed in 3.2.5 (patch, same major)`, `needs 4.1.11 (major)`), a deprecated
-version, a major line with no release in a year, a peer range holding another upgrade back, two
-or more majors behind. Runtime dependencies rank before dev-only ones (`dev · ` in the reason).
+Shows every outdated direct dependency once, current → latest, major/minor/patch (including
+`2 majors behind` for 10 → 12), verified/generic tier, importing files, calls and references,
+and nonzero top symbols. Workspaces on different versions share one row
+(`5.0.52, 7.0.59 → 7.0.128`, past two versions the oldest and newest), its last column saying
+`2 versions in 3 workspaces` (under the row when the terminal is too narrow), and usage is
+counted once across the repository. Workspace columns appear only in workspace repositories.
+PRIORITIES come first, in two tiers, each row with a one-line reason and the command to run.
+**Urgent** (up to five rows, all with `--all`): known advisories for the installed version,
+with its smallest fix (`fixed in 3.2.5 (patch, same major)`, `needs 4.1.11 (major)`), and a
+deprecated version. **Worth planning**, collapsed to its count until `--all`: a major line with
+no release in a year, version drift (workspaces on different majors of one package), a peer
+range holding another upgrade back, two or more majors behind. Runtime dependencies rank before dev-only ones (`dev · ` in the reason).
 Rules and weights: [priorities.md](priorities.md). When nothing is urgent, it suggests a cheap
 batch of minor/patch upgrades.
 Groups follow: a scope is one family (`@radix-ui/*`) whatever its members' versions, and
@@ -23,8 +27,11 @@ pin the same exact dependency version (`ai + @ai-sdk/*`); each group says why. N
 the family or lead package; external peers are labeled `peer of <package>`.
 `uptide check --group nestjs` discovers and expands the exact member list before checking.
 JSON retains each member, the stable group selector and peer relationships.
+`--json` has one entry per package: `versions` lists every installed version with its
+workspaces when they differ, `current` is the oldest outdated one, and `usage` is counted once.
 Other rows put majors first, then importing files and call sites. Terminal rows align to
-the available width; narrow terminals truncate names and omit trailing columns. Top symbols
+the available width; names are never truncated (a name past 45 characters gets its own line)
+and narrow terminals omit trailing columns instead. Top symbols
 are hidden until `--details`. Only verified packages have a tier tag; generic is the default.
 Color is disabled for pipes, `NO_COLOR`, `--no-color` and CI.
 
@@ -43,14 +50,17 @@ Color is disabled for pipes, `NO_COLOR`, `--no-color` and CI.
 
 Tooling is separate and collapsed: script commands and package bins, known build/config
 tools, packages referenced in configuration, types for used runtime packages (and Node),
-and peers of used packages. Only the remaining packages without source imports are
+and peers of used packages. Compilers and bundlers (`typescript`, `@swc/core`, `esbuild`,
+`@babel/core`, `vite`, `webpack`) are tooling even when a script imports them, and a new major
+of one is shown under TOOLING even while it is collapsed (`compiler major: check build and
+tsconfig`). Only the remaining packages without source imports are
 “possibly unused.” Configuration is read as data, never executed; local installed metadata
 is preferred for bins and peers, with registry metadata as a fallback.
 
 Syntax scanning includes imports, re-exports, require, import-equals, literal dynamic
 imports and JS/TS/JSX/TSX. Calls/new/JSX and non-call references are separate counts;
 passing a binding as a value, such as `app.register(cookie)`, counts as a reference.
-Indirect aliases and reflection are not followed. Counts are repository-wide when several
+Indirect aliases and reflection are not followed. Counts are repository-wide, once per package, when several
 workspaces lock different versions. HTML shows all upgrade rows, with tooling and
 possibly unused packages in collapsed sections, and a copyable check command per row.
 Internal workspace dependencies and local/git/URL specifiers are excluded from registry queries.

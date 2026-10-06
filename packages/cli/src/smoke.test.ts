@@ -130,8 +130,8 @@ it.each(['npm', 'npm-workspaces', 'pnpm', 'yarn', 'yarn-berry'])(
       `smoke-${fixture} (${manager}) ·`,
     );
     expect(checkReportFailures(oldHeader, fixture, manager)).toHaveLength(1);
-    expect(checkReportFailures(output.replace('major ×8', 'major'), fixture, manager)).toHaveLength(
-      1,
-    );
+    expect(
+      checkReportFailures(output.replace('8 majors behind', 'major'), fixture, manager),
+    ).toHaveLength(1);
   },
 );

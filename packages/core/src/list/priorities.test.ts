@@ -8,6 +8,7 @@ import {
   rankPriorities,
   reasonOf,
   securitySignal,
+  tierOfSignal,
   unsupportedSignal,
   urgencyOf,
 } from './priorities.js';
@@ -78,6 +79,23 @@ describe('security', () => {
     expect(reasonOf({ ...base, security: open }, '1.0.0', 0)).toBe(
       '1 advisory (1 critical), no fixed version yet',
     );
+  });
+});
+
+describe('security across installed versions', () => {
+  it('counts the advisories of any installed version and fixes above all of them', () => {
+    const signal = securitySignal(
+      ['1.2.0', '2.1.0'],
+      [advisory('high', '<1.3.0'), advisory('moderate', '>=2.0.0 <2.2.0')],
+      ['1.2.0', '1.3.0', '2.1.0', '2.2.0'],
+    );
+    expect(signal).toEqual({
+      advisories: 2,
+      worst: 'high',
+      counts: { high: 1, moderate: 1 },
+      fixedIn: '2.2.0',
+      fixChange: 'major',
+    });
   });
 });
 
@@ -209,6 +227,28 @@ describe('blocking', () => {
   });
 });
 
+describe('drift', () => {
+  it('names the majors workspaces disagree on, ranked below unsupported and above blocking', () => {
+    const drift = { ...base, drift: { majors: [5, 7], workspaces: 3 } };
+    expect(reasonOf(drift, '5.0.52', 9)).toBe('version drift: 5.x and 7.x across 3 workspaces');
+    expect(reasonOf({ ...base, drift: { majors: [3, 4, 5], workspaces: 4 } }, '3.0.0', 0)).toBe(
+      'version drift: 3.x, 4.x and 5.x across 4 workspaces',
+    );
+    expect(urgencyOf({ ...drift, unsupported: { since: '2024-01' } })?.signal).toBe('unsupported');
+    expect(urgencyOf({ ...drift, blocks: ['react 19'] })?.signal).toBe('drift');
+  });
+});
+
+describe('tiers', () => {
+  it('puts advisories and deprecations in urgent, the rest in worth planning', () => {
+    expect(
+      (['security', 'deprecated', 'unsupported', 'drift', 'blocking', 'behind'] as const).map(
+        tierOfSignal,
+      ),
+    ).toEqual(['urgent', 'urgent', 'planning', 'planning', 'planning', 'planning']);
+  });
+});
+
 describe('behind', () => {
   it('is a signal from two majors behind; one is the normal state of an outdated package', () => {
     expect(urgencyOf({ ...base, behind: 1 })).toBeUndefined();
@@ -226,10 +266,11 @@ describe('effort', () => {
 });
 
 describe('ranking', () => {
-  it('orders by urgency (security > deprecated > unsupported > blocking > behind), then effort', () => {
+  it('orders by urgency (security > deprecated > unsupported > drift > blocking > behind), then effort', () => {
     const all: PackageSignals[] = [
       { ...base, behind: 3 },
       { ...base, blocks: ['x 2'] },
+      { ...base, drift: { majors: [1, 2], workspaces: 2 } },
       { ...base, unsupported: { since: '2024-01' } },
       { ...base, deprecated: 'old' },
       { ...base, security: { advisories: 1, worst: 'low', counts: { low: 1 } } },
@@ -237,6 +278,7 @@ describe('ranking', () => {
     expect(all.map((s) => urgencyOf(s)?.signal)).toEqual([
       'behind',
       'blocking',
+      'drift',
       'unsupported',
       'deprecated',
       'security',
@@ -245,6 +287,7 @@ describe('ranking', () => {
       name,
       packages: [name],
       signal: 'behind' as const,
+      tier: 'planning' as const,
       urgency,
       effort,
       reason: '',
@@ -297,6 +340,7 @@ describe('prioritize', () => {
         group: 'ai',
         packages: ['ai', '@ai-sdk/openai'],
         signal: 'deprecated',
+        tier: 'urgent',
         urgency: 4,
         effort: 7,
         reason: '@ai-sdk/openai deprecated: use v2',

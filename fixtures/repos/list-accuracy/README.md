@@ -181,3 +181,7 @@ Git-ignored files are counted without reading source contents. This is synthetic
 not a timing claim for the unavailable private application.
 
 Reproduce: `pnpm build` then `node scripts/list-scan-benchmark.mjs /path/to/webpack-v5.50.0`.
+
+`version-drift` installs invented packages at different versions across three workspaces; every
+consumer of the list report is tested against it (`packages/cli/src/list-consumers.test.ts`,
+`packages/core/src/plan/gather.test.ts`).
