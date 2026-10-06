@@ -10,11 +10,15 @@ const script = join(root, 'scripts/dco.mjs');
 
 interface Result {
   commits: string[];
+  exempt: string[];
   problems: string[];
 }
 /** The checker CI runs, over everything `head` adds on top of `base`. */
-function check(dir: string, base: string, head: string) {
-  const run = spawnSync('node', [script, base, head, '--json'], { cwd: dir, encoding: 'utf8' });
+function check(dir: string, base: string, head: string, ...extra: string[]) {
+  const run = spawnSync('node', [script, base, head, '--json', ...extra], {
+    cwd: dir,
+    encoding: 'utf8',
+  });
   return {
     status: run.status,
     result: run.stdout ? (JSON.parse(run.stdout) as Result) : undefined,
@@ -136,7 +140,7 @@ describe('every commit in a pull request is signed off', () => {
   it('passes a pull request that adds nothing', () => {
     const dir = repo([]);
     const { status, result } = check(dir, 'main', 'pr');
-    expect(result).toEqual({ commits: [], problems: [] });
+    expect(result).toEqual({ commits: [], exempt: [], problems: [] });
     expect(status).toBe(0);
   });
 
@@ -170,5 +174,47 @@ describe('every commit in a pull request is signed off', () => {
     const run = spawnSync('node', [script], { cwd: root, encoding: 'utf8' });
     expect(run.status).toBe(2);
     expect(run.stderr).toContain('usage:');
+  });
+});
+
+describe('bots that cannot sign off', () => {
+  const dependabot = 'dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>';
+  const actions = 'github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>';
+  // The shape of uptide-dev/uptide#19: one Dependabot commit, no sign-off.
+  const bump = {
+    message: 'chore(deps): bump source-map-js from 1.2.1 to 1.2.2\n',
+    author: dependabot,
+  };
+
+  it("passes a bot's own commits in the pull request it opened, and says they are exempt", () => {
+    const dir = repo([bump]);
+    const { status, result } = check(dir, 'main', 'pr', '--pr-author=dependabot[bot]');
+    expect(result?.problems).toEqual([]);
+    expect(result?.exempt).toEqual(result?.commits);
+    expect(status).toBe(0);
+    const actionsDir = repo([{ message: 'chore: regenerate\n', author: actions }]);
+    expect(check(actionsDir, 'main', 'pr', '--pr-author=github-actions[bot]').status).toBe(0);
+  });
+
+  it("does not exempt a commit claiming a bot's address in someone else's pull request", () => {
+    const dir = repo([bump]);
+    for (const author of [[], ['--pr-author=mallory'], ['--pr-author=github-actions[bot]']]) {
+      const { status, result } = check(dir, 'main', 'pr', ...author);
+      expect(result?.exempt).toEqual([]);
+      expect(result?.problems).toEqual([
+        expect.stringContaining('has no Signed-off-by line: chore(deps): bump source-map-js'),
+      ]);
+      expect(status).toBe(1);
+    }
+  });
+
+  it("still needs a sign-off on a person's commit pushed to a bot's pull request", () => {
+    const dir = repo([bump, { message: 'fix: adjust the lockfile\n' }]);
+    const { status, result } = check(dir, 'main', 'pr', '--pr-author=dependabot[bot]');
+    expect(result?.exempt).toHaveLength(1);
+    expect(result?.problems).toEqual([
+      expect.stringContaining('has no Signed-off-by line: fix: adjust the lockfile'),
+    ]);
+    expect(status).toBe(1);
   });
 });

@@ -29,6 +29,10 @@ jobs:
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           BASE_REF: ${{ github.event.pull_request.base.ref }}
+          # Who opened the pull request, as GitHub records it: a bot's own commits in its
+          # own pull request (Dependabot) are exempt; a commit merely claiming a bot's
+          # address in someone else's pull request is not. See BOTS in scripts/dco.mjs.
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
           # refs/pull/N/head is the complete pull request head as this repository sees it,
           # for a branch and for a fork alike, and refs/heads/<base> is the base branch as
@@ -40,4 +44,4 @@ jobs:
           # The refs above are CI's own bookkeeping: --base-name is the branch a
           # contributor would actually rebase onto, for the failure message.
           node scripts/dco.mjs refs/uptide/base refs/uptide/pr-head \
-            --base-name="origin/${BASE_REF}"
+            --base-name="origin/${BASE_REF}" --pr-author="${PR_AUTHOR}"
