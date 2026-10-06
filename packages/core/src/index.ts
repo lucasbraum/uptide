@@ -24,6 +24,7 @@ export {
   type TruthCase,
   type TruthScore,
 } from './check/truth.js';
+export { type Verdict, verdictOf } from './check/verdict.js';
 export { compareVersions, majorsBehind, parseVersion } from './check/version.js';
 export { classify, type UnclassifiedChange } from './diff/classify.js';
 export { diffSurfaces, rawDiff } from './diff/diff.js';
@@ -83,6 +84,7 @@ export {
   type UsageVia,
   usagePaths,
 } from './domain/usage.js';
+export { BY } from './domain/wording.js';
 export {
   AdapterCapabilityError,
   type ErrorCode,

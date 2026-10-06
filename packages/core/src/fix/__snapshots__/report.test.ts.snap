@@ -8,14 +8,14 @@ exports[`storefront-zod > snapshots the full PR description and compact terminal
 | | |
 |---|---|
 | **Risk** | Medium: request validation in webhooks |
-| **Changes** | 29 sites in 8 files · 25 by rule · 4 by agent |
+| **Changes** | 29 sites in 8 files · 25 auto-fixed · 4 fixed by the agent (LLM) |
 | **Types** | ✅ 29 errors after the bump → 1 (1 pre-existing) |
 | **Behavior** | ✅ 9 schemas identical · 2 not checked · 21/21 custom-message assertions |
 | **Tests** | ✅ 5 tests in 3 files passed |
 
 ### What changed
 
-**1. Default error messages** · 1 site · by rule
+**1. Default error messages** · 1 site · auto-fixed
 Zod 4 words its default messages differently. Assertions that the migrated code made fail now match the new text; the tests pass again.
 <details><summary>Example and files</summary>
 
@@ -28,7 +28,7 @@ Zod 4 words its default messages differently. Assertions that the migrated code 
 
 </details>
 
-**2. New error API** · 24 sites · by rule
+**2. New error API** · 24 sites · auto-fixed
 \`required_error\` and \`invalid_type_error\` were replaced by \`error\`. Messages are unchanged.
 <details><summary>Example and files</summary>
 
@@ -47,7 +47,7 @@ Returning \`undefined\` keeps zod's default message for wrong types, exactly lik
 
 </details>
 
-**3. \`.ip()\` removed** · 1 site · by agent
+**3. \`.ip()\` removed** · 1 site · by the agent (LLM)
 Now \`z.union([z.ipv4(), z.ipv6()])\`, which accepts both families like before.
 <details><summary>Diff and reasoning</summary>
 
@@ -69,7 +69,7 @@ Diagnostics: 2 → 1.
 
 </details>
 
-**4. \`ZodTypeDef\` removed** · 1 fix, 3 errors · by agent
+**4. \`ZodTypeDef\` removed** · 1 fix, 3 errors · by the agent (LLM)
 \`consumer\` now types schemas as \`ZodType<TMessage, unknown>\`, preserving the input/output contract.
 <details><summary>Diff and reasoning</summary>
 
@@ -262,17 +262,17 @@ exports[`storefront-zod > snapshots the full PR description and compact terminal
 | | |
 |---|---|
 | **Risk** | Medium: request validation in webhooks |
-| **Changes** | 29 sites in 8 files · 25 by rule · 4 by agent |
+| **Changes** | 29 sites in 8 files · 25 auto-fixed · 4 fixed by the agent (LLM) |
 | **Types** | ✅ 29 errors after the bump → 1 (1 pre-existing) |
 | **Behavior** | ✅ 9 schemas identical · 2 not checked · 21/21 custom-message assertions |
 | **Tests** | ✅ 5 tests in 3 files passed |
 
 ### What changed
 
-**1. Default error messages** · 1 site · by rule
-**2. New error API** · 24 sites · by rule
-**3. \`.ip()\` removed** · 1 site · by agent
-**4. \`ZodTypeDef\` removed** · 1 fix, 3 errors · by agent
+**1. Default error messages** · 1 site · auto-fixed
+**2. New error API** · 24 sites · auto-fixed
+**3. \`.ip()\` removed** · 1 site · by the agent (LLM)
+**4. \`ZodTypeDef\` removed** · 1 fix, 3 errors · by the agent (LLM)
 "
 `;
 
@@ -284,14 +284,14 @@ exports[`stripe > snapshots the full PR description and compact terminal/comment
 | | |
 |---|---|
 | **Risk** | High: behavior changes |
-| **Changes** | 4 sites in 1 file · 0 by rule · 4 by agent |
+| **Changes** | 4 sites in 1 file · 0 auto-fixed · 4 fixed by the agent (LLM) |
 | **Types** | ✅ 4 errors after the bump → 0 |
 | **Behavior** | ⚠️ not checked |
 | **Tests** | ⚠️ no test script in the repository |
 
 ### What changed
 
-**1. Stripe API version** · 2 sites · by agent
+**1. Stripe API version** · 2 sites · by the agent (LLM)
 API literals now match the target SDK; types compile, but response and webhook compatibility needs review.
 <details><summary>Diff and reasoning</summary>
 
@@ -371,7 +371,7 @@ Diagnostics: 4 → 3.
 
 </details>
 
-**2. Subscription billing period moved to items** · 2 sites · by agent
+**2. Subscription billing period moved to items** · 2 sites · by the agent (LLM)
 One shared helper takes the item that ends last and returns start and end from that same item (undefined with no items), preserving the single-item values; multi-item and no-item behavior needs your decision.
 <details><summary>Diff and reasoning</summary>
 
@@ -735,14 +735,14 @@ exports[`stripe > snapshots the full PR description and compact terminal/comment
 | | |
 |---|---|
 | **Risk** | High: behavior changes |
-| **Changes** | 4 sites in 1 file · 0 by rule · 4 by agent |
+| **Changes** | 4 sites in 1 file · 0 auto-fixed · 4 fixed by the agent (LLM) |
 | **Types** | ✅ 4 errors after the bump → 0 |
 | **Behavior** | ⚠️ not checked |
 | **Tests** | ⚠️ no test script in the repository |
 
 ### What changed
 
-**1. Stripe API version** · 2 sites · by agent
-**2. Subscription billing period moved to items** · 2 sites · by agent
+**1. Stripe API version** · 2 sites · by the agent (LLM)
+**2. Subscription billing period moved to items** · 2 sites · by the agent (LLM)
 "
 `;

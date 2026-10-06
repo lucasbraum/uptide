@@ -160,7 +160,7 @@ it("publishes a stored run from the user's repository: the fork itself by defaul
   const moved = mock();
   await expect(
     publish({ ...report, head: 'def' }, true, moved.io, { cwd: '/user/repo' }),
-  ).rejects.toThrow('run `uptide verify --branch uptide/zod-4.6.5` first');
+  ).rejects.toThrow('run `npx uptide verify --branch uptide/zod-4.6.5` first');
   expect(moved.calls.some((c) => c.includes('push'))).toBe(false);
 });
 
@@ -205,7 +205,7 @@ it('records a publish step that fails instead of throwing, and treats a missing 
     failed: 'gh pr create failed: HTTP 502: Bad Gateway',
   });
   expect(run.notes.at(-1)).toContain(
-    '`uptide pr --branch uptide/zod-4.6.5 --yes` retries the publish step alone',
+    '`npx uptide pr --branch uptide/zod-4.6.5 --yes` retries the publish step alone',
   );
   const planned = { ...report, head: 'abc', notes: [] as string[] } as FixReport;
   await publishVerified(planned, { tool: { uptideDirty: false }, cwd: '/user/repo' }, mock().io);

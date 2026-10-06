@@ -1,6 +1,7 @@
 import type { ListedDependency, ListGroup, ListReport, Priority } from '@uptide/core';
 import pc from 'picocolors';
 import type { CheckHeader } from './format-check.js';
+import { INVOCATION } from './invocation.js';
 import { alignedRows, type Cell, ellipsis, terminalHeader } from './terminal.js';
 
 export interface FormatListOptions {
@@ -19,16 +20,16 @@ const quote = (s: string): string =>
 const dependencyKey = (p: ListedDependency): string =>
   JSON.stringify([p.name, p.registryName ?? p.name, p.current]);
 export const listCommand = (packages: ListedDependency[], opts: FormatListOptions): string =>
-  `${opts.invocation ?? 'uptide'} check ${[...new Set(packages.map((p) => p.name))].map(quote).join(' ')}${opts.cwd ? ` --cwd ${quote(opts.cwd)}` : ''}`;
+  `${opts.invocation ?? INVOCATION} check ${[...new Set(packages.map((p) => p.name))].map(quote).join(' ')}${opts.cwd ? ` --cwd ${quote(opts.cwd)}` : ''}`;
 export const listChange = (p: ListedDependency): string =>
   p.majorGap > 1 ? `major ×${p.majorGap}` : p.change;
 export const groupCommand = (group: ListGroup, opts: FormatListOptions): string =>
-  `${opts.invocation ?? 'uptide'} check --group ${quote(group.id)}${opts.cwd ? ` --cwd ${quote(opts.cwd)}` : ''}`;
+  `${opts.invocation ?? INVOCATION} check --group ${quote(group.id)}${opts.cwd ? ` --cwd ${quote(opts.cwd)}` : ''}`;
 /** The command that starts on a priority: its group or package, at its smallest fix when it has one. */
 export const priorityCommand = (p: Priority, opts: FormatListOptions): string =>
-  `${opts.invocation ?? 'uptide'} check ${p.group ? `--group ${quote(p.group)}` : p.packages.map(quote).join(' ')}${p.target ? ` --target ${quote(p.target)}` : ''}${opts.cwd ? ` --cwd ${quote(opts.cwd)}` : ''}`;
+  `${opts.invocation ?? INVOCATION} check ${p.group ? `--group ${quote(p.group)}` : p.packages.map(quote).join(' ')}${p.target ? ` --target ${quote(p.target)}` : ''}${opts.cwd ? ` --cwd ${quote(opts.cwd)}` : ''}`;
 export const cheapBatchCommand = (names: string[], opts: FormatListOptions): string =>
-  `${opts.invocation ?? 'uptide'} check ${names.map(quote).join(' ')}${opts.cwd ? ` --cwd ${quote(opts.cwd)}` : ''}`;
+  `${opts.invocation ?? INVOCATION} check ${names.map(quote).join(' ')}${opts.cwd ? ` --cwd ${quote(opts.cwd)}` : ''}`;
 /** What the advisory lookup covered, for the PRIORITIES heading. */
 export function advisoryStatus(report: ListReport): string {
   const a = report.advisories;
@@ -55,15 +56,29 @@ export function groupCount(group: ListGroup & { totalMembers?: number }): string
   const total = group.totalMembers ?? group.members.length;
   return `${plural(total, 'package')}${total === group.members.length ? '' : ` (${group.members.length} in this section)`}`;
 }
+/**
+ * Where the group goes: `→ 12.x`, or each target major with what reaches it when they differ,
+ * a family named once (`→ ai 7 · @ai-sdk/* 4`).
+ */
 export function groupVersions(group: ListGroup): string {
   const main = group.members.filter((p) => !p.peerOf);
-  const range = (): string => {
-    const majors = [...new Set(main.map((p) => Number(p.latest.split('.')[0])))].sort(
-      (a, b) => a - b,
-    );
-    return majors.length > 1 ? `${majors[0]}–${majors.at(-1)}.x` : `${majors[0]}.x`;
+  const byMajor = new Map<number, string[]>();
+  for (const p of main) {
+    const major = Number(p.latest.split('.')[0]);
+    byMajor.set(major, [...new Set([...(byMajor.get(major) ?? []), p.name])]);
+  }
+  if (byMajor.size <= 1) return `→ ${[...byMajor.keys()][0]}.x`;
+  const label = (names: string[]): string => {
+    const scopes = new Set(names.map((n) => (n.startsWith('@') ? n.split('/')[0] : n)));
+    const [scope] = scopes;
+    return names.length > 1 && scopes.size === 1 && scope?.startsWith('@')
+      ? `${scope}/*`
+      : names.join(', ');
   };
-  return `→ ${range()}`;
+  return `→ ${[...byMajor]
+    .sort(([a], [b]) => b - a)
+    .map(([major, names]) => `${label(names)} ${major}`)
+    .join(' · ')}`;
 }
 export const UNUSED_HINT = "no usage found by Uptide's scan; verify before removing";
 export const listReasons = (p: ListedDependency): string[] =>

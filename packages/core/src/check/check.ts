@@ -55,6 +55,7 @@ import { groupRootCauses } from './root-cause.js';
 import { runtimeChangeFindings } from './runtime-changes.js';
 import { confirmGeneric, evidenceOf, tierOf } from './tier.js';
 import { unattributedFindings } from './unattributed.js';
+import { verdictOf } from './verdict.js';
 import { compareVersions, majorsBehind, parseVersion } from './version.js';
 
 /** Packs `check` can plan with; the same ones `fix` runs. */
@@ -574,8 +575,17 @@ export function mergeAcrossWorkspaces(
         unattributed: list.flatMap((p) =>
           (p.compile?.unattributed ?? []).map((d) => ({ ...d, file: prefixed(p, d.file) })),
         ),
+        ...(list.every((p) => p.compile?.newErrors !== undefined)
+          ? { newErrors: sum((p) => p.compile?.newErrors ?? 0) }
+          : {}),
       };
     }
+    // One verdict for the merged entry: its findings and compile summary are the union.
+    if (first.verdict)
+      combined.verdict = verdictOf(
+        combined,
+        list.find((p) => p.verdict?.notVerified)?.verdict?.notVerified,
+      );
     merged.set(first, combined);
     for (const p of list.slice(1)) dropped.add(p);
   }
@@ -1516,6 +1526,7 @@ async function checkGroup(
         unresolvedInTarget: signal.unresolvedInTarget,
         unresolvedFiles: signal.unresolvedFiles,
         unattributed: merged.unattributed,
+        newErrors: signal.diagnostics.length,
       };
       if (signal.skipped) notes.push(signal.skipped);
       else if (signal.baselineErrors > 0)
@@ -1852,6 +1863,16 @@ async function checkGroup(
     report.findings = findings;
     report.callSitesChecked = usages.length;
     if (compile) report.compile = compile;
+    // Analyzed packages only: a skipped or untyped one says why in its status.
+    if (['breaking', 'deprecated', 'safe', 'partial', 'unknown'].includes(report.status))
+      report.verdict = verdictOf(
+        report,
+        ctx.opts.compile === false
+          ? 'compile check off (--no-compile)'
+          : sameDeclarations
+            ? 'type declarations unchanged'
+            : 'this language adapter does not compile',
+      );
     const runtime = prepared.map((p) => p.runtime).filter((r) => r !== undefined);
     if (runtime.length > 0) report.runtime = runtime;
     // A pack's plan note is fed from what this workspace already has: both copies and the usages.

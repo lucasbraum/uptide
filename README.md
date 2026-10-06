@@ -32,30 +32,28 @@ tests. Everything below is real output from it.
 
 ```console
 $ npx uptide check zod stripe
-uptide check · storefront (pnpm, 2 packages) · 10s
+uptide check · storefront · pnpm · 8.5s
 
-zod                    3.25.76 → 4.6.5    major · latest on npm   verified   ✗ 28 breaking in 7 files    24 by rule · 4 by agent
-stripe (packages/api)  14.25.0 → 23.0.0   major · latest on npm   verified   ✗ 4 breaking in 3 files     1 by rule · 3 by agent
+zod                     3.25.76 → 4.6.5    major · latest on npm      verified   ✗ 28 breaking in 7 files   24 auto-fixable · 4 need the agent (LLM)
+stripe (packages/api)   14.25.0 → 23.0.0   major ×9 · latest on npm   verified   ✗ 4 breaking in 3 files    1 auto-fixable · 3 need the agent (LLM)
 
-verified: migration pack · generic: no pack, breaking only if the compiler or the runtime probe confirms it
+zod   28 breaking · compiled against 4.6.5: 28 new type errors
+  ✗ New error API (required_error → error)   24 sites          auto-fixable
+  ✗ ZodTypeDef removed                       1 fix, 3 errors   needs the agent (LLM)
+  ✗ .ip() removed                            monitoring.ts:6   needs the agent (LLM)
+  ! 15 deprecated calls (.uuid, .datetime, .email, ...)   8 auto-fixable
 
-zod
-  ✗ New error API (required_error → error)   24 sites          by rule
-  ✗ ZodTypeDef removed                       1 fix, 3 errors   by agent
-  ✗ .ip() removed                            monitoring.ts:6   by agent
-  ! 15 deprecated calls (.uuid, .datetime, .email, ...)   8 by rule
-
-stripe
-  ✗ Test fixture casts widened                   renewal.test.ts:7   by rule
-  ✗ Subscription billing period moved to items   2 sites             by agent
-  ✗ apiVersion no longer matches the SDK         client.ts:9         by agent
+stripe   4 breaking · compiled against 23.0.0: 4 new type errors
+  ✗ Test fixture casts widened                   renewal.test.ts:7   auto-fixable
+  ✗ Subscription billing period moved to items   2 sites             needs the agent (LLM)
+  ✗ apiVersion no longer matches the SDK         client.ts:9         needs the agent (LLM)
     1 API change since 2023-10-16 affects your code
 
 Next
-  npx uptide fix zod       migrate on a new branch, verify, no push
-  npx uptide fix stripe    migrate on a new branch, verify, no push
-  npx uptide plan                 the order to upgrade in, with the effort
-  npx uptide check zod stripe --details      every site and reason
+  npx uptide fix zod                       migrate on a new branch, verify, no push
+  npx uptide fix stripe                    migrate on a new branch, verify, no push
+  npx uptide plan --only 'zod,stripe'      the order to upgrade in, with the effort
+  npx uptide check zod stripe --details    every site and reason
 ```
 
 `list` reads manifests, lockfiles, source imports and registry metadata. PRIORITIES come
@@ -160,7 +158,7 @@ $ npx uptide fix zod
 uptide fix · zod 3.25.76 → 4.6.5 (latest on npm) · verification passed · 36s
 
   Risk      Medium: request validation in webhooks
-  Changes   29 sites in 8 files · 25 by rule · 4 by agent
+  Changes   29 sites in 8 files · 25 auto-fixed · 4 fixed by the agent (LLM)
   Types     ✅ 29 errors after the bump → 1 (1 pre-existing)
   Behavior  ✅ 9 schemas identical · 2 not checked · 21/21 custom-message assertions
   Tests     ✅ 5 tests in 3 files passed
@@ -180,7 +178,7 @@ $ npx uptide fix stripe
 uptide fix · stripe 14.25.0 → 23.0.0 (latest on npm) · verification passed · 41s
 
   Risk      High: behavior changes
-  Changes   6 sites in 3 files · 3 by rule · 3 by agent
+  Changes   6 sites in 3 files · 3 auto-fixed · 3 fixed by the agent (LLM)
   Types     ✅ 5 errors after the bump → 1 (1 pre-existing)
   Behavior  ⚠️ 1 of 570 API changes affects your code · 47 touch resources you use (8 breaking)
   Tests     ✅ 3 tests in 2 files passed · the test script of packages/api
@@ -230,10 +228,10 @@ verification and publish gate. Set the chosen provider's key in your environment
 config or command arguments.
 
 ```sh
-uptide fix zod --provider openai --model gpt-6.1-sol
+npx uptide fix zod --provider openai --model gpt-6.1-sol
 UPTIDE_PROVIDER=gemini UPTIDE_MODEL=gemini-3.8-flash uptide fix stripe
-uptide fix zod --max-cost 1
-uptide fix zod --no-llm
+npx uptide fix zod --max-cost 1
+npx uptide fix zod --no-llm
 ```
 
 For each setting, precedence is flag → `UPTIDE_PROVIDER` / `UPTIDE_MODEL` → nearest

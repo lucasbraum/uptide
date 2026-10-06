@@ -191,6 +191,39 @@ describe('check on the synthetic consumer', () => {
   });
 });
 
+describe('the verdict of every analyzed package', () => {
+  it('records the breaking count and what verified it in the report (JSON)', async () => {
+    const compiled = await check({
+      cwd: CONSUMER,
+      adapter,
+      fetcher,
+      cache: memoryCache(),
+      runtime: false,
+    });
+    const synthetic = compiled.packages.find((p) => p.name === 'synthetic');
+    expect(synthetic?.compile?.newErrors).toBeGreaterThan(0);
+    expect(synthetic?.verdict).toMatchObject({
+      compiledAgainst: '2.0.0',
+      newErrors: synthetic?.compile?.newErrors,
+      breaking: synthetic?.findings.filter((f) => f.severity === 'breaking').length,
+    });
+    expect(synthetic?.verdict?.summary).toMatch(
+      /^\d+ breaking · compiled against 2\.0\.0: \d+ new type errors?$/,
+    );
+    const off = await check({
+      cwd: CONSUMER,
+      adapter,
+      fetcher,
+      cache: memoryCache(),
+      runtime: false,
+      compile: false,
+    });
+    expect(off.packages.find((p) => p.name === 'synthetic')?.verdict).toMatchObject({
+      notVerified: 'compile check off (--no-compile)',
+    });
+  });
+});
+
 describe('check skips what cannot matter', () => {
   it('marks @types/* and never-imported dependencies as not-imported unless allDeps', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'uptide-deps-'));

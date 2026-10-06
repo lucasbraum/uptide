@@ -20,7 +20,9 @@ describe('uptide (no command)', () => {
     expect(await run([], io, fakeEngine())).toBe(0);
     expect(io.stdout()).toContain('zod     3.23.8 installed, latest 4.6.5, 1 major behind');
     expect(io.stdout()).toContain('stripe  14.25.0 installed, latest 22.6.2, 8 majors behind');
-    expect(io.stdout()).toContain('Run `uptide list`, then `uptide check <package>` for impact.');
+    expect(io.stdout()).toContain(
+      'Run `npx uptide list`, then `npx uptide check <package>` for impact.',
+    );
     expect(io.stderr()).toMatch(/✔ Repository {2}shop \(npm\) \(\d+ms\)/);
   });
 
@@ -317,13 +319,13 @@ describe('uptide fix', () => {
         ['fix', '--only', 'react'],
         {},
         'no selected-provider API key is set',
-        'Next: uptide fix react',
+        'Next: npx uptide fix react',
       ],
       [
         ['fix', '--only', 'react', '--no-llm'],
         { ANTHROPIC_API_KEY: 'test-key' },
         'assisted fixes are off (--no-llm)',
-        'Next: uptide check react --details',
+        'Next: npx uptide check react --details',
       ],
     ] as const) {
       const engine = fakeEngine();
@@ -474,7 +476,7 @@ describe('uptide verify', () => {
     );
     // A kept clone is always named, with the reason and how it goes away.
     expect(io.stderr()).toContain(
-      'Temporary clone kept: /tmp/uptide-runs/run-x/repo\n  your checkout changed during the run; `uptide clean` removes kept clones older than 7 days.',
+      'Temporary clone kept: /tmp/uptide-runs/run-x/repo\n  your checkout changed during the run; `npx uptide clean` removes kept clones older than 7 days.',
     );
   });
   it('ends with the summary and the next commands, never the PR body', async () => {

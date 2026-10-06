@@ -1,7 +1,7 @@
 import type { ListReport } from '@uptide/core';
 import { expect, it, vi } from 'vitest';
 import { run } from './cli.js';
-import { formatList } from './format-list.js';
+import { formatList, groupVersions } from './format-list.js';
 import { fakeEngine, memoryIo, tempRepo } from './test-utils.js';
 
 const report: ListReport = {
@@ -61,7 +61,7 @@ it('collapses minor/patch rows, separates unused packages and suggests the top i
   expect(text).not.toContain('minor  1.0.0 → 1.1.0');
   expect(text).toContain('TOOLING  1 package, used by scripts and config · --all');
   expect(text).not.toContain('consider removing');
-  expect(text.trim().split('\n').at(-1)).toBe('Next  uptide check zod');
+  expect(text.trim().split('\n').at(-1)).toBe('Next  npx uptide check zod');
   expect(formatList(report, { all: true })).toMatch(/minor +1.0.0 → 1.1.0/);
 });
 it('lists without node_modules and never calls check; JSON retains every entry', async () => {
@@ -152,7 +152,7 @@ it('prints singular usage, references, major gaps, groups and workspace columns 
   expect(text).not.toContain('notUsed');
   expect(text).not.toContain('src/main.ts');
   expect(text).not.toMatch(/ · \.(?:\n|$)/);
-  expect(text.trim().split('\n').at(-1)).toBe('Next  uptide check --group nestjs');
+  expect(text.trim().split('\n').at(-1)).toBe('Next  npx uptide check --group nestjs');
   expect(formatList(grouped, { all: true })).toMatch(/1 file +1 call/);
   expect(formatList(grouped, { details: true })).toContain('src/main.ts');
   grouped.workspaces = ['.', 'packages/api'];
@@ -196,4 +196,29 @@ it('returns incomplete discovery and preserves unknown packages in JSON', async 
   expect(await run(['list', '--json'], io, engine)).toBe(2);
   expect(JSON.parse(io.stdout()).unknown).toEqual(unknown);
   expect(JSON.parse(io.stdout()).packages).toHaveLength(3);
+});
+
+it('names each target major when a group reaches several, a family once', () => {
+  const member = (name: string, latest: string) =>
+    ({ name, latest, current: '1.0.0' }) as ListReport['packages'][number];
+  const group = (members: ListReport['packages']) => ({
+    id: 'ai',
+    name: 'ai + @ai-sdk/*',
+    members,
+  });
+  expect(
+    groupVersions(
+      group([
+        member('ai', '7.0.1'),
+        member('@ai-sdk/openai', '4.0.0'),
+        member('@ai-sdk/react', '4.1.0'),
+      ]),
+    ),
+  ).toBe('→ ai 7 · @ai-sdk/* 4');
+  expect(
+    groupVersions(group([member('ai', '7.0.1'), member('@ai-sdk/openai-compatible', '3.0.0')])),
+  ).toBe('→ ai 7 · @ai-sdk/openai-compatible 3');
+  expect(
+    groupVersions(group([member('@nestjs/core', '12.0.0'), member('@nestjs/common', '12.1.0')])),
+  ).toBe('→ 12.x');
 });

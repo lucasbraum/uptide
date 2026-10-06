@@ -1,15 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 import type { CheckReport, CheckResult, FixReport } from '@uptide/core';
-import {
-  formatFix,
-  isFailure,
-  PRICE_DATE,
-  priceFor,
-  selectLlm,
-  TIER_LEGEND,
-  uptideCommand,
-} from '@uptide/core';
+import { formatFix, isFailure, PRICE_DATE, priceFor, selectLlm, TIER_LEGEND } from '@uptide/core';
 import { Command, CommanderError } from 'commander';
 import { describeRepo, detectRepo, type Repo } from './detect.js';
 import { defaultEngine, type Engine } from './engine.js';
@@ -35,6 +27,7 @@ import { writeListHtml } from './html/list.js';
 import { writeMigrationHtml } from './html/migration.js';
 import { writePlanHtml } from './html/plan.js';
 import { openHtml, writeHtml } from './html/write.js';
+import { INVOCATION } from './invocation.js';
 import { type Io, type Ui, type UiFlags, uiOf } from './io.js';
 import { PRIVACY } from './privacy.js';
 import { createProgress, elapsed, type Progress } from './progress.js';
@@ -47,7 +40,6 @@ import {
 } from './status.js';
 import { createTelemetry, type Telemetry } from './telemetry/client.js';
 import { checkMetrics, fixMetrics, listMetrics } from './telemetry/metrics.js';
-
 import { VERSION } from './version.js';
 
 export { VERSION } from './version.js';
@@ -108,8 +100,6 @@ export function parseTargets(
 
 /** A prerelease build tells people to run the prerelease: `latest` may not have this command yet. */
 // npm latest is a placeholder until the stable CLI launch.
-/** `npx uptide`, or `npx uptide@next` when this build is a prerelease: commands must reach this build. */
-const INVOCATION = uptideCommand(VERSION);
 const HTML_INVOCATION = INVOCATION;
 /** Package managers `fix` can upgrade and verify with. */
 const FIX_MANAGERS: readonly string[] = ['pnpm', 'npm', 'yarn'];
@@ -130,7 +120,7 @@ function whereItRan(report: FixReport): string {
     ? `Warning: your checkout changed during the run: ${report.sourceChanged.join('; ')}.`
     : 'Your checkout was not touched: same branch, files, hooks and git config.';
   const clone = report.clone?.kept
-    ? `Temporary clone kept: ${report.clone.path}\n  ${report.clone.reason}; \`uptide clean\` removes kept clones older than 7 days.`
+    ? `Temporary clone kept: ${report.clone.path}\n  ${report.clone.reason}; \`${INVOCATION} clean\` removes kept clones older than 7 days.`
     : 'Ran in a temporary clone, removed now that the run is over.';
   return `${clone}\n${untouched}\n`;
 }
@@ -350,7 +340,7 @@ ${PRIVACY}`,
                 width: io.columns,
                 details: flags.details,
                 header: headerOf(repo, io.now() - started),
-                invocation: 'uptide',
+                invocation: INVOCATION,
                 cwd: flags.cwd,
               }),
             );
@@ -361,7 +351,7 @@ ${PRIVACY}`,
                 version: VERSION,
                 date: new Date().toISOString(),
                 header: headerOf(repo, io.now() - started),
-                invocation: 'uptide',
+                invocation: INVOCATION,
                 details: flags.details,
                 cwd: resolve(io.cwd) === resolve(repo.root) ? undefined : repo.root,
               },

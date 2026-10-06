@@ -91,3 +91,26 @@ it('keeps selectors unique when an unscoped lead matches a scope shorthand', () 
   );
   expect(groups.map((g) => g.id)).toEqual(['@example/*', 'example']);
 });
+
+it('names a mixed group after its hub on a tie, even when a family member is used more', () => {
+  // ai shares a pinned dependency with one @ai-sdk member only; that member is used in more
+  // files. Each has one link outside its family: ai, in no family and nobody's peer, leads.
+  const used = (name: string, files: number): ListedDependency => ({
+    ...pkg(name, '4.0.0', '7.0.0'),
+    usage: { files, callSites: files, references: 0, topSymbols: [], workspaces: [] },
+  });
+  const groups = dependencyGroups(
+    [used('ai', 1), used('@ai-sdk/openai-compatible', 9), used('@ai-sdk/react', 3)],
+    new Map([
+      ['ai', [{ dependencies: { '@ai-sdk/provider': '1.1.3' } }]],
+      ['@ai-sdk/openai-compatible', [{ dependencies: { '@ai-sdk/provider': '1.1.3' } }]],
+    ]),
+    new Map<string, Manifest>([
+      ['ai', { dependencies: { '@ai-sdk/provider': '4.0.22' } }],
+      ['@ai-sdk/openai-compatible', { dependencies: { '@ai-sdk/provider': '4.0.22' } }],
+    ]),
+  );
+  expect(groups.map(({ id, name, lead, reason }) => ({ id, name, lead, reason }))).toEqual([
+    { id: 'ai', name: 'ai + @ai-sdk/*', lead: 'ai', reason: 'shared @ai-sdk/provider' },
+  ]);
+});

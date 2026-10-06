@@ -102,7 +102,7 @@ it('loads the stored run for the branch, refuses a branch that moved, and opens 
   git(root, 'switch', '-q', '-');
   await expect(
     openPr({ cwd: root, branch: 'uptide/zod-4.6.5', yes: true }, io.print, io),
-  ).rejects.toThrow('run `uptide verify --branch uptide/zod-4.6.5` first');
+  ).rejects.toThrow('run `npx uptide verify --branch uptide/zod-4.6.5` first');
   await expect(openPr({ cwd: root, branch: 'uptide/other' }, io.print, io)).rejects.toThrow(
     'no stored migration run for uptide/other',
   );

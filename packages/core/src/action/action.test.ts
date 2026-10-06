@@ -120,7 +120,7 @@ it.runIf(process.env.UPTIDE_NETWORK === '1')(
           maxBuffer: 2 * 1024 * 1024,
         },
       );
-      expect(output).toContain('1 by rule · 0 by agent');
+      expect(output).toContain('1 auto-fixed · 0 fixed by the agent (LLM)');
       expect(output).toContain('Low: rule-only; all verified');
       expect(output).toContain('Sticky comment: 1 created, 1 updated');
       expect(output).toContain(

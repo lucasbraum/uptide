@@ -14,7 +14,7 @@ POSSIBLY UNUSED  1 package, no usage found by Uptide's scan; verify before remov
 
 Usage is a syntax scan, no type analysis.
 Generic analysis is the default; verified means a migration pack is available.
-Next  uptide check babel-plugin-example
+Next  npx uptide check babel-plugin-example
 "
 `;
 
@@ -43,7 +43,7 @@ TOOLING  4 packages, used by scripts and config
     lint-staged command
 
 POSSIBLY UNUSED  2 packages, no usage found by Uptide's scan; verify before removing
-unused-plugin   2 packages (1 in this section)   → 2.x   uptide check --group unused-plugin
+unused-plugin   2 packages (1 in this section)   → 2.x   npx uptide check --group unused-plugin
   unused-plugin   1.0.0 → 2.0.0   major   0 files
     no static imports, script/bin usage, configuration references, stylesheet imports or HTML assets found
   pretty-quick    1.0.0 → 2.0.0   major   0 files
@@ -51,7 +51,7 @@ unused-plugin   2 packages (1 in this section)   → 2.x   uptide check --group 
 
 Usage is a syntax scan, no type analysis.
 Generic analysis is the default; verified means a migration pack is available.
-Next  uptide check husky
+Next  npx uptide check husky
 "
 `;
 

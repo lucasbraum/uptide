@@ -324,7 +324,13 @@ export function prioritize(
       signal: best.u.signal,
       urgency: best.u.urgency,
       effort: g.members.reduce((n, p) => n + (p.signals?.effort ?? 0), 0),
-      reason: best.p.name === (g.lead ?? g.name) ? reason : `${best.p.name}: ${reason}`,
+      // A member other than the lead is named before its reason, after any `dev · `.
+      reason:
+        best.p.name === (g.lead ?? g.name)
+          ? reason
+          : reason.startsWith('dev · ')
+            ? `dev · ${best.p.name} ${reason.slice('dev · '.length)}`
+            : `${best.p.name} ${reason}`,
       ...rowOf(best.p, best.p.signals as PackageSignals),
     });
   }

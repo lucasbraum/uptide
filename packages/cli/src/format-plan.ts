@@ -1,5 +1,5 @@
 import type { Effort, PlannedPackage, UpgradePlan, UpgradeStep } from '@uptide/core';
-import { TIER_LEGEND } from '@uptide/core';
+import { BY, TIER_LEGEND } from '@uptide/core';
 import pc from 'picocolors';
 import { type CheckHeader, repoLine } from './format-check.js';
 import { elapsed } from './progress.js';
@@ -16,14 +16,14 @@ export interface FormatPlanOptions {
 
 const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
 
-/** `small · 28 sites: 24 by rule, 4 by agent · 2 unconfirmed`, or what "none" means. */
+/** `small · 28 sites: 24 auto-fixable, 4 need the agent (LLM) · 2 unconfirmed`, or what "none" means. */
 export function effortLine(e: Effort): string {
   if (e.level === 'unknown') return 'not checked completely · effort unknown';
   if (e.level === 'none') return 'no code changes expected';
   const sites = e.byRule + e.byAgent + e.manual;
   const by = [
-    e.byRule > 0 ? `${e.byRule} by rule` : '',
-    e.byAgent > 0 ? `${e.byAgent} by agent` : '',
+    e.byRule > 0 ? BY.rule(e.byRule) : '',
+    e.byAgent > 0 ? BY.agent(e.byAgent) : '',
     e.manual > 0 ? `${e.manual} manual` : '',
   ].filter(Boolean);
   return [

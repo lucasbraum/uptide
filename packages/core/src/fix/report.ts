@@ -1,5 +1,6 @@
 import { basename } from 'node:path';
 import type { Finding } from '../domain/report.js';
+import { BY } from '../domain/wording.js';
 import { GENERIC_NOTE } from '../packs/generic.js';
 import { UPTIDE_COMMAND } from '../version.js';
 import type { BehaviorResult } from './behavior.js';
@@ -511,7 +512,7 @@ export function summaryCells(report: FixReport): {
   const tests = `${testsRow(report)}${lintCell(report)}`;
   const changes = !report.sites.length
     ? 'none: versions and lockfile only'
-    : `${count(report.sites.length, 'site')} in ${new Set(report.sites.map((s) => s.finding.usage.file)).size} file${new Set(report.sites.map((s) => s.finding.usage.file)).size === 1 ? '' : 's'}${report.verificationPending ? ' · analysis only' : ` · ${c.mechanical} by rule · ${c.agent} by agent${c.manual ? ` · ${c.manual} manual` : ''}`}`;
+    : `${count(report.sites.length, 'site')} in ${new Set(report.sites.map((s) => s.finding.usage.file)).size} file${new Set(report.sites.map((s) => s.finding.usage.file)).size === 1 ? '' : 's'}${report.verificationPending ? ' · analysis only' : ` · ${BY.ruleDone(c.mechanical)} · ${BY.agentDone(c.agent)}${c.manual ? ` · ${c.manual} manual` : ''}`}`;
   const messages = bs.flatMap((b) => b.messageChecks ?? []).filter((c) => c.status !== 'default');
   const messageSummary = messages.length
     ? ` · ${messages.filter((c) => c.status === 'identical').length}/${messages.length} custom-message assertions`
@@ -550,7 +551,7 @@ function summaryRows(report: FixReport): string[] {
 const heading = (g: Group, report: FixReport, i: number) => {
   const sources = [...new Set(g.sites.map((s) => s.outcome))]
     .map((source) =>
-      source === 'mechanical' ? 'by rule' : source === 'agent' ? 'by agent' : 'manual',
+      source === 'mechanical' ? BY.ruleDoneTag : source === 'agent' ? BY.agentDoneTag : 'manual',
     )
     .sort();
   return `**${i + 1}. ${description(g, report).title}** · ${g.edits.length !== g.sites.length ? `${g.edits.length} fix${g.edits.length === 1 ? '' : 'es'}, ${count(g.sites.length, 'error')}` : `${g.sites.length} site${g.sites.length === 1 ? '' : 's'}`} · ${sources.join(' + ')}`;

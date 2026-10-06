@@ -3,6 +3,7 @@ import { compareVersions, majorsBehind } from '@uptide/core';
 import pc from 'picocolors';
 import type { Repo } from './detect.js';
 import type { Engine } from './engine.js';
+import { runnable } from './invocation.js';
 
 /** The dependencies uptide migrates today. */
 export const SUPPORTED = ['zod', 'stripe'] as const;
@@ -144,7 +145,9 @@ export function formatStatus(report: StatusReport, opts: { color?: boolean } = {
   else if (
     used.some((d) => !d.latest || !d.installed || compareVersions(d.installed, d.latest) < 0)
   )
-    lines.push(`Run ${colors.bold('`uptide list`, then `uptide check <package>`')} for impact.`);
+    lines.push(
+      `Run ${colors.bold(runnable('`uptide list`, then `uptide check <package>`'))} for impact.`,
+    );
   else lines.push('Nothing to upgrade.');
   return `${lines.join('\n')}\n`;
 }

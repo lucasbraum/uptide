@@ -82,7 +82,7 @@ for (const name of ['storefront-zod', 'stripe'])
   });
 it('matches the storefront counts and folds the two resolved diagnostics into one fix', () => {
   const body = prBody(fixture('storefront-zod'));
-  expect(body).toContain('29 sites in 8 files · 25 by rule · 4 by agent');
+  expect(body).toContain('29 sites in 8 files · 25 auto-fixed · 4 fixed by the agent (LLM)');
   expect(body).toContain('✅ 5 tests in 3 files passed');
   // The one test that asserted zod 3's default wording was updated, and the owner is told.
   expect(visible(body)).toContain(
@@ -93,7 +93,7 @@ it('matches the storefront counts and folds the two resolved diagnostics into on
   expect(body).toContain(
     '`signUpSchema` and `createOrderSchema`: behavior not checked (they import another schema file)',
   );
-  expect(body).toContain('1 fix, 3 errors · by agent');
+  expect(body).toContain('1 fix, 3 errors · by the agent (LLM)');
   expect(body.match(/^\*\*\d+\./gm)).toHaveLength(4);
   expect(body).not.toContain('diagnostic resolved by an earlier');
   expect(body).toContain('orders.ts` (6)');
@@ -425,7 +425,9 @@ describe('runs are scoped to their own repository', () => {
     expect(body).toContain(
       '| **Risk** | Medium: billing path; API version bump with additive changes only |',
     );
-    expect(body).toContain('| **Changes** | 1 site in 1 file · 0 by rule · 1 by agent |');
+    expect(body).toContain(
+      '| **Changes** | 1 site in 1 file · 0 auto-fixed · 1 fixed by the agent (LLM) |',
+    );
     expect(body).toContain(
       "### Worth a look\n\n- Check the webhook endpoint's API version in the Stripe Dashboard before deploying.",
     );
@@ -468,7 +470,7 @@ describe('runs are scoped to their own repository', () => {
         ],
       }),
     );
-    expect(body).toMatch(/^\*\*1\. Test fixture casts widened\*\* · 1 site · by rule$/m);
+    expect(body).toMatch(/^\*\*1\. Test fixture casts widened\*\* · 1 site · auto-fixed$/m);
     expect(body).toContain('the same cast now goes through `unknown`');
   });
 
