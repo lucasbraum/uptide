@@ -178,7 +178,22 @@ interface Ctx {
    * member set diffs, but the declaration keeps pointing at the path it was declared under.
    */
   inherited?: boolean;
+  /**
+   * Declarations being walked above this one, with the path each was walked under. A name
+   * that reaches one of them again is a cycle (`declare namespace pino { export { pino as
+   * default } }`), cut instead of walked.
+   */
+  ancestors?: Map<ts.Node, string>;
+  /** How many named declarations deep this walk is. */
+  depth?: number;
 }
+
+/**
+ * Deeper than this, a walk is cut like a cycle. Only re-entering declarations nests named
+ * walks (type literals nest no deeper than the source text), so the limit bounds the
+ * recursion and the call stack with it.
+ */
+export const MAX_NESTING = 32;
 
 /** Emits a symbol and returns the context its members should be walked with. */
 function emit(ctx: Ctx, symbol: Omit<ApiSymbol, 'exportedFrom'>, nodes: Node[]): Ctx {
@@ -571,10 +586,36 @@ function namespaceExports(ctx: Ctx, modules: ModuleDeclaration[]): Map<string, N
   return symbol ? namedExports(symbol.getExports()) : new Map();
 }
 
-export function walkNamed(ctx: Ctx, path: string, decls: Node[]): void {
+export function walkNamed(parent: Ctx, path: string, decls: Node[]): void {
   const kinds = decls.map(kindOf).filter((k): k is SymbolKind => k !== undefined);
   if (kinds.length === 0) return;
   const kind = strongest(kinds);
+
+  // A declaration already being walked above, or a walk past MAX_NESTING: the name is
+  // emitted, so it still diffs, and compared by name instead of walked again.
+  const cycle = decls
+    .map((d) => parent.ancestors?.get(d.compilerNode))
+    .find((p) => p !== undefined);
+  const depth = (parent.depth ?? 0) + 1;
+  if (cycle !== undefined || depth > MAX_NESTING) {
+    emit(
+      parent,
+      {
+        path,
+        kind,
+        signature:
+          cycle !== undefined
+            ? `recursive type ${cycle} (compared by name)`
+            : `nested deeper than ${MAX_NESTING} levels (compared by name)`,
+        deprecated: deprecatedOf(decls),
+      },
+      decls,
+    );
+    return;
+  }
+  const ancestors = new Map(parent.ancestors);
+  for (const d of decls) ancestors.set(d.compilerNode, path);
+  const ctx: Ctx = { ...parent, ancestors, depth };
 
   const classes = decls.filter(Node.isClassDeclaration);
   const functions = decls.filter(Node.isFunctionDeclaration);

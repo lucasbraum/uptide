@@ -958,6 +958,125 @@ it('turns recursive extraction failure into an explicit per-package failure', as
   expect(result.summary.failed).toBe(1);
 });
 
+describe('recursive declarations (uptide-dev/uptide#4)', () => {
+  /** A consumer of logkit (pino-like, recursive) and widget, both installed at 1.0.0. */
+  function consumer(): string {
+    const DEPS = join(ROOT, 'deps');
+    const repo = mkdtempSync(join(tmpdir(), 'uptide-recursive-'));
+    mkdirSync(join(repo, 'src'), { recursive: true });
+    cpSync(join(DEPS, 'recursive-v1'), join(repo, 'node_modules/logkit'), { recursive: true });
+    cpSync(join(DEPS, 'widget-v1'), join(repo, 'node_modules/widget'), { recursive: true });
+    const deps = { logkit: '1.0.0', widget: '1.0.0' };
+    writeFileSync(join(repo, 'package.json'), JSON.stringify({ name: 'app', dependencies: deps }));
+    writeFileSync(
+      join(repo, 'package-lock.json'),
+      JSON.stringify({
+        name: 'app',
+        lockfileVersion: 3,
+        packages: {
+          '': { dependencies: deps },
+          'node_modules/logkit': { version: '1.0.0' },
+          'node_modules/widget': { version: '1.0.0' },
+        },
+      }),
+    );
+    writeFileSync(
+      join(repo, 'tsconfig.json'),
+      JSON.stringify({
+        compilerOptions: {
+          module: 'NodeNext',
+          moduleResolution: 'NodeNext',
+          strict: true,
+          noEmit: true,
+          skipLibCheck: true,
+        },
+        include: ['src'],
+      }),
+    );
+    writeFileSync(
+      join(repo, 'src/index.ts'),
+      [
+        "import logkit = require('logkit');",
+        "import { boxed } from 'widget';",
+        'const log = logkit();',
+        'export const parent = log.parent;',
+        'export const child = log.child({}).level;',
+        'export const value = boxed().a;',
+        '',
+      ].join('\n'),
+    );
+    return repo;
+  }
+  const recursiveFetcher: PackageFetcher = {
+    async resolve(_name, requested) {
+      return requested === 'latest' ? '2.0.0' : requested;
+    },
+    async versions() {
+      return [];
+    },
+    async fetch(name, version) {
+      const dir = mkdtempSync(join(tmpdir(), `uptide-${name}-`));
+      cpSync(
+        join(
+          ROOT,
+          'deps',
+          name === 'logkit' ? `recursive-v${version[0]}` : `widget-v${version[0]}`,
+        ),
+        dir,
+        {
+          recursive: true,
+        },
+      );
+      return { name, version, dir };
+    },
+  };
+
+  it('analyzes a package whose namespace exports itself, and finds the real break', async () => {
+    const result = await check({
+      cwd: consumer(),
+      only: ['logkit'],
+      adapter,
+      fetcher: recursiveFetcher,
+      cache: memoryCache(),
+      runtime: false,
+    });
+    const logkit = result.packages.find((p) => p.name === 'logkit') as PackageReport;
+    expect(logkit.status).toBe('breaking');
+    expect(logkit.skipReason).toBeUndefined();
+    expect(
+      logkit.findings.map(
+        (f) => `${f.change.kind} ${f.change.path} ${f.usage.file}:${f.usage.line}`,
+      ),
+    ).toContain('removed logkit.Logger#parent src/index.ts:4');
+  });
+
+  it('fails a package alone: the others keep their results, and the failure says which and why', async () => {
+    const result = await check({
+      cwd: consumer(),
+      only: ['logkit', 'widget'],
+      adapter: {
+        ...adapter,
+        extractSurface: async (pkg) => {
+          if (pkg.name === 'widget') throw new RangeError('Maximum call stack size exceeded');
+          return adapter.extractSurface(pkg);
+        },
+      },
+      fetcher: recursiveFetcher,
+      cache: memoryCache(),
+      runtime: false,
+    });
+    expect(result.packages.find((p) => p.name === 'widget')).toMatchObject({
+      status: 'skipped',
+      skipReason: 'ANALYSIS_STACK_OVERFLOW',
+      notes: [
+        expect.stringMatching(/^widget: analysis exceeded its recursion limit .*No safety verdict/),
+      ],
+    });
+    expect(result.packages.find((p) => p.name === 'logkit')?.status).toBe('breaking');
+    expect(result.summary.failed).toBe(1);
+  });
+});
+
 describe('check on a pnpm workspace with the isolated node-linker', () => {
   it("compiles each workspace with its own @types: a baseline of 0, as the workspace's tsc has", async () => {
     // Nothing hoisted: @types/node is only in each package's node_modules. Types read from the
