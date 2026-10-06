@@ -1,9 +1,12 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { ts } from 'ts-morph';
 import { afterAll, describe, expect, it } from 'vitest';
+import { printCompilerNode } from '../adapters/typescript/serialize.js';
 import type { CheckReport, Finding } from '../domain/report.js';
 import { genericPack } from '../packs/generic.js';
+import { onReset } from '../shared-state.js';
 import { git } from './process.js';
 import { prBody } from './report.js';
 import { type FixServices, fix } from './run.js';
@@ -184,6 +187,40 @@ describe('fix for a dependency without a pack', () => {
     expect(body).toContain(
       'Tier: generic (no migration pack: agent edits verified by the compiler)',
     );
+  }, 20000);
+
+  it('discards shared TypeScript state after an attempt fails inside it, then retries the site', async () => {
+    let resets = 0;
+    onReset(() => {
+      resets++;
+    });
+    const { root, services, fixer } = paintFixture();
+    const answer = fixer(0.01);
+    // The first attempt fails inside TypeScript's printer, as a stack overflow does.
+    const f = ts.factory;
+    const boom = f.createIdentifier('Boom');
+    Object.defineProperty(boom, 'escapedText', {
+      get() {
+        throw new RangeError('Maximum call stack size exceeded');
+      },
+    });
+    let calls = 0;
+    const flaky = {
+      ...answer,
+      fix: async (request: FixRequest) => {
+        if (++calls === 1)
+          printCompilerNode(
+            f.createTypeReferenceNode('Partial', [f.createTypeReferenceNode(boom)]),
+          );
+        return answer.fix(request);
+      },
+    };
+    const before = resets;
+    const result = await fix({ cwd: root, only: 'paint', fixer: flaky }, services);
+    expect(resets).toBe(before + 1);
+    expect(calls).toBe(2);
+    expect(result.sites.map((s) => s.outcome)).toEqual(['agent']);
+    expect(result.verification.passed).toBe(true);
   }, 20000);
 
   it('refuses plainly without an agent, before anything changes', async () => {

@@ -3,6 +3,7 @@ import { dirname, join, resolve } from 'node:path';
 import { Project, type ResolutionHostFactory, ts } from 'ts-morph';
 import type { RepoDir } from '../../domain/adapter.js';
 import { UptideError } from '../../errors.js';
+import { onReset } from '../../shared-state.js';
 import { type Lockfile, readLockfile } from './lockfile.js';
 import { declaredPaths, workspaceSourceMap } from './workspace-source.js';
 
@@ -47,6 +48,8 @@ export function findRepoRoot(cwd: string): string | undefined {
 const SYNTHETIC_EXCLUDES = ['**/node_modules/**', '**/dist/**', '**/build/**'];
 
 const repos = new Map<string, LoadedRepo>();
+// A program or checker a failed analysis was inside may be half updated: reload them.
+onReset(() => repos.clear());
 
 /** `loadRepo`, cached by directory: a parsed program is reused across every package checked in a workspace. */
 export function loadedRepo(dir: string, rootFiles?: string[]): LoadedRepo {

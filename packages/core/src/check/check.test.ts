@@ -1,14 +1,18 @@
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { ts } from 'ts-morph';
 import { describe, expect, it } from 'vitest';
 import { createTypescriptAdapter } from '../adapters/typescript/index.js';
+import { printCompilerNode } from '../adapters/typescript/serialize.js';
 import type { PackageFetcher, SurfaceCache } from '../domain/io.js';
 import type { ProgressEvent } from '../domain/progress.js';
 import type { Finding, PackageReport } from '../domain/report.js';
 import type { ApiSurface } from '../domain/surface.js';
 import { UptideError } from '../errors.js';
-import { isolatedPnpmWorkspace } from '../fix/test-fixture.js';
+import { fix } from '../fix/run.js';
+import { isolatedPnpmWorkspace, zodFixture } from '../fix/test-fixture.js';
+import { onReset } from '../shared-state.js';
 import {
   check,
   mergeAcrossWorkspaces,
@@ -1081,6 +1085,96 @@ describe('recursive declarations (uptide-dev/uptide#4)', () => {
         (f) => `${f.change.kind} ${f.change.path} ${f.usage.file}:${f.usage.line}`,
       ),
     ).toContain('removed logkit.Logger#parent src/index.ts:4');
+  });
+
+  it("leaves no state behind: after a package fails mid-print, the next one's report is byte-identical to its own run", async () => {
+    // A failure inside the shared printer (what a stack overflow did on main), then logkit.
+    const f = ts.factory;
+    const boom = f.createIdentifier('Boom');
+    Object.defineProperty(boom, 'escapedText', {
+      get() {
+        throw new RangeError('Maximum call stack size exceeded');
+      },
+    });
+    const failing = f.createTypeReferenceNode('Partial', [f.createTypeReferenceNode(boom)]);
+    const run = (only: string[]) =>
+      check({
+        cwd: consumer(),
+        only,
+        order: ['widget', 'logkit'],
+        concurrency: 1,
+        adapter: {
+          ...adapter,
+          extractSurface: async (pkg) => {
+            if (pkg.name === 'widget') printCompilerNode(failing);
+            return adapter.extractSurface(pkg);
+          },
+        },
+        fetcher: recursiveFetcher,
+        cache: memoryCache(),
+        runtime: false,
+      });
+    // Timings and temporary directories differ between any two runs; nothing else may.
+    const stable = (report: PackageReport | undefined) =>
+      JSON.stringify(report, (key, value) =>
+        key === 'timing' || key === 'ms' ? undefined : value,
+      ).replace(/\/[^"]*uptide-[^"/]*/g, '<tmp>');
+    const after = await run(['widget', 'logkit']);
+    expect(after.packages.find((p) => p.name === 'widget')?.skipReason).toBe(
+      'ANALYSIS_STACK_OVERFLOW',
+    );
+    const alone = await run(['logkit']);
+    expect(stable(after.packages.find((p) => p.name === 'logkit'))).toBe(
+      stable(alone.packages.find((p) => p.name === 'logkit')),
+    );
+  });
+
+  it("leaves no state behind after a failed fix: the next package's check is byte-identical to its own run", async () => {
+    let resets = 0;
+    onReset(() => {
+      resets++;
+    });
+    const f = ts.factory;
+    const boom = f.createIdentifier('Boom');
+    Object.defineProperty(boom, 'escapedText', {
+      get() {
+        throw new RangeError('Maximum call stack size exceeded');
+      },
+    });
+    const checkLogkit = () =>
+      check({
+        cwd: consumer(),
+        only: ['logkit'],
+        adapter,
+        fetcher: recursiveFetcher,
+        cache: memoryCache(),
+        runtime: false,
+      });
+    const stable = (report: PackageReport | undefined) =>
+      JSON.stringify(report, (key, value) =>
+        key === 'timing' || key === 'ms' ? undefined : value,
+      ).replace(/\/[^"]*uptide-[^"/]*/g, '<tmp>');
+    const alone = stable((await checkLogkit()).packages.find((p) => p.name === 'logkit'));
+    // As the Action does: fix one detected upgrade, then check the next. This fix fails
+    // inside TypeScript's printer while analyzing zod.
+    const { root, services } = zodFixture(mkdtempSync(join(tmpdir(), 'uptide-failing-fix-')));
+    const before = resets;
+    await expect(
+      fix(
+        { cwd: root, only: 'zod', fixer: null },
+        {
+          ...services,
+          check: async () => {
+            printCompilerNode(
+              f.createTypeReferenceNode('Partial', [f.createTypeReferenceNode(boom)]),
+            );
+            throw new Error('unreachable');
+          },
+        },
+      ),
+    ).rejects.toThrow('Maximum call stack size exceeded');
+    expect(resets).toBe(before + 1);
+    expect(stable((await checkLogkit()).packages.find((p) => p.name === 'logkit'))).toBe(alone);
   });
 
   it('fails a package alone: the others keep their results, and the failure says which and why', async () => {

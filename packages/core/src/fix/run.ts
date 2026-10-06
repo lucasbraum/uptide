@@ -13,6 +13,7 @@ import { stripePack } from '../packs/stripe/index.js';
 import { payloadApiVersions, stripeUsageContext } from '../packs/stripe/relevance.js';
 import type { MigrationPack, PackContext } from '../packs/types.js';
 import { zodPack } from '../packs/zod/index.js';
+import { resetSharedState } from '../shared-state.js';
 import { UPTIDE_COMMAND, uptideVersionInfo } from '../version.js';
 import { assist } from './assisted.js';
 import { behaviorCheck } from './behavior.js';
@@ -133,10 +134,24 @@ function originOf(root: string): string | undefined {
 }
 /** Compatibility alias: the same default now applies to all packages. */
 export const GENERIC_MAX_COST_USD = DEFAULT_MAX_COST_USD;
+/**
+ * One package's migration. A failure leaves no shared TypeScript state behind: whatever a
+ * caller runs next in this process (the Action fixes each detected upgrade in turn) starts
+ * as in a new process (shared-state.ts).
+ */
 export async function fix(
   options: FixOptions,
   services: FixServices = defaults,
 ): Promise<FixReport> {
+  try {
+    return await fixPackage(options, services);
+  } catch (err) {
+    resetSharedState();
+    throw err;
+  }
+}
+
+async function fixPackage(options: FixOptions, services: FixServices): Promise<FixReport> {
   const started = Date.now();
   const root = realpathSync(resolve(options.cwd));
   if (

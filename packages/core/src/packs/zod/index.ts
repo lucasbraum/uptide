@@ -11,6 +11,7 @@ import {
 } from 'ts-morph';
 import type { Finding } from '../../domain/report.js';
 import { satisfies } from '../../fetch/range.js';
+import { onReset } from '../../shared-state.js';
 import type { MigrationPack, PackContext, TransformResult } from '../types.js';
 import { zodGuide } from './guide.js';
 import { defaultMessageSites } from './messages.js';
@@ -229,6 +230,7 @@ function formatTransform(text: string, call: CallExpression): TransformResult | 
  * of a hundred sites paid for a hundred parses.
  */
 const parsed = new Map<string, SourceFile>();
+onReset(() => parsed.clear());
 function parse(text: string): SourceFile {
   let source = parsed.get(text);
   if (!source) {
