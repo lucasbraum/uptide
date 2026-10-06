@@ -1,0 +1,4 @@
+catalog:
+  zod: ^4.0.0
+onlyBuiltDependencies:
+  - esbuild

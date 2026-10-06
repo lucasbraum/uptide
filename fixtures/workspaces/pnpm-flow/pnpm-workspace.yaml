@@ -1,0 +1,3 @@
+packages: ['apps/*', "packages/**", '!**/test/**'] # flow form
+catalog:
+  zod: ^4.0.0

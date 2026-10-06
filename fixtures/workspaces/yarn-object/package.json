@@ -1,0 +1,13 @@
+{
+  "name": "workspace-yarn-object",
+  "private": true,
+  "workspaces": {
+    "packages": [
+      "apps/*",
+      "packages/*"
+    ],
+    "nohoist": [
+      "**/react"
+    ]
+  }
+}

@@ -1,63 +1,167 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { type Dirent, existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { parse } from 'yaml';
+import { UptideError } from './errors.js';
 
-/**
- * Workspace packages declared by pnpm-workspace.yaml (`packages:` list) or package.json
- * `workspaces`, expanded one directory level for `dir/*` patterns, honoring `!` exclusions.
- * The root is a workspace too. Directories without a package.json are not packages.
- */
-export function workspacePackagesOf(root: string): string[] {
-  const patterns: string[] = [];
+/** The `packages` a workspace file declares, and which file declared them. */
+function declaredPatterns(root: string): { file: string; patterns: string[] } | undefined {
+  const strings = (list: unknown): string[] =>
+    Array.isArray(list) ? list.filter((p): p is string => typeof p === 'string') : [];
   const yaml = join(root, 'pnpm-workspace.yaml');
   if (existsSync(yaml)) {
-    // Minimal YAML: only the `packages:` block list is read; the rest (catalog, overrides) is irrelevant here.
-    let inPackages = false;
-    for (const line of readFileSync(yaml, 'utf8').split('\n')) {
-      if (/^packages:\s*$/.test(line)) {
-        inPackages = true;
-        continue;
-      }
-      if (inPackages && /^\s+-\s*/.test(line)) {
-        patterns.push(
-          line
-            .replace(/^\s+-\s*/, '')
-            .trim()
-            .replace(/^['"]|['"]$/g, ''),
-        );
-        continue;
-      }
-      if (inPackages && !/^\s/.test(line) && line.trim() !== '') inPackages = false;
-    }
-  } else {
+    let doc: unknown;
     try {
-      const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {
-        workspaces?: string[] | { packages?: string[] };
-      };
-      patterns.push(
-        ...(Array.isArray(pkg.workspaces) ? pkg.workspaces : (pkg.workspaces?.packages ?? [])),
+      doc = parse(readFileSync(yaml, 'utf8'));
+    } catch (err) {
+      throw new UptideError(
+        'INVALID_WORKSPACE',
+        `pnpm-workspace.yaml is not valid YAML: ${(err instanceof Error ? err.message : String(err)).split('\n')[0]}`,
       );
+    }
+    // pnpm reads only this file; a `packages` key is optional (catalogs and settings alone are fine).
+    return {
+      file: 'pnpm-workspace.yaml',
+      patterns: strings((doc as { packages?: unknown } | null)?.packages),
+    };
+  }
+  let pkg: { workspaces?: unknown };
+  try {
+    pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+  } catch {
+    return undefined; // no package.json: no workspaces
+  }
+  // npm and yarn: an array, or yarn's `{ packages: [...], nohoist: [...] }`.
+  const workspaces = pkg.workspaces;
+  if (workspaces === undefined) return undefined;
+  return {
+    file: 'package.json "workspaces"',
+    patterns: strings(
+      Array.isArray(workspaces) ? workspaces : (workspaces as { packages?: unknown })?.packages,
+    ),
+  };
+}
+
+/**
+ * A glob as a RegExp over `/`-separated paths relative to the root: `*` and `?` stay inside
+ * one segment, `**` spans any number of them. Brace sets (`{a,b}`) and character classes are
+ * not supported; no workspace seen so far uses them.
+ */
+export function globRegExp(glob: string): RegExp {
+  let re = '';
+  for (let i = 0; i < glob.length; i++) {
+    const c = glob[i] as string;
+    if (c === '*' && glob[i + 1] === '*') {
+      i++;
+      if (glob[i + 1] === '/') {
+        i++;
+        re += '(?:.*/)?';
+      } else re += '.*';
+    } else if (c === '*') re += '[^/]*';
+    else if (c === '?') re += '[^/]';
+    else re += c.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+  }
+  return new RegExp(`^${re}$`);
+}
+
+/**
+ * Installed dependencies: never a workspace package (pnpm ignores them too), never walked.
+ * Dot-directories are treated the same way: pnpm globs with `dot: false`.
+ */
+const INSTALLED = new Set(['node_modules', 'bower_components']);
+/** Usually build output: a match when a pattern names one (`packages/build`), but not walked into. */
+const NOT_WALKED = new Set(['dist', 'build', 'coverage', 'out']);
+
+/**
+ * The directories holding a package.json that one pattern matches. Only the pattern's static
+ * prefix is walked (`packages/*` reads `packages/` one level deep), as deep as the pattern
+ * reaches; a `**` has no depth limit, and a leading one walks the whole repository.
+ */
+function matchingDirs(root: string, pattern: string): string[] {
+  const segments = pattern.split('/');
+  const firstGlob = segments.findIndex((s) => /[*?]/.test(s));
+  if (firstGlob === -1) return existsSync(join(root, pattern, 'package.json')) ? [pattern] : [];
+  const rest = segments.slice(firstGlob);
+  const re = globRegExp(pattern);
+  const found: string[] = [];
+  const walk = (rel: string, depth: number): void => {
+    if (depth === 0) return;
+    let entries: Dirent[];
+    try {
+      entries = readdirSync(join(root, rel), { withFileTypes: true });
     } catch {
-      // no package.json: no workspaces
+      return; // a missing or unreadable prefix matches nothing
     }
-  }
-  const excluded = patterns
+    for (const entry of entries) {
+      if (!entry.isDirectory() || INSTALLED.has(entry.name) || entry.name.startsWith('.')) continue;
+      const dir = rel ? `${rel}/${entry.name}` : entry.name;
+      if (re.test(dir) && existsSync(join(root, dir, 'package.json'))) found.push(dir);
+      if (!NOT_WALKED.has(entry.name)) walk(dir, depth - 1);
+    }
+  };
+  walk(
+    segments.slice(0, firstGlob).join('/'),
+    rest.some((s) => s.includes('**')) ? Infinity : rest.length,
+  );
+  return found;
+}
+
+function resolveWorkspaces(root: string): string[] {
+  const declared = declaredPatterns(root);
+  if (!declared) return ['.'];
+  // `.` and `./` name the root, which is always a workspace.
+  const clean = (p: string): string => p.replace(/^\.\//, '').replace(/\/+$/, '') || '.';
+  const include = declared.patterns.filter((p) => !p.startsWith('!')).map(clean);
+  const exclude = declared.patterns
     .filter((p) => p.startsWith('!'))
-    .map((p) => p.slice(1).replace(/\/\*\*?$/, ''));
-  const found = new Set<string>(['.']);
-  for (const pattern of patterns) {
-    if (pattern.startsWith('!')) continue;
-    const clean = pattern.replace(/^\.\//, '').replace(/\/\*\*?$/, '/*');
-    if (clean.endsWith('/*')) {
-      const parentRel = clean.slice(0, -2);
-      const parent = join(root, parentRel);
-      if (!existsSync(parent)) continue;
-      for (const entry of readdirSync(parent, { withFileTypes: true })) {
-        if (entry.isDirectory() && existsSync(join(parent, entry.name, 'package.json')))
-          found.add(`${parentRel}/${entry.name}`);
-      }
-    } else if (existsSync(join(root, clean, 'package.json'))) {
-      found.add(clean);
+    .map((p) => globRegExp(clean(p.slice(1))));
+  if (include.length === 0) return ['.'];
+  const found = new Set([
+    '.',
+    ...include
+      .filter((pattern) => pattern !== '.')
+      .flatMap((pattern) => matchingDirs(root, pattern))
+      .filter((dir) => !exclude.some((re) => re.test(dir))),
+  ]);
+  if (found.size === 1 && !include.includes('.'))
+    throw new UptideError(
+      'INVALID_WORKSPACE',
+      `${declared.file} declares packages (${declared.patterns.join(', ')}) but none of them matches a directory with a package.json; fix the patterns, or Uptide would check only the root`,
+    );
+  return [...found].sort();
+}
+
+/** Per root, for the life of the process: probes call this for every directory they walk. */
+const resolved = new Map<string, string[] | UptideError>();
+
+/**
+ * Workspace packages declared by pnpm-workspace.yaml (`packages:`) or package.json
+ * `workspaces` (npm, yarn), matched as globs with `!` exclusions. The root is a workspace
+ * too; directories without a package.json are not packages. A workspace file that is not
+ * YAML, or declares packages none of which exist, is an INVALID_WORKSPACE error: checking
+ * the root alone would look like a clean result. For list, check and fix; a probe of some
+ * other directory uses `workspacePackagesOrRoot`.
+ */
+export function workspacePackagesOf(root: string): string[] {
+  let result = resolved.get(root);
+  if (!result) {
+    try {
+      result = resolveWorkspaces(root);
+    } catch (err) {
+      if (!(err instanceof UptideError)) throw err;
+      result = err;
     }
+    resolved.set(root, result);
   }
-  return [...found].filter((d) => !excluded.some((e) => d === e || d.startsWith(`${e}/`))).sort();
+  if (result instanceof UptideError) throw result;
+  return [...result];
+}
+
+/** `workspacePackagesOf` for a probe: a directory whose workspace file is broken is just its root. */
+export function workspacePackagesOrRoot(root: string): string[] {
+  try {
+    return workspacePackagesOf(root);
+  } catch (err) {
+    if (err instanceof UptideError && err.code === 'INVALID_WORKSPACE') return ['.'];
+    throw err;
+  }
 }

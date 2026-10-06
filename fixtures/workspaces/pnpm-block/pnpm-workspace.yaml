@@ -1,0 +1,8 @@
+# Every app, every package at any depth, never a test fixture.
+packages:
+  - 'apps/*'
+  - "packages/**" # nested too
+  - '!**/test/**'
+
+catalog:
+  zod: ^4.0.0

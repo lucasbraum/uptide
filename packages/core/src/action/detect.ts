@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { readLockfile } from '../adapters/typescript/lockfile.js';
-import { workspacePackagesOf } from '../adapters/typescript/repo.js';
 import { compareVersions } from '../check/version.js';
+import { globRegExp, workspacePackagesOrRoot } from '../workspaces.js';
 export type SupportedPackage = 'zod' | 'stripe';
 export interface Upgrade {
   name: SupportedPackage;
@@ -18,25 +18,15 @@ export function matchesPaths(file: string, patterns: string[]): boolean {
   return patterns.some((pattern) => {
     if (pattern.startsWith('/') || pattern.split('/').includes('..'))
       throw new Error('paths must be repository-relative');
-    const re = pattern
-      .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-      .replace(/\*\*\//g, '\u0001')
-      .replace(/\*\*/g, '\u0002')
-      .replace(/\*/g, '[^/]*')
-      .replace(/\?/g, '[^/]')
-      .split('\u0001')
-      .join('(?:.*/)?')
-      .split('\u0002')
-      .join('.*');
     return (
-      new RegExp(`^${re}$`).test(file) ||
+      globRegExp(pattern).test(file) ||
       (!pattern.includes('*') && file.startsWith(`${pattern.replace(/\/$/, '')}/`))
     );
   });
 }
 function versions(root: string) {
   const result = new Map<string, Map<string, string>>();
-  for (const workspace of workspacePackagesOf(root)) {
+  for (const workspace of workspacePackagesOrRoot(root)) {
     const p = JSON.parse(readFileSync(join(root, workspace, 'package.json'), 'utf8'));
     const declared = new Map<string, string>(
       Object.entries({

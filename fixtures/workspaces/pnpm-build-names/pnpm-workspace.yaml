@@ -1,0 +1,4 @@
+# Packages named like build output are packages (netlify/build has packages/build).
+packages:
+  - 'packages/*'
+  - 'tools/*'

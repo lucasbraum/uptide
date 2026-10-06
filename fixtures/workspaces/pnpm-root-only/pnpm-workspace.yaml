@@ -1,0 +1,4 @@
+# The repository is its only package; vendored code is not a workspace.
+packages:
+  - '.'
+  - '!vendor/**'
