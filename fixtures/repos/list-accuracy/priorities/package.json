@@ -3,7 +3,7 @@
   "private": true,
   "dependencies": {
     "lodash": "4.17.15",
-    "jsonwebtoken": "8.5.1",
+    "jsonwebtoken": "9.0.0",
     "moment": "2.29.1",
     "uuid": "3.4.0"
   },
