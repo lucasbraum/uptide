@@ -61,7 +61,10 @@ const priorities = await listDependencies({
   },
 });
 const header = { repo: 'synthetic-priorities', manager: 'npm', packages: 0, ms: 412 };
-writeFileSync(join(output, 'list-priorities.html'), renderListHtml(priorities, { ...common, header }));
+writeFileSync(
+  join(output, 'list-priorities.html'),
+  renderListHtml(priorities, { ...common, header }),
+);
 writeFileSync(
   join(output, 'list-priorities.txt'),
   formatList(priorities, { width: 120, header: { ...header, ms: 412 } }),
