@@ -61,7 +61,7 @@ function repo(yaml: string, dirs: string[]): string {
   return root;
 }
 
-it('never matches node_modules, and matches but does not walk into dot-directories and build output', () => {
+it('never matches node_modules or dot-directories, and matches but does not walk into build output', () => {
   const root = repo('packages: ["**", "tools/build"]\n', [
     'packages/a',
     'packages/a/node_modules/dep',
@@ -71,7 +71,7 @@ it('never matches node_modules, and matches but does not walk into dot-directori
     'packages/.hidden',
     'tools/build',
   ]);
-  expect(workspacePackagesOf(root)).toEqual(['.', 'packages/.hidden', 'packages/a', 'tools/build']);
+  expect(workspacePackagesOf(root)).toEqual(['.', 'packages/a', 'tools/build']);
 });
 
 it('is an error for a workspace file that is not YAML, and the root alone for a probe', () => {

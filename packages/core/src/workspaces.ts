@@ -63,7 +63,10 @@ export function globRegExp(glob: string): RegExp {
   return new RegExp(`^${re}$`);
 }
 
-/** Installed dependencies: never a workspace package (pnpm ignores them too), never walked. */
+/**
+ * Installed dependencies: never a workspace package (pnpm ignores them too), never walked.
+ * Dot-directories are treated the same way: pnpm globs with `dot: false`.
+ */
 const INSTALLED = new Set(['node_modules', 'bower_components']);
 /** Usually build output: a match when a pattern names one (`packages/build`), but not walked into. */
 const NOT_WALKED = new Set(['dist', 'build', 'coverage', 'out']);
@@ -89,10 +92,10 @@ function matchingDirs(root: string, pattern: string): string[] {
       return; // a missing or unreadable prefix matches nothing
     }
     for (const entry of entries) {
-      if (!entry.isDirectory() || INSTALLED.has(entry.name)) continue;
+      if (!entry.isDirectory() || INSTALLED.has(entry.name) || entry.name.startsWith('.')) continue;
       const dir = rel ? `${rel}/${entry.name}` : entry.name;
       if (re.test(dir) && existsSync(join(root, dir, 'package.json'))) found.push(dir);
-      if (!entry.name.startsWith('.') && !NOT_WALKED.has(entry.name)) walk(dir, depth - 1);
+      if (!NOT_WALKED.has(entry.name)) walk(dir, depth - 1);
     }
   };
   walk(
