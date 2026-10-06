@@ -8,6 +8,6 @@
     "uuid": "3.4.0"
   },
   "devDependencies": {
-    "minimist": "1.2.5"
+    "minimist": "1.2.6"
   }
 }
