@@ -8,6 +8,11 @@ export const css = `
 @media(max-width:800px){.member-grid.has-command{grid-template-columns:minmax(0,1fr) 34px}.has-command>div:not(.pkg-name):not(.copy-cell),.has-command>.details-line{grid-column:1/-1}.has-command>.copy-cell{grid-column:2;grid-row:1}.has-command>.pkg-name{grid-column:1;grid-row:1}.member-grid{grid-template-columns:minmax(140px,1fr) minmax(150px,1fr);gap:10px 20px}.stat{padding:20px 16px}.stat strong{font-size:32px}.stats{grid-template-columns:repeat(3,minmax(0,1fr))}.stat{border-bottom:1px solid var(--line)}}
 @media(max-width:540px){.incomplete-row,.source-row{grid-template-columns:1fr;padding:20px;gap:9px}main{border:0}.hero{padding:22px 20px 26px}.report-top{margin-bottom:30px}.brand{font-size:22px}.report-top>.label{font-size:10px}.meta{display:grid;gap:5px}.stat{padding:18px 20px}.stat strong{font-size:32px}.stat .label{font-size:9px}.member-grid{grid-template-columns:1fr;padding:20px;gap:9px}.member-grid .pkg-name{font-size:14px}.member-grid .gap{display:inline}.section-label{padding:28px 20px 16px;gap:15px}.package>header,.site,summary{padding:20px}.dep{grid-template-columns:1fr;padding:20px;gap:8px}.filters,.next,footer{padding:22px 20px}.notes ul{padding:0 40px 16px}.more{padding:12px 20px}.group-note{margin:12px 20px}.notice{margin:20px}.term code,.command code{font-size:11px;padding:12px}.copy,[data-copy]{padding:10px 12px}.versions,.usage{font-size:12px}}
 @media print{:root,:root[data-theme=dark]{color-scheme:light;--bg:#fff;--surface:#fff;--line:#bbb;--text:#111;--body:#333;--dim:#555;--accent:#164a85;--ok:#17582e;--warn:#714800;--bad:#8a1823}body{font-size:10pt}main{max-width:none;min-height:0;border:0}.hero{padding-top:0}.dots{background:none}.filters,button,.copy-cell{display:none!important}[hidden]:not(.filters):not(button){display:block!important}details::details-content{display:block!important;content-visibility:visible!important}details>*:not(summary){display:block!important}pre{white-space:pre-wrap;overflow:visible}.site,.member-grid,.dep{break-inside:avoid}a{color:inherit;text-decoration:none}#empty-filter{display:none!important}.stats{grid-template-columns:repeat(var(--stat-count,5),minmax(0,1fr))}}
+
+button.stat{font:inherit;color:inherit;text-align:left;background:none;border:0;border-right:1px solid var(--line);border-bottom:1px solid var(--line);border-radius:0;cursor:pointer;padding:24px 28px}button.stat:hover{background:var(--surface)}button.stat[aria-pressed=true]{background:color-mix(in srgb,var(--accent) 12%,var(--bg));box-shadow:inset 0 -4px 0 var(--accent)}button.stat[aria-pressed=true] .label{color:var(--accent)}button.stat:focus-visible{outline-offset:-4px}
+.filter-status{display:flex;gap:16px;align-items:center;justify-content:space-between;padding:14px 40px;border-bottom:1px solid var(--line);font:12px var(--mono);color:var(--accent);background:var(--surface)}
+.priority-list{list-style:none;margin:0;padding:0}.priority-row{display:grid;grid-template-columns:minmax(160px,1fr) minmax(200px,2fr) minmax(240px,1.6fr);gap:20px;padding:16px 40px;border-top:1px solid var(--line);align-items:center}.priority-row .pkg-name{font:600 13px var(--mono);overflow-wrap:anywhere}.priority-row .reason{font-size:14px}.signal-security .reason{color:var(--bad)}.signal-deprecated .reason,.signal-unsupported .reason{color:var(--warn)}.priority-row .command{margin:0}
+@media(max-width:800px){.priority-row{grid-template-columns:1fr;padding:16px 20px;gap:8px}button.stat{padding:20px 16px}.filter-status{padding:12px 20px}}
 `;
 export const js = `
 (()=>{
@@ -22,6 +27,21 @@ function filter(){const q=search.value.toLowerCase(); let count=0;
  });document.querySelector('#empty-filter').hidden=count>0;
 }
 controls.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{active=b.dataset.filter;controls.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));filter();}));search.addEventListener('input',filter);}
+const list=document.querySelector('[data-list]');if(list){
+const tiles=[...document.querySelectorAll('.stat[data-filter]')],rows=[...list.querySelectorAll('.member-grid')],status=document.querySelector('.filter-status'),label=status.querySelector('[data-filter-label]'),empty=document.querySelector('[data-filter-empty]');let opened=[];
+const tests={major:r=>r.dataset.change==='major',minor:r=>r.dataset.change==='minor',patch:r=>r.dataset.change==='patch',groups:r=>r.dataset.section==='group',tooling:r=>r.dataset.section==='tooling',unused:r=>r.dataset.section==='unused',priority:r=>r.hasAttribute('data-priority'),verified:r=>r.hasAttribute('data-verified')};
+function apply(f){if(!tests[f])f='';opened.forEach(d=>d.open=false);opened=[];
+ tiles.forEach(t=>t.setAttribute('aria-pressed',String(!!f&&t.dataset.filter===f)));
+ let shown=0;rows.forEach(r=>{r.hidden=!!f&&!tests[f](r);if(!r.hidden)shown++;});
+ list.querySelectorAll('.package').forEach(p=>{if(p.querySelector('.member-grid'))p.hidden=!!f&&!p.querySelector('.member-grid:not([hidden])');});
+ list.querySelectorAll('[data-block]').forEach(b=>{b.hidden=!!f&&!b.querySelector('.member-grid:not([hidden])');if(f&&!b.hidden&&b.tagName==='DETAILS'&&!b.open){b.open=true;opened.push(b);}});
+ const top=list.querySelector('.priorities');if(top)top.hidden=!!f&&f!=='priority';
+ status.hidden=!f;empty.hidden=!f||shown>0;
+ if(f){const groups=list.querySelectorAll('[data-group]:not([hidden])').length;label.textContent='Showing '+(f==='groups'?groups+' group'+(groups===1?'':'s')+' · ':'')+shown+' package'+(shown===1?'':'s')+' · '+tiles.find(t=>t.dataset.filter===f).querySelector('.label').textContent;}
+ const hash=f?'#filter='+f:'';if(location.hash!==hash)try{history.replaceState(null,'',location.href.replace(/#.*$/,'')+hash);}catch{location.hash=hash;}}
+tiles.forEach(t=>t.addEventListener('click',()=>apply(t.getAttribute('aria-pressed')==='true'?'':t.dataset.filter)));
+status.querySelector('[data-filter-clear]').addEventListener('click',()=>{apply('');tiles[0].focus();});
+const fromHash=()=>apply((/^#filter=([a-z]+)$/.exec(location.hash)||[])[1]||'');addEventListener('hashchange',fromHash);fromHash();}
 document.querySelectorAll('[data-copy]').forEach(b=>{b.hidden=false;b.addEventListener('click',async()=>{
  const code=b.parentElement.querySelector('code');const status=b.querySelector('[data-copy-status]')||b;
  try{await navigator.clipboard.writeText(code.textContent);status.textContent='Copied';b.dataset.copied='';if(code.classList.contains('copy-source'))code.hidden=true;}

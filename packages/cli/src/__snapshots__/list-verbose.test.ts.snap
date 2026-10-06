@@ -21,6 +21,9 @@ Usage warning: .gitignore skipped 3 of 4 candidate source
 files (75%); rules: "hidden*.js" (3). Usage may be
 understated.
 
+PRIORITIES  most urgent first · advisories not checked (not…
+  Nothing urgent: no advisories, deprecations, unsupported …
+
 PACKAGES
   axios          1.0.0 → 2.0.0   major   1 file   1 call
 

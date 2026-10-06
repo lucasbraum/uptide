@@ -33,10 +33,21 @@ export function reportHeader(opts: ReportHeader): string {
   }).format(new Date(opts.date));
   return `<header class="hero dots"><div class="report-top"><div class="brand">${logo}<span>uptide</span></div><span class="label">Dependency ${opts.kind === 'list' ? 'discovery' : 'check'} / local report</span></div><div class="label">${opts.kind === 'list' ? 'Your dependencies, at a glance' : 'Your upgrade, before you merge'}</div><h1>${e(opts.repo)}</h1><div class="meta"><span>${e(opts.manager)}</span><time datetime="${e(opts.date)}">Generated ${e(when)}</time><span>Uptide CLI ${e(opts.version)}</span></div></header>`;
 }
+/**
+ * Summary tiles. A tile with a `filter` is a toggle button the page script uses to filter
+ * the rows (`data-filter`); more than six tiles wrap onto even rows.
+ */
 export function reportStats(
-  stats: { label: string; value: number; tone?: 'warn' | 'safe' }[],
+  stats: { label: string; value: number; tone?: 'warn' | 'safe'; filter?: string }[],
 ): string {
-  return `<div class="stats" style="--stat-count:${stats.length}">${stats.map((s) => `<div class="stat ${s.tone ?? ''}"><strong>${s.value}</strong><span class="label">${escapeHtml(s.label)}</span></div>`).join('')}</div>`;
+  const columns = Math.ceil(stats.length / Math.ceil(stats.length / 6));
+  const tile = (s: (typeof stats)[number]): string => {
+    const inner = `<strong>${s.value}</strong><span class="label">${escapeHtml(s.label)}</span>`;
+    return s.filter
+      ? `<button type="button" class="stat ${s.tone ?? ''}" data-filter="${escapeHtml(s.filter)}" aria-pressed="false">${inner}</button>`
+      : `<div class="stat ${s.tone ?? ''}">${inner}</div>`;
+  };
+  return `<div class="stats" style="--stat-count:${columns}">${stats.map(tile).join('')}</div>`;
 }
 export const reportCommand = (command: string): string =>
   `<div class="term command"><code>${escapeHtml(command)}</code><button type="button" class="copy" data-copy hidden aria-label="Copy command">Copy</button></div>`;

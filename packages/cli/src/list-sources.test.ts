@@ -45,7 +45,7 @@ it('renders one collapsed non-registry HTML section with reasons, no paths/URLs,
   const report = await listDependencies({ cwd: root(), fetcher });
   const html = renderListHtml(report, htmlOpts);
   expect(html).toContain(
-    '<details class="notes"><summary>03 / Not checked / 22 non-registry sources</summary>',
+    '<details class="notes"><summary>04 / Not checked / 22 non-registry sources</summary>',
   );
   expect(html).not.toContain('<details class="notes" open');
   expect(html).not.toContain('Incomplete discovery');

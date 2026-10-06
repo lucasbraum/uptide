@@ -5,6 +5,9 @@ exports[`collapses non-registry sources by reason in the terminal (TTY=false) 1`
 
 4 outdated   4 major   0 minor   0 groups   1 tooling
 
+PRIORITIES  most urgent first · advisories not checked (not available for this registry client)
+  Nothing urgent: no advisories, deprecations, unsupported lines or blocking peers.
+
 PACKAGES
   ordinary         1.0.0 → 2.0.0   major   1 file   1 call
   registry-alias   1.0.0 → 2.0.0   major   1 file   1 call
@@ -30,6 +33,9 @@ exports[`collapses non-registry sources by reason in the terminal (TTY=true) 1`]
 "[1muptide list[22m
 
 [1m4[22m outdated   [1m4[22m major   [1m0[22m minor   [1m0[22m groups   [1m1[22m tooling
+
+[1mPRIORITIES[22m  [2mmost urgent first · advisories not checked (not available for this registry client)[22m
+  Nothing urgent: no advisories, deprecations, unsupported lines or blocking peers.
 
 [1mPACKAGES[22m
   [1mordinary[22m         1.0.0 → 2.0.0   [33mmajor[39m   1 file   1 call

@@ -49,7 +49,8 @@ it.each([
   await run(['list'], io, fakeEngine({ list: discover }));
   expect(io.stdout() + io.stderr()).not.toContain(String.fromCharCode(27));
 });
-it.each(['nestjs', '@nestjs/*', '@nestjs/cli'])(
+// The CLI and schematics are part of the @nestjs family group, not a group of their own.
+it.each(['nestjs', '@nestjs/*'])(
   'expands --group %s to full members before checking',
   async (selector) => {
     const report = await discover();
@@ -104,12 +105,12 @@ it('rejects unknown or incomplete groups without analysis', async () => {
 
 it('counts only visible groups and aligns all package version arrows', async () => {
   const report = await discover();
-  expect(report.groups).toHaveLength(2);
+  expect(report.groups).toHaveLength(1);
   const text = formatList(report, { width: 180, all: true });
   expect(text).toContain('1 group');
-  expect(text).toMatch(/@nestjs\/\* +8 packages +→ 12.x/);
-  expect(text).toMatch(/@nestjs\/cli +2 packages +→ 12.x/);
-  const rows = text.split('\n').filter((line) => /^ {2}\S/.test(line));
+  expect(text).toMatch(/@nestjs\/\* +10 packages +→ 12.x/);
+  // Package rows: indented, with a version arrow (a priority row has neither arrow nor version).
+  const rows = text.split('\n').filter((line) => /^ {2}\S/.test(line) && line.includes(' → '));
   expect(rows.length).toBe(report.packages.length);
   expect(new Set(rows.map((line) => line.indexOf('→'))).size).toBe(1);
 });

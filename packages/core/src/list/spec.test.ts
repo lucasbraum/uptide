@@ -123,7 +123,8 @@ it('uses the real scoped alias target for registry selection and authentication'
       },
     }),
   });
-  expect(transport).toHaveBeenCalledTimes(1);
+  // The packument, then the full document for publish dates: both from the real target.
+  expect(transport).toHaveBeenCalledTimes(2);
   expect(report.failures).toEqual([]);
   expect(report.packages[0]).toMatchObject({ name: 'alias', registryName: '@example/real-scoped' });
   expect(JSON.stringify(report)).not.toContain('synthetic-token');

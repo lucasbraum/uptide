@@ -5,6 +5,9 @@ exports[`collapses possibly unused with cautious wording and explains rows on ex
 
 12 outdated   12 major   0 minor   0 groups   11 tooling
 
+PRIORITIES  most urgent first · advisories not checked (not available for this registry client)
+  Nothing urgent: no advisories, deprecations, unsupported lines or blocking peers.
+
 TOOLING  11 packages, used by scripts and config · --all
 
 POSSIBLY UNUSED  1 package, no usage found by Uptide's scan; verify before removing · --all
@@ -19,6 +22,9 @@ exports[`keeps configured peer members out of Possibly unused while locating the
 "uptide list
 
 6 outdated   6 major   0 minor   0 groups   4 tooling
+
+PRIORITIES  most urgent first · advisories not checked (not available for this registry client)
+  Nothing urgent: no advisories, deprecations, unsupported lines or blocking peers.
 
 TOOLING  4 packages, used by scripts and config
   husky           1.0.0 → 2.0.0   major   0 files

@@ -7,7 +7,7 @@ export const ellipsis = (text: string, width: number): string => {
   const chars = Array.from(text);
   return chars.length <= width ? text : `${chars.slice(0, Math.max(0, width - 1)).join('')}…`;
 };
-export type Tone = 'bold' | 'dim' | 'yellow' | 'green';
+export type Tone = 'bold' | 'dim' | 'yellow' | 'green' | 'red';
 export interface Cell {
   text: string;
   tone?: Tone;
