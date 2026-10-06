@@ -1,0 +1,6 @@
+{
+  "name": "c",
+  "dependencies": {
+    "drift-sdk": "7.0.0"
+  }
+}

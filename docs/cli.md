@@ -27,6 +27,8 @@ pin the same exact dependency version (`ai + @ai-sdk/*`); each group says why. N
 the family or lead package; external peers are labeled `peer of <package>`.
 `uptide check --group nestjs` discovers and expands the exact member list before checking.
 JSON retains each member, the stable group selector and peer relationships.
+`--json` has one entry per package: `versions` lists every installed version with its
+workspaces when they differ, `current` is the oldest outdated one, and `usage` is counted once.
 Other rows put majors first, then importing files and call sites. Terminal rows align to
 the available width; names are never truncated (a name past 45 characters gets its own line)
 and narrow terminals omit trailing columns instead. Top symbols

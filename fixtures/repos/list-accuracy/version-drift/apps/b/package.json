@@ -1,0 +1,8 @@
+{
+  "name": "b",
+  "dependencies": {
+    "drift-sdk": "7.0.0",
+    "@drift/core": "2.0.0",
+    "@drift/react": "2.0.0"
+  }
+}
