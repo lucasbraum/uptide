@@ -77,18 +77,12 @@ describe('private material stays out of this repository', () => {
 });
 
 describe('the CI step that runs it', () => {
-  /** The `run: |` block of the "No private material" step, exactly as CI runs it. */
+  /** The `run:` of the "No private material" step, exactly as CI runs it. */
   const step = (() => {
     const lines = readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8').split('\n');
     const start = lines.findIndex((line) => line.trim() === '- name: No private material');
-    const run = lines.findIndex((line, i) => i > start && line.trim() === 'run: |');
-    const indent = (line: string) => line.length - line.trimStart().length;
-    const body: string[] = [];
-    for (const line of lines.slice(run + 1)) {
-      if (line.trim() && indent(line) <= indent(lines[run] as string)) break;
-      body.push(line.slice(indent(lines[run] as string) + 2));
-    }
-    return body.join('\n');
+    const run = lines.find((line, i) => i > start && line.trim().startsWith('run:'));
+    return (run as string).trim().slice('run:'.length).trim();
   })();
   const repo = 'uptide-dev/uptide';
   /** The step under one event; the denylist term is one this repository never contains. */
@@ -137,8 +131,20 @@ describe('the CI step that runs it', () => {
     });
   });
 
+  it('runs the shared script, so this test runs what CI runs', () => {
+    expect(step).toBe('node scripts/private-material.mjs');
+  });
+
+  it("scans the release app's Version Packages pull request in full: it gets the secret", () => {
+    expect(ci({ ...ours, PR_AUTHOR: 'uptide-release[bot]', secret: true })).toEqual({
+      status: 0,
+      notice: false,
+      scanned: true,
+    });
+  });
+
   it('still fails a missing denylist on any other pull request from this repository', () => {
-    for (const author of ['lucas', 'github-actions[bot]', 'dependabot', ''])
+    for (const author of ['lucas', 'github-actions[bot]', 'uptide-release[bot]', 'dependabot', ''])
       expect([author, ci({ ...ours, PR_AUTHOR: author, secret: false }).status]).toEqual([
         author,
         2,

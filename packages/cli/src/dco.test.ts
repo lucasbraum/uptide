@@ -218,3 +218,29 @@ describe('bots that cannot sign off', () => {
     expect(status).toBe(1);
   });
 });
+
+describe('the release app', () => {
+  // GitHub assigns the app's user id when it is created; its address carries that id.
+  const app = 'uptide-release[bot] <231840129+uptide-release[bot]@users.noreply.github.com>';
+  const version = { message: 'chore(release): version packages\n', author: app };
+
+  it('passes its own commits in the Version Packages pull request it opened', () => {
+    const dir = repo([version]);
+    const { status, result } = check(dir, 'main', 'pr', '--pr-author=uptide-release[bot]');
+    expect(result?.exempt).toEqual(result?.commits);
+    expect(status).toBe(0);
+  });
+
+  it("does not exempt its address in someone else's pull request, or another app's commits in its own", () => {
+    const dir = repo([version]);
+    for (const author of [[], ['--pr-author=mallory'], ['--pr-author=dependabot[bot]']])
+      expect(check(dir, 'main', 'pr', ...author).status).toBe(1);
+    const other = repo([
+      {
+        message: 'chore: impersonate\n',
+        author: 'other-app[bot] <1+other-app[bot]@users.noreply.github.com>',
+      },
+    ]);
+    expect(check(other, 'main', 'pr', '--pr-author=uptide-release[bot]').status).toBe(1);
+  });
+});
