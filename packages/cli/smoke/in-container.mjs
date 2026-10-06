@@ -103,10 +103,10 @@ for (const fixture of ['npm', 'npm-workspaces', 'pnpm', 'yarn', 'yarn-berry']) {
   expect(`${manager} status: exit ${status.code}, wanted 0`, status.code === 0, status.err);
   has(`${manager} status`, status.out, '3.23.8 installed');
   has(`${manager} status`, status.out, '14.25.0 installed');
-  has(
+  matches(
     `${manager} status`,
     status.out,
-    'Run `uptide list`, then `uptide check <package>` for impact.',
+    /Run `npx uptide\S* list`, then `npx uptide\S* check <package>` for impact\./,
   );
 
   const inventory = uptide(repo, 'list', '--json');
@@ -152,8 +152,13 @@ for (const fixture of ['npm', 'npm-workspaces', 'pnpm', 'yarn', 'yarn-berry']) {
     /zod\s+3\.23\.8 → 4\.6\.5\s+major · (?:--target|latest on npm)\s+verified\s+✗ \d+ breaking/,
   );
   has(`${manager} check`, check.out, 'New error API (required_error → error)');
-  has(`${manager} check`, check.out, 'by rule');
-  has(`${manager} check`, check.out, 'by agent');
+  matches(
+    `${manager} check`,
+    check.out,
+    /\nzod\s+\d+ breaking · compiled against 4\.6\.5: \d+ new type errors?\n/,
+  );
+  has(`${manager} check`, check.out, 'auto-fixable');
+  has(`${manager} check`, check.out, 'needs the agent (LLM)');
   matches(`${manager} check`, check.out, /\nNext\n(?: {2}.*\n)*? {2}npx uptide\S* fix zod /);
   has(`${manager} check`, check.out, 'check zod stripe --target zod@');
   for (const noise of ['low-confidence', 'pre-existing type error', 'BREAKING'])
