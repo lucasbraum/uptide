@@ -28,7 +28,13 @@ export function validModel(value: unknown): value is string {
     !value.split('/').some((p) => p === '.' || p === '..' || !p)
   );
 }
-function readConfig(cwd: string): { provider?: string; model?: string } {
+interface UptideConfig {
+  provider?: string;
+  model?: string;
+  /** `false`: never send installed versions to npm's advisory endpoint (`list --no-advisories`). */
+  advisories?: boolean;
+}
+function readConfig(cwd: string): UptideConfig {
   // Nearest config up to the Git root; includes a root config when invoked in a workspace.
   let dir = resolve(cwd);
   for (;;) {
@@ -47,7 +53,7 @@ function readConfig(cwd: string): { provider?: string; model?: string } {
         value = JSON.parse(raw);
       } catch {
         throw new Error(
-          'uptide.config.json must be a small valid JSON object containing only provider and model. Keys belong only in environment variables.',
+          'uptide.config.json must be a small valid JSON object containing only provider, model and advisories. Keys belong only in environment variables.',
         );
       }
       if (keyFound)
@@ -56,19 +62,22 @@ function readConfig(cwd: string): { provider?: string; model?: string } {
         );
       if (!value || typeof value !== 'object' || Array.isArray(value))
         throw new Error(
-          'uptide.config.json must contain only provider and model; API keys belong only in environment variables.',
+          'uptide.config.json must contain only provider, model and advisories; API keys belong only in environment variables.',
         );
       for (const [name, setting] of Object.entries(value)) {
         if (keyLike(name) || (typeof setting === 'string' && keyLike(setting)))
           throw new Error(
             'uptide.config.json contains a key-like setting. Remove credentials from the file; use environment variables only.',
           );
-        if (!['provider', 'model'].includes(name) || typeof setting !== 'string')
+        const allowed =
+          (['provider', 'model'].includes(name) && typeof setting === 'string') ||
+          (name === 'advisories' && typeof setting === 'boolean');
+        if (!allowed)
           throw new Error(
-            'uptide.config.json accepts only provider and model strings. Keys belong only in environment variables.',
+            'uptide.config.json accepts only provider and model strings, and advisories as true or false. Keys belong only in environment variables.',
           );
       }
-      const config = value as { provider?: string; model?: string };
+      const config = value as UptideConfig;
       if (config.provider !== undefined && !PROVIDERS.includes(config.provider as Provider))
         throw new Error(
           'Invalid provider in uptide.config.json: choose anthropic, openai or gemini.',
@@ -132,4 +141,10 @@ export function selectLlm(
       ? { baseUrl: openaiBaseUrl(env.OPENAI_BASE_URL) }
       : {}),
   };
+}
+
+/** Whether `list` may send installed versions to npm's advisory endpoint: not when the
+ * nearest uptide.config.json says `"advisories": false`. */
+export function advisoriesEnabled(cwd: string): boolean {
+  return readConfig(cwd).advisories !== false;
 }

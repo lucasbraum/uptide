@@ -10,7 +10,7 @@ Each outdated direct dependency gets these signals (JSON: `packages[].signals`).
 
 | Signal | When | Source |
 | --- | --- | --- |
-| security | a known advisory covers the **installed** version | one POST to npm's `/-/npm/v1/security/advisories/bulk` for every public package; packages from a private registry or scope are never sent |
+| security | a known advisory covers the **installed** version | one POST to npm's `/-/npm/v1/security/advisories/bulk` for every public package; packages from a private registry or scope are never sent; off with `--no-advisories` or `"advisories": false` in `uptide.config.json` |
 | deprecated | the registry marks the installed version deprecated | the abbreviated packument discovery already fetches |
 | unsupported | a newer major exists and the installed major line's last release is 12 months old or more | the registry's `time` map, fetched only for packages with a newer major |
 | blocking | its installed peer range holds back another outdated package (`blocks react 19`) | installed manifests |
@@ -18,8 +18,39 @@ Each outdated direct dependency gets these signals (JSON: `packages[].signals`).
 | effort | files to touch + call sites / 10, halved by a verified migration pack | the usage scan |
 
 The advisory request and the publish dates each have a 5-second deadline and never retry. If
-the advisory request fails, times out or every package is private, the PRIORITIES heading says
-“advisories not checked” and the run goes on; nothing is guessed.
+the advisory request fails, times out, is turned off or every package is private, the
+PRIORITIES heading says “advisories not checked” with the reason, and the run goes on; nothing
+is guessed.
+
+## Runtime and dev
+
+Each package is **runtime** when a workspace declares it in `dependencies` or
+`optionalDependencies` (or it is the peer of a package that is), and it is not tooling; it is
+**dev** when it is only in `devDependencies`, or is tooling (a test runner, a linter, a build
+tool). JSON: `packages[].kind`.
+
+A dev package's advisory drops one severity step, and at equal urgency the runtime package
+comes first. So:
+
+    runtime critical  >  runtime high  ≥  dev critical  >  runtime moderate  ≥  dev high  > …
+
+A high advisory in a runtime dependency outranks a critical one in a dev-only test runner: both
+rank 5.3, and runtime wins the tie. A dev critical still outranks a runtime moderate. The reason
+of a dev row starts with `dev · `, for every signal: `dev · 2 advisories (1 critical), fixed in
+1.2.6 (patch, same major)`.
+
+## The smallest fix
+
+For a security row, the fix is the lowest stable version above the installed one that none of
+its advisories covers, and the reason says what moving there is:
+
+- `fixed in 3.2.5 (patch, same major)` or `fixed in 4.18.0 (minor, same major)`;
+- `needs 4.1.11 (major)` when every version of the installed major is affected;
+- `no fixed version yet` when no published version is clean.
+
+At equal urgency (and the same runtime/dev side), a same-major fix ranks above a major-only
+one: it is the cheaper way out. The row's command checks that version, not the latest:
+`uptide check moment --target moment@2.29.4`.
 
 ## Ranking
 
@@ -27,14 +58,15 @@ A package is ranked by its most urgent signal:
 
 | Urgency | Signal | Reason, as printed |
 | --- | --- | --- |
-| 5 (+0.4 critical, +0.3 high, +0.2 moderate, +0.1 low) | security | `2 advisories (1 high), fixed in 3.1.2` |
+| 5 (+0.4 critical, +0.3 high, +0.2 moderate, +0.1 low; −0.1 for dev) | security | `2 advisories (1 high), fixed in 3.1.2 (patch, same major)` |
 | 4 | deprecated | `deprecated: <registry message, truncated to 60 characters>` |
 | 3 | unsupported | `4.x line unsupported since 2025-03, 37 files to touch` |
 | 2 | blocking | `blocks ai 7` |
 | 1 | behind | `3 majors behind, 2 files to touch` |
 
-Among equal urgencies, the cheaper upgrade (lower effort) comes first. “Fixed in” is the lowest
-stable version above the installed one that none of its advisories covers.
+The dev step is applied before ranking (a dev critical ranks 5.3). Among equal urgencies:
+runtime before dev, then a same-major fix before a major-only one, then the cheaper upgrade
+(lower effort).
 
 ## Groups
 

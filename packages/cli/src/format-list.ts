@@ -24,9 +24,9 @@ export const listChange = (p: ListedDependency): string =>
   p.majorGap > 1 ? `major ×${p.majorGap}` : p.change;
 export const groupCommand = (group: ListGroup, opts: FormatListOptions): string =>
   `${opts.invocation ?? 'uptide'} check --group ${quote(group.id)}${opts.cwd ? ` --cwd ${quote(opts.cwd)}` : ''}`;
-/** The command that starts on a priority: its group, or its package. */
+/** The command that starts on a priority: its group or package, at its smallest fix when it has one. */
 export const priorityCommand = (p: Priority, opts: FormatListOptions): string =>
-  `${opts.invocation ?? 'uptide'} check ${p.group ? `--group ${quote(p.group)}` : p.packages.map(quote).join(' ')}${opts.cwd ? ` --cwd ${quote(opts.cwd)}` : ''}`;
+  `${opts.invocation ?? 'uptide'} check ${p.group ? `--group ${quote(p.group)}` : p.packages.map(quote).join(' ')}${p.target ? ` --target ${quote(p.target)}` : ''}${opts.cwd ? ` --cwd ${quote(opts.cwd)}` : ''}`;
 export const cheapBatchCommand = (names: string[], opts: FormatListOptions): string =>
   `${opts.invocation ?? 'uptide'} check ${names.map(quote).join(' ')}${opts.cwd ? ` --cwd ${quote(opts.cwd)}` : ''}`;
 /** What the advisory lookup covered, for the PRIORITIES heading. */

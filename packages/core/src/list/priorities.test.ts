@@ -21,7 +21,7 @@ const advisory = (severity: string, vulnerable_versions: string): Advisory => ({
 const base: PackageSignals = { behind: 1, effort: 1 };
 
 describe('security', () => {
-  it('counts the advisories covering the installed version and finds the first fixed release', () => {
+  it('counts the advisories covering the installed version and finds the smallest fix', () => {
     const signal = securitySignal(
       '3.1.0',
       [
@@ -36,9 +36,40 @@ describe('security', () => {
       worst: 'high',
       counts: { high: 1, moderate: 1 },
       fixedIn: '3.1.2',
+      fixChange: 'patch',
     });
     expect(reasonOf({ ...base, security: signal }, '3.1.0', 4)).toBe(
-      '2 advisories (1 high), fixed in 3.1.2',
+      '2 advisories (1 high), fixed in 3.1.2 (patch, same major)',
+    );
+  });
+  // Ranges recorded from npm's bulk advisory endpoint (fixtures/repos/list-accuracy/priorities).
+  it('says when the smallest fix stays in the major and when it needs a new one', () => {
+    const lodash = securitySignal(
+      '4.17.15',
+      [
+        advisory('high', '<4.17.21'),
+        advisory('high', '>=3.7.0 <4.17.19'),
+        advisory('moderate', '>=4.0.0 <4.17.21'),
+        advisory('moderate', '>=4.0.0 <=4.17.22'),
+        advisory('high', '>=4.0.0 <=4.17.23'),
+        advisory('moderate', '<=4.17.23'),
+      ],
+      ['4.17.15', '4.17.19', '4.17.21', '4.17.23', '4.18.0', '4.18.1'],
+    );
+    expect(reasonOf({ ...base, security: lodash }, '4.17.15', 0)).toBe(
+      '6 advisories (3 high), fixed in 4.18.0 (minor, same major)',
+    );
+    const jwt = securitySignal(
+      '8.5.1',
+      [
+        advisory('moderate', '<9.0.0'),
+        advisory('high', '<=8.5.1'),
+        advisory('moderate', '<=8.5.1'),
+      ],
+      ['8.5.1', '9.0.0', '9.0.3'],
+    );
+    expect(reasonOf({ ...base, security: jwt }, '8.5.1', 0)).toBe(
+      '3 advisories (1 high), needs 9.0.0 (major)',
     );
   });
   it('is absent when no advisory covers the installed version, and says so when nothing is fixed', () => {
@@ -47,6 +78,88 @@ describe('security', () => {
     expect(reasonOf({ ...base, security: open }, '1.0.0', 0)).toBe(
       '1 advisory (1 critical), no fixed version yet',
     );
+  });
+});
+
+describe('runtime over dev', () => {
+  const sec = (worst: 'critical' | 'high', dev = false): PackageSignals => ({
+    ...base,
+    ...(dev ? { dev: true } : {}),
+    security: {
+      advisories: 1,
+      worst,
+      counts: { [worst]: 1 },
+      fixedIn: '1.0.1',
+      fixChange: 'patch',
+    },
+  });
+  it('drops a dev package one severity step: a dev critical ties a runtime high', () => {
+    expect(urgencyOf(sec('critical'))?.urgency).toBe(5.4);
+    expect(urgencyOf(sec('high'))?.urgency).toBe(5.3);
+    expect(urgencyOf(sec('critical', true))?.urgency).toBe(5.3);
+    expect(urgencyOf(sec('high', true))?.urgency).toBe(5.2);
+  });
+  it('ranks a runtime high above a dev-only critical, and says dev in the reason', () => {
+    const { priorities } = prioritize(
+      [
+        {
+          name: 'vitest',
+          current: '1.0.0',
+          change: 'major',
+          classification: 'tooling',
+          usage: { files: 0 },
+          signals: sec('critical', true),
+        },
+        {
+          name: 'express',
+          current: '1.0.0',
+          change: 'major',
+          classification: 'used',
+          usage: { files: 9 },
+          signals: { ...sec('high'), effort: 9 },
+        },
+      ],
+      [],
+    );
+    expect(priorities.map((p) => [p.name, p.reason])).toEqual([
+      ['express', '1 advisory (1 high), fixed in 1.0.1 (patch, same major)'],
+      ['vitest', 'dev · 1 advisory (1 critical), fixed in 1.0.1 (patch, same major)'],
+    ]);
+  });
+});
+
+describe('smallest fix', () => {
+  it('ranks a same-major fix above a major-only one at equal severity, and targets the fix', () => {
+    const fix = (fixedIn: string, fixChange: 'patch' | 'major'): PackageSignals => ({
+      ...base,
+      effort: 0,
+      security: { advisories: 1, worst: 'high', counts: { high: 1 }, fixedIn, fixChange },
+    });
+    const { priorities } = prioritize(
+      [
+        {
+          name: 'needs-major',
+          current: '1.0.0',
+          change: 'major',
+          classification: 'used',
+          usage: { files: 0 },
+          signals: fix('2.0.0', 'major'),
+        },
+        {
+          name: 'same-major',
+          current: '1.0.0',
+          change: 'major',
+          classification: 'used',
+          usage: { files: 0 },
+          signals: { ...fix('1.0.1', 'patch'), effort: 50 },
+        },
+      ],
+      [],
+    );
+    expect(priorities.map((p) => [p.name, p.sameMajorFix ?? false, p.target])).toEqual([
+      ['same-major', true, 'same-major@1.0.1'],
+      ['needs-major', false, 'needs-major@2.0.0'],
+    ]);
   });
 });
 

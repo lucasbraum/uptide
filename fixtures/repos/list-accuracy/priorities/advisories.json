@@ -1,0 +1,90 @@
+{
+  "lodash": [
+    {
+      "severity": "high",
+      "title": "Command Injection in lodash",
+      "url": "https://github.com/advisories/GHSA-35jh-r3h4-6jhm",
+      "vulnerable_versions": "<4.17.21"
+    },
+    {
+      "severity": "high",
+      "title": "Prototype Pollution in lodash",
+      "url": "https://github.com/advisories/GHSA-p6mc-m468-83gw",
+      "vulnerable_versions": ">=3.7.0 <4.17.19"
+    },
+    {
+      "severity": "moderate",
+      "title": "Regular Expression Denial of Service (ReDoS) in lodash",
+      "url": "https://github.com/advisories/GHSA-29mw-wpgm-hmr9",
+      "vulnerable_versions": ">=4.0.0 <4.17.21"
+    },
+    {
+      "severity": "moderate",
+      "title": "Lodash has Prototype Pollution Vulnerability in `_.unset` and `_.omit` functions",
+      "url": "https://github.com/advisories/GHSA-xxjr-mmjv-4gpg",
+      "vulnerable_versions": ">=4.0.0 <=4.17.22"
+    },
+    {
+      "severity": "high",
+      "title": "lodash vulnerable to Code Injection via `_.template` imports key names",
+      "url": "https://github.com/advisories/GHSA-r5fr-rjxr-66jc",
+      "vulnerable_versions": ">=4.0.0 <=4.17.23"
+    },
+    {
+      "severity": "moderate",
+      "title": "lodash vulnerable to Prototype Pollution via array path bypass in `_.unset` and `_.omit`",
+      "url": "https://github.com/advisories/GHSA-f23m-r3pf-42rh",
+      "vulnerable_versions": "<=4.17.23"
+    }
+  ],
+  "jsonwebtoken": [
+    {
+      "severity": "moderate",
+      "title": "jsonwebtoken vulnerable to signature validation bypass due to insecure default algorithm in jwt.verify()",
+      "url": "https://github.com/advisories/GHSA-qwph-4952-7xr6",
+      "vulnerable_versions": "<9.0.0"
+    },
+    {
+      "severity": "high",
+      "title": "jsonwebtoken unrestricted key type could lead to legacy keys usage ",
+      "url": "https://github.com/advisories/GHSA-8cf7-32gw-wr33",
+      "vulnerable_versions": "<=8.5.1"
+    },
+    {
+      "severity": "moderate",
+      "title": "jsonwebtoken's insecure implementation of key retrieval function could lead to Forgeable Public/Private Tokens from RSA to HMAC",
+      "url": "https://github.com/advisories/GHSA-hjrf-2m68-5959",
+      "vulnerable_versions": "<=8.5.1"
+    }
+  ],
+  "moment": [
+    {
+      "severity": "high",
+      "title": "Path Traversal: 'dir/../../filename' in moment.locale",
+      "url": "https://github.com/advisories/GHSA-8hfj-j24r-96c4",
+      "vulnerable_versions": "<2.29.2"
+    },
+    {
+      "severity": "high",
+      "title": "Moment.js vulnerable to Inefficient Regular Expression Complexity",
+      "url": "https://github.com/advisories/GHSA-wc69-rhjr-hc9g",
+      "vulnerable_versions": ">=2.18.0 <2.29.4"
+    }
+  ],
+  "uuid": [
+    {
+      "severity": "moderate",
+      "title": "uuid: Missing buffer bounds check in v3/v5/v6 when buf is provided",
+      "url": "https://github.com/advisories/GHSA-w5hq-g745-h8pq",
+      "vulnerable_versions": "<11.1.1"
+    }
+  ],
+  "minimist": [
+    {
+      "severity": "critical",
+      "title": "Prototype Pollution in minimist",
+      "url": "https://github.com/advisories/GHSA-xvch-5gv4-984h",
+      "vulnerable_versions": ">=1.0.0 <1.2.6"
+    }
+  ]
+}

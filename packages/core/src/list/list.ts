@@ -9,6 +9,7 @@ import type { PackageFetcher } from '../domain/io.js';
 import type { Tier } from '../domain/report.js';
 import { errorCode } from '../errors.js';
 import { loadRegistryConfig, registryFor } from '../fetch/npmrc.js';
+import { advisoriesEnabled } from '../llm/config.js';
 import { stripePack } from '../packs/stripe/index.js';
 import { zodPack } from '../packs/zod/index.js';
 import type { TaskCommands } from './config.js';
@@ -52,6 +53,11 @@ export interface ListedDependency {
   tier: Tier;
   majorGap: number;
   classification: 'used' | 'tooling' | 'possibly-unused' | 'peer';
+  /**
+   * runtime: declared in dependencies or optionalDependencies (or a peer of a package that
+   * is), and not tooling; dev: only in devDependencies, or tooling. Dev ranks after runtime.
+   */
+  kind?: 'runtime' | 'dev';
   peerOf?: string[];
   reasons: string[];
   /** What makes it worth upgrading first; see priorities.ts. */
@@ -132,6 +138,11 @@ export interface ListOptions {
   verbose?: boolean;
   /** "Now" for the support window; tests pin it. */
   now?: Date;
+  /**
+   * `false` (`--no-advisories`): installed versions are never sent to npm's advisory endpoint.
+   * Unset: on, unless uptide.config.json says `"advisories": false`.
+   */
+  advisories?: boolean;
 }
 
 /** Discovery only. Reads manifests, lockfiles, source syntax and registry metadata. */
@@ -183,6 +194,8 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
   // Keep workspace aliases with different targets separate, even at identical versions.
   const declared = new Map<string, Map<string, string[]>>();
   const skipped = new Map<string, NonNullable<ListReport['skipped']>[number]>();
+  // Declared as a runtime dependency in some workspace: dependencies or optionalDependencies.
+  const runtimeKeys = new Set<string>();
   const skip = (name: string, source: string, workspace: string): void => {
     if (opts.only && !opts.only.includes(localName(name))) return;
     const key = JSON.stringify([name, source]);
@@ -210,6 +223,10 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
       if (value !== undefined && (!value || typeof value !== 'object' || Array.isArray(value)))
         throw new Error(`malformed package.json: ${field} must be an object`);
     }
+    const runtimeNames = new Set([
+      ...Object.keys(manifest.dependencies ?? {}),
+      ...Object.keys(manifest.optionalDependencies ?? {}),
+    ]);
     for (const [name, spec] of Object.entries({
       ...manifest.dependencies,
       ...manifest.devDependencies,
@@ -250,6 +267,7 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
       }
       const key = JSON.stringify([name, source.name]);
       identities.set(key, { name, registryName: source.name });
+      if (runtimeNames.has(name)) runtimeKeys.add(key);
       const versions = declared.get(key) ?? new Map<string, string[]>();
       versions.set(version, [...(versions.get(version) ?? []), workspace]);
       declared.set(key, versions);
@@ -336,14 +354,24 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
         ...(declared.get(name)?.keys() ?? []),
       ]),
     ]);
+  const advisoriesOff =
+    opts.advisories === false
+      ? 'turned off with --no-advisories'
+      : opts.advisories === undefined && !advisoriesEnabled(opts.cwd)
+        ? 'turned off in uptide.config.json'
+        : undefined;
   const advisoryRequest: Promise<
     { checked: string[]; advisories: Record<string, Advisory[]> } | { error: string }
-  > = fetcher.advisories
-    ? fetcher.advisories(advisoryQuery).catch((error: unknown) => ({
-        error:
-          error instanceof Error && error.name === 'TimeoutError' ? 'timed out' : 'request failed',
-      }))
-    : Promise.resolve({ error: 'not available for this registry client' });
+  > = advisoriesOff
+    ? Promise.resolve({ error: advisoriesOff })
+    : fetcher.advisories
+      ? fetcher.advisories(advisoryQuery).catch((error: unknown) => ({
+          error:
+            error instanceof Error && error.name === 'TimeoutError'
+              ? 'timed out'
+              : 'request failed',
+        }))
+      : Promise.resolve({ error: 'not available for this registry client' });
   const deprecations = new Map<string, string>();
   const published = new Map<string, Record<string, string>>();
   const allVersions = new Map<string, string[]>();
@@ -532,6 +560,10 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
     const deprecated = deprecatedSignal(deprecations.get(JSON.stringify([key, p.current])));
     const time = published.get(key);
     const unsupported = time ? unsupportedSignal(p.current, p.latest, time, now) : undefined;
+    p.kind =
+      (runtimeKeys.has(key) || p.classification === 'peer') && p.classification !== 'tooling'
+        ? 'runtime'
+        : 'dev';
     p.signals = {
       ...(security ? { security } : {}),
       ...(deprecated ? { deprecated } : {}),
@@ -546,6 +578,7 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
         : {}),
       behind: p.majorGap,
       effort: effortOf(p.usage, p.tier === 'verified'),
+      ...(p.kind === 'dev' ? { dev: true } : {}),
     };
   }
   const { priorities, cheapBatch } = prioritize(packages, groups);

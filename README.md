@@ -88,7 +88,9 @@ Registry settings use environment overrides, project and user `.npmrc` files, sc
 registries and host/path-scoped credentials. Known advisories come from one request to npm's
 bulk advisory endpoint with the names and installed versions of packages served by the public
 npm registry; packages from another registry or scope are never sent there. A failure or
-timeout (5 s) says “advisories not checked” and never fails the run. Publish dates for the
+timeout (5 s) says “advisories not checked” and never fails the run; `--no-advisories` (or
+`"advisories": false` in `uptide.config.json`) never sends the request. Runtime dependencies
+rank before dev-only ones, and an advisory row names its smallest fix (same major or not). Publish dates for the
 support window come from the full registry document of packages with a newer major, under the
 same 5-second deadline. Discovery otherwise uses abbreviated metadata with up to
 16 concurrent requests, a 10-second timeout per attempt (including response bodies), and one
@@ -342,7 +344,8 @@ error. `uptide fix --no-llm` turns assisted fixes off. No account.
 Anonymous telemetry is off by default and asks for consent in an interactive terminal.
 Set UPTIDE_TELEMETRY=0 to disable it. No IP, code, paths or repo names are collected.
 Other network use: your npm registry for package metadata and tarballs, npm's advisory
-endpoint from `list` (public package names and installed versions), PostHog EU only
+endpoint from `list` (public package names and installed versions; `--no-advisories` turns
+it off), PostHog EU only
 after telemetry opt-in, and GitHub when you pass `fix --pr` or run `pr` / `pr-body`.
 
 There is no Uptide server. With telemetry off (the default):

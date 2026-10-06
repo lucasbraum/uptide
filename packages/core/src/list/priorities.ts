@@ -33,8 +33,10 @@ export interface PackageSignals {
     advisories: number;
     worst: Severity;
     counts: Partial<Record<Severity, number>>;
-    /** The lowest stable version above the installed one that no advisory covers. */
+    /** The smallest fix: the lowest stable version above the installed one that none of its advisories covers. */
     fixedIn?: string;
+    /** What moving to `fixedIn` is: within the installed major (patch, minor) or a new major. */
+    fixChange?: 'patch' | 'minor' | 'major';
   };
   /** The registry's deprecation message for the installed version. */
   deprecated?: string;
@@ -48,6 +50,8 @@ export interface PackageSignals {
   behind: number;
   /** Cost to upgrade; lower is cheaper. See `effortOf`. */
   effort: number;
+  /** Only in devDependencies, or tooling: ranked after runtime packages (see urgencyOf). */
+  dev?: boolean;
 }
 
 const inRange = (version: string, range: string): boolean => {
@@ -82,11 +86,22 @@ export function securitySignal(
         !hits.some((a) => inRange(v, a.vulnerable_versions)),
     )
     .sort(compareVersions)[0];
+  const from = parseVersion(current);
+  const to = fixedIn ? parseVersion(fixedIn) : undefined;
+  const fixChange =
+    from && to
+      ? to.major !== from.major
+        ? 'major'
+        : to.minor !== from.minor
+          ? 'minor'
+          : 'patch'
+      : undefined;
   return {
     advisories: hits.length,
     worst: SEVERITIES.find((s) => counts[s]) as Severity,
     counts,
     ...(fixedIn ? { fixedIn } : {}),
+    ...(fixChange ? { fixChange } : {}),
   };
 }
 
@@ -128,12 +143,23 @@ export function effortOf(usage: { files: number; callSites: number }, verified: 
   return Math.round((verified ? raw / 2 : raw) * 10) / 10;
 }
 
-/** The most urgent signal, and its rank: security also orders by severity. */
+/**
+ * The most urgent signal, and its rank. Security also orders by severity (critical +0.4,
+ * high +0.3, moderate +0.2, low +0.1), and a dev-only package drops one severity step: a
+ * critical advisory in a test runner ranks with a high one in production code, and the
+ * runtime package wins that tie (rankPriorities).
+ */
 export function urgencyOf(s: PackageSignals): { signal: Signal; urgency: number } | undefined {
   if (s.security)
     return {
       signal: 'security',
-      urgency: URGENCY.security + (SEVERITIES.length - SEVERITIES.indexOf(s.security.worst)) / 10,
+      urgency:
+        Math.round(
+          (URGENCY.security +
+            (SEVERITIES.length - SEVERITIES.indexOf(s.security.worst)) / 10 -
+            (s.dev ? 0.1 : 0)) *
+            10,
+        ) / 10,
     };
   if (s.deprecated) return { signal: 'deprecated', urgency: URGENCY.deprecated };
   if (s.unsupported) return { signal: 'unsupported', urgency: URGENCY.unsupported };
@@ -148,15 +174,26 @@ const files = (n: number): string => `${n} file${n === 1 ? '' : 's'} to touch`;
 const truncate = (text: string, max: number): string =>
   text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`;
 
-/** One line saying why: the most urgent signal, in words. */
+/** One line saying why: the most urgent signal, in words; `dev · ` first for a dev-only package. */
 export function reasonOf(s: PackageSignals, current: string, usageFiles: number): string {
+  const text = signalText(s, current, usageFiles);
+  return text && s.dev ? `dev · ${text}` : text;
+}
+/** `fixed in 3.2.5 (patch, same major)`, `needs 4.1.11 (major)`. */
+function fixText(sec: NonNullable<PackageSignals['security']>): string {
+  if (!sec.fixedIn) return 'no fixed version yet';
+  return sec.fixChange === 'major'
+    ? `needs ${sec.fixedIn} (major)`
+    : `fixed in ${sec.fixedIn} (${sec.fixChange}, same major)`;
+}
+function signalText(s: PackageSignals, current: string, usageFiles: number): string {
   const top = urgencyOf(s)?.signal;
   const touch = usageFiles ? `, ${files(usageFiles)}` : '';
   switch (top) {
     case 'security': {
       const sec = s.security as NonNullable<PackageSignals['security']>;
       const n = sec.advisories;
-      return `${n} ${n === 1 ? 'advisory' : 'advisories'} (${sec.counts[sec.worst]} ${sec.worst})${sec.fixedIn ? `, fixed in ${sec.fixedIn}` : ', no fixed version yet'}`;
+      return `${n} ${n === 1 ? 'advisory' : 'advisories'} (${sec.counts[sec.worst]} ${sec.worst}), ${fixText(sec)}`;
     }
     case 'deprecated':
       return `deprecated: ${truncate(s.deprecated as string, 60)}`;
@@ -184,13 +221,41 @@ export interface Priority {
   urgency: number;
   effort: number;
   reason: string;
+  /** Dev-only: ranked after a runtime row of the same urgency. */
+  dev?: boolean;
+  /** Its advisories are fixed within the installed major: ranked before a major-only fix. */
+  sameMajorFix?: boolean;
+  /** `name@version` to check: the smallest fix, when there is one. */
+  target?: string;
 }
 
-/** Most urgent first; among equals, the cheaper upgrade first. */
+/** Ties, in order: runtime before dev, a same-major fix before a major-only one, then cheaper. */
+const tieBreak = (
+  a: { dev?: boolean; sameMajorFix?: boolean; effort: number },
+  b: { dev?: boolean; sameMajorFix?: boolean; effort: number },
+): number =>
+  Number(!!a.dev) - Number(!!b.dev) ||
+  Number(!!b.sameMajorFix) - Number(!!a.sameMajorFix) ||
+  a.effort - b.effort;
+
+/** Most urgent first; among equals, runtime, then a same-major fix, then the cheaper upgrade. */
 export function rankPriorities(items: Priority[]): Priority[] {
   return [...items].sort(
-    (a, b) => b.urgency - a.urgency || a.effort - b.effort || a.name.localeCompare(b.name),
+    (a, b) => b.urgency - a.urgency || tieBreak(a, b) || a.name.localeCompare(b.name),
   );
+}
+
+/** The ranking fields a package's signals give its row. */
+function rowOf(
+  p: Upgradable,
+  s: PackageSignals,
+): Pick<Priority, 'dev' | 'sameMajorFix' | 'target'> {
+  const fix = urgencyOf(s)?.signal === 'security' ? s.security : undefined;
+  return {
+    ...(s.dev ? { dev: true } : {}),
+    ...(fix?.fixChange && fix.fixChange !== 'major' ? { sameMajorFix: true } : {}),
+    ...(fix?.fixedIn ? { target: `${p.name}@${fix.fixedIn}` } : {}),
+  };
 }
 
 /** A minor or patch release touching at most this many files is cheap. */
@@ -220,13 +285,18 @@ export function prioritize(
     members
       .map((p) => ({ p, u: p.signals ? urgencyOf(p.signals) : undefined }))
       .filter((x): x is { p: Upgradable; u: NonNullable<ReturnType<typeof urgencyOf>> } => !!x.u)
-      // The member that says most: most urgent, then furthest behind, then cheapest.
-      .sort(
-        (a, b) =>
+      // The member that says most: most urgent, runtime, same-major fix, furthest behind, cheapest.
+      .sort((a, b) => {
+        const sa = a.p.signals as PackageSignals;
+        const sb = b.p.signals as PackageSignals;
+        return (
           b.u.urgency - a.u.urgency ||
-          (b.p.signals?.behind ?? 0) - (a.p.signals?.behind ?? 0) ||
-          (a.p.signals?.effort ?? 0) - (b.p.signals?.effort ?? 0),
-      )[0];
+          Number(!!sa.dev) - Number(!!sb.dev) ||
+          Number(!!rowOf(b.p, sb).sameMajorFix) - Number(!!rowOf(a.p, sa).sameMajorFix) ||
+          sb.behind - sa.behind ||
+          sa.effort - sb.effort
+        );
+      })[0];
   for (const g of groups) {
     for (const p of g.members) grouped.add(p);
     // Moving with, or holding back, the rest of its own group is what the group already
@@ -255,6 +325,7 @@ export function prioritize(
       urgency: best.u.urgency,
       effort: g.members.reduce((n, p) => n + (p.signals?.effort ?? 0), 0),
       reason: best.p.name === (g.lead ?? g.name) ? reason : `${best.p.name}: ${reason}`,
+      ...rowOf(best.p, best.p.signals as PackageSignals),
     });
   }
   for (const p of packages) {
@@ -268,6 +339,7 @@ export function prioritize(
       urgency: u.urgency,
       effort: p.signals.effort,
       reason: reasonOf(p.signals, p.current, p.usage.files),
+      ...rowOf(p, p.signals),
     });
   }
   const priorities = rankPriorities(rows);

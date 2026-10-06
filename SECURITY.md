@@ -31,7 +31,8 @@ compare runtime behavior. It makes no LLM call.
 
 **Network.** Your npm registry, for metadata and tarballs. npm's bulk advisory endpoint, from
 `list`, with the names and installed versions of packages served by the public npm registry
-(never a package from another registry or scope). The chosen Anthropic, OpenAI or Gemini API, only for
+(never a package from another registry or scope; `list --no-advisories` or `"advisories": false`
+in uptide.config.json turns it off). The chosen Anthropic, OpenAI or Gemini API, only for
 assisted fixes in `fix`, only with your own environment API key, and never with `--no-llm`:
 the request carries the finding, the enclosing function or declaration and the compiler
 error for one site at a time. GitHub, through your own `gh`, only when you pass `--pr` or
