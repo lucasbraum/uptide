@@ -34,6 +34,7 @@ import { stripePack } from '../packs/stripe/index.js';
 import type { MigrationPack } from '../packs/types.js';
 import { zodPack } from '../packs/zod/index.js';
 import { diffRuntime, probeRuntime } from '../runtime/runtime.js';
+import { resetSharedState } from '../shared-state.js';
 import { requireFindUsages } from './capabilities.js';
 import { arbitrateUnchecked } from './file-kind.js';
 import { groupName, releaseGroups } from './groups.js';
@@ -847,7 +848,10 @@ async function checkWorkspace(ctx: Ctx, job: WorkspaceJob): Promise<PackageRepor
             ),
           ];
         } catch (err) {
-          // One dependency that cannot be analyzed is one answer missing, not all of them.
+          // One dependency that cannot be analyzed is one answer missing, not all of them,
+          // and leaves nothing behind: whatever shared TypeScript state it was inside is
+          // discarded before the next package (shared-state.ts).
+          resetSharedState();
           const late = errorCode(err) === 'TIME_BUDGET';
           return members.map((m) => ({
             ...notImported(workspace, m, installed.get(m) as string),

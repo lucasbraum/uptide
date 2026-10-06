@@ -13,6 +13,7 @@ import {
   type UsageVia,
 } from '../../domain/usage.js';
 import { UptideError } from '../../errors.js';
+import { onReset } from '../../shared-state.js';
 import type { TypescriptAdapter } from './index.js';
 import { locationKey } from './index.js';
 import { forgetRepo, type LoadedRepo, loadedRepo, ownsFile, readInstalled } from './repo.js';
@@ -126,6 +127,7 @@ const detailed = new Map<
   string,
   Promise<Awaited<ReturnType<TypescriptAdapter['extractSurfaceDetailed']>>>
 >();
+onReset(() => detailed.clear());
 
 function detailedSurfaceOf(
   adapter: TypescriptAdapter,

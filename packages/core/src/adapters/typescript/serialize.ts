@@ -1,4 +1,5 @@
 import { Node, ts } from 'ts-morph';
+import { onReset } from '../../shared-state.js';
 
 /**
  * Turns a declaration into the normalized text compared across versions. The TypeScript
@@ -7,7 +8,16 @@ import { Node, ts } from 'ts-morph';
  * to `T` (so moving a file inside the package is not a change).
  */
 
-const printer = ts.createPrinter({ removeComments: true, omitTrailingSemicolon: true });
+const newPrinter = () => ts.createPrinter({ removeComments: true, omitTrailingSemicolon: true });
+/**
+ * One printer for every print. TypeScript clears its writer only when a print finishes, so a
+ * print that throws leaves its partial text in front of the next one: a print that throws
+ * replaces the printer, and so does a reset (shared-state.ts).
+ */
+let printer = newPrinter();
+onReset(() => {
+  printer = newPrinter();
+});
 
 export interface PrintOptions {
   /** A type literal to print as `{…}` because its members are emitted as separate symbols. */
@@ -47,11 +57,20 @@ function transformer(opts: PrintOptions): ts.TransformerFactory<ts.Node> {
 }
 
 export function printCompilerNode(node: ts.Node, opts: PrintOptions = {}): string {
-  const result = ts.transform(node, [transformer(opts)]);
-  const transformed = result.transformed[0] ?? node;
-  const text = printer.printNode(ts.EmitHint.Unspecified, transformed, node.getSourceFile());
-  result.dispose();
-  return normalizeText(text);
+  let result: ts.TransformationResult<ts.Node> | undefined;
+  try {
+    // The transformer prints too (union members are sorted by their text): inside the try.
+    result = ts.transform(node, [transformer(opts)]);
+    const transformed = result.transformed[0] ?? node;
+    return normalizeText(
+      printer.printNode(ts.EmitHint.Unspecified, transformed, node.getSourceFile()),
+    );
+  } catch (err) {
+    printer = newPrinter();
+    throw err;
+  } finally {
+    result?.dispose();
+  }
 }
 
 export function printNode(node: Node, opts: PrintOptions = {}): string {
