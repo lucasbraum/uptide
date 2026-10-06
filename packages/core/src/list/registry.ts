@@ -8,6 +8,7 @@ import {
   registryFor,
 } from '../fetch/npmrc.js';
 import { type FetchFn, packumentUrl } from '../fetch/registry.js';
+import type { Advisory } from './priorities.js';
 
 export class DiscoveryRegistryError extends Error {
   constructor(
@@ -46,6 +47,7 @@ interface Manifest {
   dependencies?: Record<string, string>;
   peerDependencies?: Record<string, string>;
   bin?: string | Record<string, string>;
+  deprecated?: string;
 }
 interface Packument {
   'dist-tags'?: Record<string, string>;
@@ -93,6 +95,25 @@ function isTimeout(error: unknown): boolean {
   return 'cause' in error && error.cause !== error && isTimeout(error.cause);
 }
 
+/** What the priority signals read from a registry, beyond versions and peers. */
+export interface RegistrySignals {
+  /** The deprecation message of one version, from the packument already fetched. */
+  deprecation(name: string, version: string): Promise<string | undefined>;
+  /** Every published version, from the packument already fetched. */
+  versions(name: string): Promise<string[]>;
+  /** The registry's `time` map: one full-document request, made only when asked. */
+  published(name: string): Promise<Record<string, string>>;
+  /**
+   * Known advisories in one bulk request, for packages served by the public npm registry;
+   * names served by another registry are left out of the request and of `checked`.
+   */
+  advisories(
+    query: Map<string, string[]>,
+  ): Promise<{ checked: string[]; advisories: Record<string, Advisory[]> }>;
+}
+
+const NPM_REGISTRY = 'registry.npmjs.org';
+
 /** One abbreviated packument per package, kept in memory only. Each HTTP attempt gets
  * its own deadline (including the body); only timeout/5xx gets one retry. List's pool
  * bounds concurrency. A host is blocked only after it actually answers 401/403/405. */
@@ -101,7 +122,9 @@ export function createDiscoveryFetcher(opts: {
   config?: RegistryConfig;
   fetch?: FetchFn;
   timeoutMs?: number;
-}): Pick<PackageFetcher, 'resolve' | 'metadata'> {
+  /** Deadline for the optional signal requests (advisories, publish dates); they never retry. */
+  signalTimeoutMs?: number;
+}): Pick<PackageFetcher, 'resolve' | 'metadata'> & RegistrySignals {
   const config = opts.config ?? loadRegistryConfig({ cwd: opts.cwd });
   const transport = opts.fetch ?? fetch;
   const timeoutMs = opts.timeoutMs ?? 10_000;
@@ -200,8 +223,49 @@ export function createDiscoveryFetcher(opts: {
     }
     return { ...entry, version };
   };
+  const signalTimeoutMs = opts.signalTimeoutMs ?? 5_000;
+  /** One request under a deadline, body included; any failure is the caller's "not checked". */
+  const once = async <T>(url: string, init: RequestInit): Promise<T> => {
+    const signal = AbortSignal.timeout(signalTimeoutMs);
+    const response = await transport(url, { ...init, signal });
+    if (!response.ok) {
+      void response.body?.cancel().catch(() => {});
+      throw new Error(`${registryHost(url)} answered ${response.status}`);
+    }
+    return (await response.json()) as T;
+  };
+  const times = new Map<string, Promise<Record<string, string>>>();
   return {
     resolve: async (name, version) => (await manifest(name, version)).version,
+    deprecation: async (name, version) => (await ask(name)).versions?.[version]?.deprecated,
+    versions: async (name) => Object.keys((await ask(name)).versions ?? {}),
+    published: (name) => {
+      let request = times.get(name);
+      if (!request) {
+        const url = packumentUrl(name, registryFor(name, config).replace(/\/$/, ''));
+        request = once<{ time?: Record<string, string> }>(url, {
+          headers: { accept: 'application/json', ...authHeaders(url, config) },
+        }).then((doc) => doc.time ?? {});
+        times.set(name, request);
+      }
+      return request;
+    },
+    advisories: async (query) => {
+      const body = Object.fromEntries(
+        [...query].filter(([name]) => registryHost(registryFor(name, config)) === NPM_REGISTRY),
+      );
+      const checked = Object.keys(body);
+      if (!checked.length) return { checked, advisories: {} };
+      const advisories = await once<Record<string, Advisory[]>>(
+        `https://${NPM_REGISTRY}/-/npm/v1/security/advisories/bulk`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', accept: 'application/json' },
+          body: JSON.stringify(body),
+        },
+      );
+      return { checked, advisories };
+    },
     metadata: async (name, version) => {
       const result = await manifest(name, version);
       return {

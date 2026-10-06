@@ -83,6 +83,38 @@ it('lists without node_modules and never calls check; JSON retains every entry',
   ).toBe(2);
 });
 
+it('passes --no-advisories to discovery, and leaves the config to decide without it', async () => {
+  const cwd = tempRepo({ 'package.json': '{"name":"shop"}', 'package-lock.json': '{}' });
+  const list = vi.fn(async (_request: { advisories?: boolean }) => report);
+  await run(['list', '--json', '--no-advisories'], memoryIo({ cwd }), fakeEngine({ list }));
+  await run(['list', '--json'], memoryIo({ cwd }), fakeEngine({ list }));
+  expect(list.mock.calls.map(([request]) => request.advisories)).toEqual([false, undefined]);
+});
+
+it('checks a priority at its smallest fix, and says advisories were not checked when off', () => {
+  const text = formatList(
+    {
+      ...report,
+      advisories: { status: 'not checked', packages: 0, reason: 'turned off with --no-advisories' },
+      priorities: [
+        {
+          name: 'moment',
+          packages: ['moment'],
+          signal: 'security',
+          urgency: 5.3,
+          effort: 1,
+          reason: '2 advisories (2 high), fixed in 2.29.4 (patch, same major)',
+          sameMajorFix: true,
+          target: 'moment@2.29.4',
+        },
+      ],
+    },
+    { width: 160 },
+  );
+  expect(text).toContain('advisories not checked (turned off with --no-advisories)');
+  expect(text).toContain('uptide check moment --target moment@2.29.4');
+});
+
 it('accepts one positional fix package and rejects extra names', async () => {
   const engine = fakeEngine();
   const io = memoryIo();

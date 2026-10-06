@@ -302,11 +302,15 @@ ${PRIVACY}`,
       .option('--html [path]', 'write a self-contained HTML report (default: OS temp directory)')
       .option('--open', 'open the HTML report in a browser (requires --html)')
       .option('--details', 'show top symbols and source file lists')
-      .option('--verbose', 'show discovery/render phase timings and file counts'),
+      .option('--verbose', 'show discovery/render phase timings and file counts')
+      .option(
+        '--no-advisories',
+        'never send installed versions to npm\'s advisory endpoint (also: "advisories": false in uptide.config.json)',
+      ),
   )
     .addHelpText(
       'after',
-      `\nExamples:\n  $ uptide list\n  $ uptide list --all --json\n\nNo compilation, install or tarball downloads; registry metadata only.\nUsage counts calls/new/JSX and references through imported bindings. Tooling and\npossibly unused packages are collapsed; use --all to expand. Majors first, then importing files and call sites.\n${EXIT_CODES('discovery complete', 'not used', '; incomplete discovery retains successful rows')}`,
+      `\nExamples:\n  $ uptide list\n  $ uptide list --all --json\n\nNo compilation, install or tarball downloads: registry metadata, and one request to npm's\nadvisory endpoint with public packages' names and installed versions (--no-advisories).\nUsage counts calls/new/JSX and references through imported bindings. Tooling and\npossibly unused packages are collapsed; use --all to expand. Majors first, then importing files and call sites.\n${EXIT_CODES('discovery complete', 'not used', '; incomplete discovery retains successful rows')}`,
     )
     .action(
       (
@@ -316,6 +320,8 @@ ${PRIVACY}`,
           open?: boolean;
           details?: boolean;
           verbose?: boolean;
+          /** false only with --no-advisories; otherwise uptide.config.json decides. */
+          advisories?: boolean;
         },
       ) =>
         act(flags, async ({ cwd, progress, ui }) => {
@@ -329,6 +335,7 @@ ${PRIVACY}`,
               cwd: repo.root,
               details: flags.details,
               ...(flags.verbose ? { verbose: true } : {}),
+              ...(flags.advisories === false ? { advisories: false } : {}),
             }),
           );
           telemetry?.record(() => listMetrics(report));

@@ -177,18 +177,20 @@ it('discovers a synthetic single-package pnpm Nest API, including tooling and pe
       .find((g) => g.members.some((p) => p.name === '@nestjs/core'))
       ?.members.map((p) => p.name),
   ).toEqual([
+    '@nestjs/cli',
     '@nestjs/common',
     '@nestjs/core',
     '@nestjs/platform-express',
     '@nestjs/platform-fastify',
+    '@nestjs/schematics',
     '@nestjs/swagger',
     '@fastify/static',
     'nodemailer',
     'reflect-metadata',
   ]);
+  // One family, whatever version each member is at: the CLI and schematics included.
   const runtimeGroup = result.groups.find((g) => g.id === 'nestjs');
-  expect(runtimeGroup?.name).toBe('@nestjs/*');
-  expect(result.groups.map((g) => g.id)).toContain('@nestjs/cli');
+  expect(runtimeGroup).toMatchObject({ name: '@nestjs/*', reason: '@nestjs family, peer link' });
   expect(new Set(result.groups.map((g) => g.id)).size).toBe(result.groups.length);
   expect(result.packages.find((p) => p.name === '@fastify/static')).toMatchObject({
     classification: 'tooling',
@@ -286,7 +288,7 @@ app.register(plugin);
   expect(scan.get('other')).toMatchObject({ references: 0, callSites: 1 });
 });
 
-it('groups lockstep scopes and required peer upgrades, without merging unrelated scoped packages', async () => {
+it('groups a scope as one family whatever its versions, and required peer upgrades', async () => {
   const cwd = fixture();
   const names = ['@suite/a', '@suite/b', '@independent/a', '@independent/b', 'view', 'view-dom'];
   writeFileSync(
@@ -308,7 +310,11 @@ it('groups lockstep scopes and required peer upgrades, without merging unrelated
           : {},
     },
   });
-  expect(result.groups.map((g) => g.name).sort()).toEqual(['@suite/*', 'view-dom']);
+  expect(result.groups.map((g) => [g.name, g.reason]).sort()).toEqual([
+    ['@independent/*', '@independent family'],
+    ['@suite/*', '@suite family'],
+    ['view-dom', 'peer link'],
+  ]);
 });
 
 it('recognizes package entry scripts and bin paths without confusing similarly named packages', async () => {

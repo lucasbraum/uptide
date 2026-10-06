@@ -135,6 +135,7 @@ export {
   type ListReport,
   listDependencies,
 } from './list/list.js';
+export type { PackageSignals, Priority, Signal } from './list/priorities.js';
 export { ACCEPTED_KEYS, KEY_ENV, selectLlm } from './llm/config.js';
 export { DEFAULT_MAX_COST_USD, providerFixer } from './llm/fixer.js';
 export { DEFAULT_MODELS, PRICE_DATE, PRICE_SOURCES, PRICES, priceFor } from './llm/pricing.js';

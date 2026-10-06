@@ -58,8 +58,17 @@ Next
   npx uptide check zod stripe --details      every site and reason
 ```
 
-`list` reads manifests, lockfiles, source imports and registry metadata. Groups come first,
-with a command such as `uptide check --group nestjs` to check their members together.
+`list` reads manifests, lockfiles, source imports and registry metadata. PRIORITIES come
+first: up to five rows, most urgent first, each with a one-line reason and the command to run
+(known advisories for the installed version, a deprecated version, a major line with no release
+in a year, a peer range holding another upgrade back, two or more majors behind; cheaper
+upgrades first among equals). When nothing is urgent it says so and suggests the cheap batch of
+minor/patch upgrades that touch few files. The rules and weights are in
+[docs/priorities.md](docs/priorities.md); nothing in `list` calls an LLM. Groups follow,
+with a command such as `uptide check --group nestjs` to check their members together: a scope
+is one family (`@radix-ui/*`), and packages also group across scopes when a peer range of one's
+latest version needs the other, or when both pin the same exact version of a dependency
+(`ai + @ai-sdk/*`). Each group says why.
 External peers are members labeled by the package that requires them. Each member keeps its own
 classification and evidence. A group header follows its lead; members with independent usage
 appear in their own section, and the group command/JSON still includes the complete member list. Each row gives current → latest, upgrade
@@ -76,7 +85,14 @@ unused” means no usage was found by Uptide's scan, so verify before removing. 
 neither commands nor source-scan exclusions.
 
 Registry settings use environment overrides, project and user `.npmrc` files, scoped
-registries and host/path-scoped credentials. Discovery uses abbreviated metadata with up to
+registries and host/path-scoped credentials. Known advisories come from one request to npm's
+bulk advisory endpoint with the names and installed versions of packages served by the public
+npm registry; packages from another registry or scope are never sent there. A failure or
+timeout (5 s) says “advisories not checked” and never fails the run; `--no-advisories` (or
+`"advisories": false` in `uptide.config.json`) never sends the request. Runtime dependencies
+rank before dev-only ones, and an advisory row names its smallest fix (same major or not). Publish dates for the
+support window come from the full registry document of packages with a newer major, under the
+same 5-second deadline. Discovery otherwise uses abbreviated metadata with up to
 16 concurrent requests, a 10-second timeout per attempt (including response bodies), and one
 retry for timeouts or HTTP 5xx. Only a host that returns 401, 403 or 405 is blocked for the
 rest of that run. Credentials and registry responses are never written to the discovery cache.
@@ -327,14 +343,16 @@ site the rules cannot migrate, the finding, the enclosing function and the compi
 error. `uptide fix --no-llm` turns assisted fixes off. No account.
 Anonymous telemetry is off by default and asks for consent in an interactive terminal.
 Set UPTIDE_TELEMETRY=0 to disable it. No IP, code, paths or repo names are collected.
-Other network use: your npm registry for package metadata and tarballs, PostHog EU only
+Other network use: your npm registry for package metadata and tarballs, npm's advisory
+endpoint from `list` (public package names and installed versions; `--no-advisories` turns
+it off), PostHog EU only
 after telemetry opt-in, and GitHub when you pass `fix --pr` or run `pr` / `pr-body`.
 
 There is no Uptide server. With telemetry off (the default):
 
 | | Where it runs | What leaves your machine |
 | --- | --- | --- |
-| `list`, `plan` | locally | package names/versions requested from your npm registry; metadata only, no source code |
+| `list`, `plan` | locally | package names/versions requested from your npm registry, and `list` sends public packages' names and installed versions to npm's advisory endpoint; metadata only, no source code |
 | `check` | locally | nothing of yours; it downloads package tarballs from your npm registry. No LLM call, and nothing in your repository is executed. |
 | `fix`, rules and verification | locally, in a temporary clone | nothing of yours |
 | `fix`, assisted fixes | Your chosen provider's API, with **your** environment API key | per site no rule covers: the finding, the enclosing function or declaration, and the compiler error |

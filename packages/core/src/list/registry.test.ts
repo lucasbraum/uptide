@@ -56,8 +56,10 @@ it('resolves all 80 packages against a delayed local registry with at most 16 re
     expect(report.unknown).toEqual([]);
     expect(report.failures).toEqual([]);
     expect(new Set(seen).size).toBe(80);
-    expect(seen).toHaveLength(80); // current and target reuse the packument
-    expect(accepts.every((accept) => accept === 'application/vnd.npm.install-v1+json')).toBe(true);
+    // Current and target reuse the abbreviated packument; each package has a newer major,
+    // so its publish dates come from one full document. Still at most 16 in flight.
+    expect(accepts.filter((a) => a === 'application/vnd.npm.install-v1+json')).toHaveLength(80);
+    expect(accepts.filter((a) => a === 'application/json')).toHaveLength(80);
     expect(peak).toBe(16);
     expect(report.timing.totalMs).toBeGreaterThan(800); // the old global budget lost queued packages
   } finally {

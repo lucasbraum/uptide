@@ -1,4 +1,4 @@
-import type { ListedDependency, ListGroup, ListReport } from '@uptide/core';
+import type { ListedDependency, ListGroup, ListReport, Priority } from '@uptide/core';
 import pc from 'picocolors';
 import type { CheckHeader } from './format-check.js';
 import { alignedRows, type Cell, ellipsis, terminalHeader } from './terminal.js';
@@ -24,6 +24,24 @@ export const listChange = (p: ListedDependency): string =>
   p.majorGap > 1 ? `major ×${p.majorGap}` : p.change;
 export const groupCommand = (group: ListGroup, opts: FormatListOptions): string =>
   `${opts.invocation ?? 'uptide'} check --group ${quote(group.id)}${opts.cwd ? ` --cwd ${quote(opts.cwd)}` : ''}`;
+/** The command that starts on a priority: its group or package, at its smallest fix when it has one. */
+export const priorityCommand = (p: Priority, opts: FormatListOptions): string =>
+  `${opts.invocation ?? 'uptide'} check ${p.group ? `--group ${quote(p.group)}` : p.packages.map(quote).join(' ')}${p.target ? ` --target ${quote(p.target)}` : ''}${opts.cwd ? ` --cwd ${quote(opts.cwd)}` : ''}`;
+export const cheapBatchCommand = (names: string[], opts: FormatListOptions): string =>
+  `${opts.invocation ?? 'uptide'} check ${names.map(quote).join(' ')}${opts.cwd ? ` --cwd ${quote(opts.cwd)}` : ''}`;
+/** What the advisory lookup covered, for the PRIORITIES heading. */
+export function advisoryStatus(report: ListReport): string {
+  const a = report.advisories;
+  if (!a) return 'advisories not checked';
+  return a.status === 'checked'
+    ? `advisories checked for ${plural(a.packages, 'package')}`
+    : `advisories not checked${a.reason ? ` (${a.reason})` : ''}`;
+}
+/** A shortened cheap batch: the first few names, then how many more. */
+export function cheapBatchLabel(names: string[], shown = 4): string {
+  return `${names.slice(0, shown).join(', ')}${names.length > shown ? ` +${names.length - shown}` : ''}`;
+}
+export const PRIORITY_ROWS = 5;
 export function listUsage(p: ListedDependency): string {
   return [
     plural(p.usage.files, 'file'),
@@ -236,6 +254,69 @@ export function formatList(report: ListReport, opts: FormatListOptions = {}): st
     }
     lines.push(c.yellow(rest), '');
   }
+  const priorities = report.priorities ?? [];
+  if (report.packages.length) {
+    lines.push(
+      `${c.bold('PRIORITIES')}  ${c.dim(`most urgent first · ${advisoryStatus(report)}`)}`,
+    );
+    const tone = (signal: Priority['signal']): Cell['tone'] =>
+      signal === 'security'
+        ? 'red'
+        : signal === 'deprecated' || signal === 'unsupported'
+          ? 'yellow'
+          : undefined;
+    const top = priorities.slice(0, opts.all ? priorities.length : PRIORITY_ROWS);
+    const longest = (texts: string[]): number => Math.max(0, ...texts.map((t) => t.length));
+    // The command is the point of a row: on the same line when all of it fits, otherwise
+    // under the name and reason, never clipped.
+    const oneLine =
+      2 +
+        longest(top.map((p) => p.name)) +
+        3 +
+        longest(top.map((p) => p.reason)) +
+        3 +
+        longest(top.map((p) => priorityCommand(p, opts))) <=
+      width;
+    const reasons = alignedRows(
+      top.map((p) => [
+        { text: p.name, tone: 'bold' },
+        { text: p.reason, ...(tone(p.signal) ? { tone: tone(p.signal) } : {}) },
+        ...(oneLine ? [{ text: priorityCommand(p, opts), tone: 'dim' as const }] : []),
+      ]),
+      width,
+      color,
+      2,
+    );
+    top.forEach((p, i) => {
+      lines.push(reasons[i] as string);
+      if (!oneLine) lines.push(c.dim(`    ${priorityCommand(p, opts)}`));
+    });
+    if (top.length < priorities.length)
+      lines.push(c.dim(`  + ${priorities.length - top.length} more · --all`));
+    if (!priorities.length) {
+      lines.push(
+        `  Nothing urgent: no advisories, deprecations, unsupported lines or blocking peers.`,
+      );
+      if (report.cheapBatch?.length)
+        lines.push(
+          ...alignedRows(
+            [
+              [
+                { text: 'cheap batch', tone: 'bold' },
+                {
+                  text: `${cheapBatchLabel(report.cheapBatch)}: minor/patch, few files, one PR`,
+                },
+                { text: cheapBatchCommand(report.cheapBatch, opts), tone: 'dim' },
+              ],
+            ],
+            width,
+            color,
+            2,
+          ),
+        );
+    }
+    lines.push('');
+  }
   const showWorkspaces = report.workspaces.some((w) => w !== '.');
   const cells = (p: ListedDependency): Cell[] => [
     { text: p.name, tone: 'bold' },
@@ -335,13 +416,20 @@ export function formatList(report: ListReport, opts: FormatListOptions = {}): st
     c.dim('Usage is a syntax scan, no type analysis.'),
     c.dim('Generic analysis is the default; verified means a migration pack is available.'),
   );
+  // Next is the top priority; with nothing urgent, the cheap batch; then the first row.
   const first = used[0] ?? tooling[0] ?? unused[0];
   const next =
     groups[0] ?? report.groups.find((g) => g.members.some((p) => p.name === first?.name));
-  if (next || first)
-    lines.push(
-      `${c.bold('Next')}  ${next ? groupCommand(next, opts) : listCommand([first as ListedDependency], opts)}`,
-    );
+  const nextCommand = priorities[0]
+    ? priorityCommand(priorities[0], opts)
+    : report.cheapBatch?.length
+      ? cheapBatchCommand(report.cheapBatch, opts)
+      : next
+        ? groupCommand(next, opts)
+        : first
+          ? listCommand([first], opts)
+          : undefined;
+  if (nextCommand) lines.push(`${c.bold('Next')}  ${nextCommand}`);
   // Hints and headings also obey the terminal width; never emit a wrapped table row.
   return `${lines
     .map((line) => {

@@ -65,7 +65,9 @@ it.skipIf(!existsSync(bin)).each([true, false])(
         (error: { stdout: string; stderr: string; code: number }) => error,
       );
       expect(result.code).toBe(accepted ? 0 : 2);
-      expect(seen).toHaveLength(2);
+      // Per package, its packument and (accepted, with a newer major) its publish dates; every
+      // request authenticated. Nothing private goes to the public advisory endpoint.
+      expect(seen).toHaveLength(accepted ? 4 : 2);
       expect(seen.every((value) => value === `Bearer ${secret}`)).toBe(true);
       const report = JSON.parse(result.stdout);
       expect(report.failures).toHaveLength(accepted ? 0 : 2);

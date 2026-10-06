@@ -9,6 +9,7 @@ import type { PackageFetcher } from '../domain/io.js';
 import type { Tier } from '../domain/report.js';
 import { errorCode } from '../errors.js';
 import { loadRegistryConfig, registryFor } from '../fetch/npmrc.js';
+import { advisoriesEnabled } from '../llm/config.js';
 import { stripePack } from '../packs/stripe/index.js';
 import { zodPack } from '../packs/zod/index.js';
 import type { TaskCommands } from './config.js';
@@ -19,10 +20,21 @@ import {
   toolingReasons,
   UNUSED_REASON,
 } from './evidence.js';
-import { dependencyGroups } from './groups.js';
+import { dependencyGroups, peerBlocks } from './groups.js';
+import {
+  type Advisory,
+  deprecatedSignal,
+  effortOf,
+  type PackageSignals,
+  type Priority,
+  prioritize,
+  securitySignal,
+  unsupportedSignal,
+} from './priorities.js';
 import {
   createDiscoveryFetcher,
   DiscoveryRegistryError,
+  type RegistrySignals,
   registryFailure,
   registryHost,
 } from './registry.js';
@@ -41,8 +53,15 @@ export interface ListedDependency {
   tier: Tier;
   majorGap: number;
   classification: 'used' | 'tooling' | 'possibly-unused' | 'peer';
+  /**
+   * runtime: declared in dependencies or optionalDependencies (or a peer of a package that
+   * is), and not tooling; dev: only in devDependencies, or tooling. Dev ranks after runtime.
+   */
+  kind?: 'runtime' | 'dev';
   peerOf?: string[];
   reasons: string[];
+  /** What makes it worth upgrading first; see priorities.ts. */
+  signals?: PackageSignals;
   workspaces: string[];
   usage: {
     files: number;
@@ -57,6 +76,8 @@ export interface ListGroup {
   id: string;
   lead?: string;
   name: string;
+  /** Why the members upgrade together: `@radix-ui family`, `peer link`, `shared <dependency>`. */
+  reason?: string;
   members: ListedDependency[];
 }
 export interface ListReport {
@@ -64,6 +85,12 @@ export interface ListReport {
   workspaces: string[];
   packages: ListedDependency[];
   groups: ListGroup[];
+  /** Most urgent first. Empty when nothing is urgent. */
+  priorities?: Priority[];
+  /** Minor and patch upgrades touching few files, with no urgent signal: one PR's worth. */
+  cheapBatch?: string[];
+  /** Whether known advisories were looked up; `not checked` never fails the run. */
+  advisories?: { status: 'checked' | 'not checked'; packages: number; reason?: string };
   scanWarnings?: string[];
   /** Packages whose latest version could not be checked; never counted as up to date. */
   unknown?: { name: string; currentVersions: string[]; workspaces: string[]; reason: string }[];
@@ -106,9 +133,16 @@ export interface ListOptions {
   cwd: string;
   only?: string[];
   adapter?: LanguageAdapter;
-  fetcher?: Pick<PackageFetcher, 'resolve' | 'metadata'>;
+  fetcher?: Pick<PackageFetcher, 'resolve' | 'metadata'> & Partial<RegistrySignals>;
   details?: boolean;
   verbose?: boolean;
+  /** "Now" for the support window; tests pin it. */
+  now?: Date;
+  /**
+   * `false` (`--no-advisories`): installed versions are never sent to npm's advisory endpoint.
+   * Unset: on, unless uptide.config.json says `"advisories": false`.
+   */
+  advisories?: boolean;
 }
 
 /** Discovery only. Reads manifests, lockfiles, source syntax and registry metadata. */
@@ -160,6 +194,8 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
   // Keep workspace aliases with different targets separate, even at identical versions.
   const declared = new Map<string, Map<string, string[]>>();
   const skipped = new Map<string, NonNullable<ListReport['skipped']>[number]>();
+  // Declared as a runtime dependency in some workspace: dependencies or optionalDependencies.
+  const runtimeKeys = new Set<string>();
   const skip = (name: string, source: string, workspace: string): void => {
     if (opts.only && !opts.only.includes(localName(name))) return;
     const key = JSON.stringify([name, source]);
@@ -187,6 +223,10 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
       if (value !== undefined && (!value || typeof value !== 'object' || Array.isArray(value)))
         throw new Error(`malformed package.json: ${field} must be an object`);
     }
+    const runtimeNames = new Set([
+      ...Object.keys(manifest.dependencies ?? {}),
+      ...Object.keys(manifest.optionalDependencies ?? {}),
+    ]);
     for (const [name, spec] of Object.entries({
       ...manifest.dependencies,
       ...manifest.devDependencies,
@@ -227,6 +267,7 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
       }
       const key = JSON.stringify([name, source.name]);
       identities.set(key, { name, registryName: source.name });
+      if (runtimeNames.has(name)) runtimeKeys.add(key);
       const versions = declared.get(key) ?? new Map<string, string[]>();
       versions.set(version, [...(versions.get(version) ?? []), workspace]);
       declared.set(key, versions);
@@ -276,7 +317,64 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
     missingVersions.set(name, missing);
   }
   manifestReadMs += performance.now() - installedStart;
+  /** Deprecation and versions come from the packument already fetched; publish dates only
+   * for a package with a newer major, where the support window matters. Never fatal. */
+  const collectSignals = async (name: string, latest: string): Promise<void> => {
+    const outdated = [...(declared.get(name)?.keys() ?? [])].filter(
+      (current) => compareVersions(latest, current) > 0,
+    );
+    if (!outdated.length) return;
+    const real = registryName(name);
+    await Promise.all([
+      ...outdated.map(async (current) => {
+        const message = await fetcher.deprecation?.(real, current).catch(() => undefined);
+        if (message) deprecations.set(JSON.stringify([name, current]), message);
+      }),
+      fetcher
+        .versions?.(real)
+        .then((list) => allVersions.set(name, list))
+        .catch(() => {}),
+      outdated.some((c) => (parseVersion(latest)?.major ?? 0) > (parseVersion(c)?.major ?? 0)) &&
+      fetcher.published
+        ? fetcher
+            .published(real)
+            .then((time) => published.set(name, time))
+            .catch(() => {})
+        : undefined,
+    ]);
+  };
   const registryStart = performance.now();
+  const wanted = names.filter((name) => !opts.only || opts.only.includes(localName(name)));
+  // One bulk request for every installed version, alongside the version lookups.
+  const advisoryQuery = new Map<string, string[]>();
+  for (const name of wanted)
+    advisoryQuery.set(registryName(name), [
+      ...new Set([
+        ...(advisoryQuery.get(registryName(name)) ?? []),
+        ...(declared.get(name)?.keys() ?? []),
+      ]),
+    ]);
+  const advisoriesOff =
+    opts.advisories === false
+      ? 'turned off with --no-advisories'
+      : opts.advisories === undefined && !advisoriesEnabled(opts.cwd)
+        ? 'turned off in uptide.config.json'
+        : undefined;
+  const advisoryRequest: Promise<
+    { checked: string[]; advisories: Record<string, Advisory[]> } | { error: string }
+  > = advisoriesOff
+    ? Promise.resolve({ error: advisoriesOff })
+    : fetcher.advisories
+      ? fetcher.advisories(advisoryQuery).catch((error: unknown) => ({
+          error:
+            error instanceof Error && error.name === 'TimeoutError'
+              ? 'timed out'
+              : 'request failed',
+        }))
+      : Promise.resolve({ error: 'not available for this registry client' });
+  const deprecations = new Map<string, string>();
+  const published = new Map<string, Record<string, string>>();
+  const allVersions = new Map<string, string[]>();
   await mapWithLimit(names, 16, async (name) => {
     const items = metadata.get(name) as Manifest[];
     // Resolve each package independently within the bounded request pool.
@@ -296,6 +394,7 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
             fail(name, error, 'target peer metadata unavailable: ');
           }
         }
+        await collectSignals(name, latest);
       } catch (error) {
         fail(name, error);
         blocked.add(name);
@@ -313,6 +412,7 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
       }
     }
   });
+  const advisoryResult = await advisoryRequest;
   const registryMs = performance.now() - registryStart;
   const configStart = performance.now();
   const configText = configs.join('\n');
@@ -439,6 +539,49 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
         .map((key) => [localName(key), targets.get(key) as Manifest]),
     ),
   );
+  // Signals, then priorities: what to upgrade first and why.
+  const keyOf = new Map(names.map((key) => [localName(key), key]));
+  const advisories = 'error' in advisoryResult ? {} : advisoryResult.advisories;
+  const blocks = peerBlocks(
+    packages,
+    new Map(unambiguous.map((key) => [localName(key), metadata.get(key) ?? []])),
+  );
+  const now = opts.now ?? new Date();
+  for (const p of packages) {
+    const key = keyOf.get(p.name) ?? p.name;
+    const together = groups.find(
+      (g) => g.reason && !g.reason.endsWith(' family') && g.members.includes(p),
+    );
+    const security = securitySignal(
+      p.current,
+      advisories[p.registryName ?? p.name] ?? [],
+      allVersions.get(key) ?? [],
+    );
+    const deprecated = deprecatedSignal(deprecations.get(JSON.stringify([key, p.current])));
+    const time = published.get(key);
+    const unsupported = time ? unsupportedSignal(p.current, p.latest, time, now) : undefined;
+    p.kind =
+      (runtimeKeys.has(key) || p.classification === 'peer') && p.classification !== 'tooling'
+        ? 'runtime'
+        : 'dev';
+    p.signals = {
+      ...(security ? { security } : {}),
+      ...(deprecated ? { deprecated } : {}),
+      ...(unsupported ? { unsupported } : {}),
+      ...(blocks.get(p.name)?.length ? { blocks: blocks.get(p.name) } : {}),
+      ...(together
+        ? {
+            movesWith: [
+              ...new Set(together.members.filter((m) => m.name !== p.name).map((m) => m.name)),
+            ],
+          }
+        : {}),
+      behind: p.majorGap,
+      effort: effortOf(p.usage, p.tier === 'verified'),
+      ...(p.kind === 'dev' ? { dev: true } : {}),
+    };
+  }
+  const { priorities, cheapBatch } = prioritize(packages, groups);
   const failuresByName = new Map(failures.map((failure) => [failure.name, failure]));
   const unknown = new Map<string, NonNullable<ListReport['unknown']>[number]>();
   for (const key of names) {
@@ -464,6 +607,18 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
     workspaces,
     packages,
     groups,
+    priorities,
+    cheapBatch,
+    advisories:
+      'error' in advisoryResult
+        ? { status: 'not checked', packages: 0, reason: advisoryResult.error }
+        : advisoryResult.checked.length
+          ? { status: 'checked', packages: advisoryResult.checked.length }
+          : {
+              status: 'not checked',
+              packages: 0,
+              reason: 'every package comes from a private registry',
+            },
     ...(scanStats.warnings?.length ? { scanWarnings: scanStats.warnings } : {}),
     skipped: [...skipped.values()].sort(
       (a, b) => compareText(a.name, b.name) || compareText(a.source, b.source),

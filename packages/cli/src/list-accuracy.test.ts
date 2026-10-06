@@ -25,8 +25,9 @@ it('collapses possibly unused with cautious wording and explains rows on expansi
   expect(expanded).toContain('referenced by configuration');
   expect(text).toMatchSnapshot();
   const html = renderListHtml(report, opts);
-  expect(html).toContain('<details class="notes"><summary>01 / Tooling');
-  expect(html).toContain('<details class="notes"><summary>02 / Possibly unused');
+  // 01 is Priorities, above every section with packages.
+  expect(html).toContain('<details class="notes" data-block><summary>02 / Tooling');
+  expect(html).toContain('<details class="notes" data-block><summary>03 / Possibly unused');
   expect(html).toContain('no usage found by Uptide&#39;s scan; verify before removing');
   expect(html).toContain('no static imports, script/bin usage');
   expect(html).not.toContain('<details class="notes" open');
@@ -36,10 +37,16 @@ it.each([
     true,
     true,
     true,
-    ['01 / Packages', '02 / Tooling', '03 / Possibly unused', '04 / Incomplete discovery'],
+    [
+      '01 / Priorities',
+      '02 / Packages',
+      '03 / Tooling',
+      '04 / Possibly unused',
+      '05 / Incomplete discovery',
+    ],
   ],
-  [false, true, false, ['01 / Tooling', '02 / Incomplete discovery']],
-  [false, false, true, ['01 / Possibly unused', '02 / Incomplete discovery']],
+  [false, true, false, ['01 / Priorities', '02 / Tooling', '03 / Incomplete discovery']],
+  [false, false, true, ['01 / Priorities', '02 / Possibly unused', '03 / Incomplete discovery']],
   [false, false, false, ['01 / Incomplete discovery']],
 ] as const)(
   'numbers only rendered sections (used=%s tooling=%s unused=%s)',
@@ -62,7 +69,9 @@ it.each([
     ];
     const html = renderListHtml(report, opts);
     expect(
-      html.match(/\d{2} \/ (?:Groups|Packages|Tooling|Possibly unused|Incomplete discovery)/g),
+      html.match(
+        /\d{2} \/ (?:Priorities|Groups|Packages|Tooling|Possibly unused|Incomplete discovery)/g,
+      ),
     ).toEqual(labels);
   },
 );
@@ -200,7 +209,8 @@ it('keeps configured peer members out of Possibly unused while locating the grou
   expect(unused).toContain('pretty-quick');
   expect(unused).toContain('uptide check --group unused-plugin');
   const html = renderListHtml(report, opts);
-  const [tools, unusedHtml] = html.split('02 / Possibly unused');
+  // 01 is Priorities.
+  const [tools, unusedHtml] = html.split('03 / Possibly unused');
   expect(tools).toContain('config file .prettierrc');
   expect(unusedHtml).not.toContain('config file .prettierrc');
   expect(unusedHtml).toContain('pretty-quick');

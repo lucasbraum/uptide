@@ -10,9 +10,17 @@ Requires a lockfile (exact manifest versions also work once the repository is de
 Shows every outdated direct dependency, current → latest, major/minor/patch (including
 `major ×2` for 10 → 12), verified/generic tier, importing files, calls and references,
 and nonzero top symbols. Workspace columns appear only in workspace repositories.
-Groups come first: scoped packages with matching current/latest versions and packages
-coupled by peer requirements have one group and a command checking all members. Names use
-the framework scope or lead package; external peers are labeled `peer of <package>`.
+PRIORITIES come first: at most five rows (all with `--all`), most urgent first, each with a
+one-line reason and the command to run: known advisories for the installed version, with its
+smallest fix (`fixed in 3.2.5 (patch, same major)`, `needs 4.1.11 (major)`), a deprecated
+version, a major line with no release in a year, a peer range holding another upgrade back, two
+or more majors behind. Runtime dependencies rank before dev-only ones (`dev · ` in the reason).
+Rules and weights: [priorities.md](priorities.md). When nothing is urgent, it suggests a cheap
+batch of minor/patch upgrades.
+Groups follow: a scope is one family (`@radix-ui/*`) whatever its members' versions, and
+packages group across scopes when a peer range of one's latest version needs the other or both
+pin the same exact dependency version (`ai + @ai-sdk/*`); each group says why. Names use
+the family or lead package; external peers are labeled `peer of <package>`.
 `uptide check --group nestjs` discovers and expands the exact member list before checking.
 JSON retains each member, the stable group selector and peer relationships.
 Other rows put majors first, then importing files and call sites. Terminal rows align to
@@ -28,6 +36,9 @@ Color is disabled for pipes, `NO_COLOR`, `--no-color` and CI.
 - `--open`: with `--html`, open the page in an interactive terminal (never in CI or a pipe).
 - `--details`: include top symbols and source file lists. HTML includes no source code, file paths, or
   workspace paths by default; commands without `--details` should be run from the named repo.
+- `--no-advisories`: never send installed versions to npm's advisory endpoint; the PRIORITIES
+  heading says “advisories not checked”. `"advisories": false` in `uptide.config.json` does the
+  same for everyone in the repository.
 - `--cwd <dir>`, `--ci`, `--no-color`: shared options.
 
 Tooling is separate and collapsed: script commands and package bins, known build/config

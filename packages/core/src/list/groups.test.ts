@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import type { Manifest } from './evidence.js';
-import { dependencyGroups } from './groups.js';
+import { dependencyGroups, peerBlocks } from './groups.js';
 import type { ListedDependency } from './list.js';
 
 function pkg(name: string, current = '1.0.0', latest = '2.0.0'): ListedDependency {
@@ -18,7 +18,7 @@ function pkg(name: string, current = '1.0.0', latest = '2.0.0'): ListedDependenc
   };
 }
 
-it('names the lockstep scope and independent tooling leads with unique matching selectors', () => {
+it('makes a scope one family, with the peers its latest versions need', () => {
   const packages = [
     pkg('@nestjs/common'),
     pkg('@nestjs/core'),
@@ -35,20 +35,52 @@ it('names the lockstep scope and independent tooling leads with unique matching 
       ['@nestjs/schematics', { peerDependencies: { 'schematics-peer': '^2' } }],
     ]),
   );
-  expect(groups.map(({ id, name }) => ({ id, name }))).toEqual([
-    { id: 'nestjs', name: '@nestjs/*' },
-    { id: '@nestjs/cli', name: '@nestjs/cli' },
-    { id: '@nestjs/schematics', name: '@nestjs/schematics' },
+  expect(groups.map(({ id, name, reason }) => ({ id, name, reason }))).toEqual([
+    { id: 'nestjs', name: '@nestjs/*', reason: '@nestjs family, peer link' },
   ]);
-  expect(groups[1]?.members.find((p) => p.name === 'cli-peer')?.peerOf).toEqual(['@nestjs/cli']);
+  expect(groups[0]?.members.find((p) => p.name === 'cli-peer')?.peerOf).toEqual(['@nestjs/cli']);
 });
 
-it('does not name a peer-coupled set as lockstep when its scoped versions differ', () => {
+it('keeps a family together when its members are at different versions', () => {
   const groups = dependencyGroups(
     [pkg('@example/lead'), pkg('@example/peer', '3.0.0', '4.0.0')],
-    new Map([['@example/lead', [{ peerDependencies: { '@example/peer': '^3' } }]]]),
+    new Map(),
   );
-  expect(groups[0]).toMatchObject({ id: '@example/lead', name: '@example/lead' });
+  expect(groups[0]).toMatchObject({ id: 'example', name: '@example/*', reason: '@example family' });
+});
+
+it('never makes @types a family, and keeps a scope split across workspaces apart', () => {
+  const inWorkspace = (name: string, workspace: string): ListedDependency => ({
+    ...pkg(name),
+    workspaces: [workspace],
+  });
+  const groups = dependencyGroups(
+    [
+      pkg('@types/node'),
+      pkg('@types/react'),
+      inWorkspace('@ui/a', 'web'),
+      inWorkspace('@ui/b', 'web'),
+      inWorkspace('@ui/c', 'admin'),
+      inWorkspace('@ui/d', 'admin'),
+    ],
+    new Map(),
+  );
+  expect(groups.map((g) => [g.id, g.name])).toEqual([
+    ['@ui/a', '@ui/*'],
+    ['@ui/c', '@ui/*'],
+  ]);
+});
+
+it('reports an installed peer range that holds another outdated package back', () => {
+  const blocks = peerBlocks(
+    [
+      pkg('@ai-sdk/react', '1.2.12', '4.0.0'),
+      pkg('react', '18.3.1', '19.2.0'),
+      pkg('zod', '3.25.0', '4.1.0'),
+    ],
+    new Map([['@ai-sdk/react', [{ peerDependencies: { react: '^18 || ^19', zod: '^3.23.8' } }]]]),
+  );
+  expect([...blocks]).toEqual([['@ai-sdk/react', ['zod 4']]]);
 });
 
 it('keeps selectors unique when an unscoped lead matches a scope shorthand', () => {

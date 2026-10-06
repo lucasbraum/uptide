@@ -106,7 +106,21 @@ it('uses layered registry auth without persisting credentials or rerequesting ta
   });
   expect(result.failures).toEqual([]);
   expect(result.packages).toHaveLength(2);
-  expect(transport).toHaveBeenCalledTimes(2); // one packument per package, shared by latest/current/target
+  // One abbreviated packument per package, shared by latest/current/target, and one full
+  // document for its publish dates (both have a newer major). No advisory request: a
+  // private registry's packages are never sent to the public advisory endpoint.
+  const accepts = transport.mock.calls.map(([, init]) => new Headers(init?.headers).get('accept'));
+  expect(accepts.sort()).toEqual([
+    'application/json',
+    'application/json',
+    'application/vnd.npm.install-v1+json',
+    'application/vnd.npm.install-v1+json',
+  ]);
+  expect(result.advisories).toEqual({
+    status: 'not checked',
+    packages: 0,
+    reason: 'every package comes from a private registry',
+  });
   expect(JSON.stringify(result)).not.toMatch(/fixture-project-secret|fixture-user-secret|\.tgz/);
   expect(readFileSync(join(cwd, '.npmrc'), 'utf8')).toBe(before);
   expect(existsSync(join(cwd, 'discovery-cache'))).toBe(false);
@@ -186,7 +200,8 @@ it('gives each attempt 10 seconds including stalled bodies, retries once, and re
     report.failures.every((f) => f.reason === 'timed out on npm.pkg.github.com, skipped'),
   ).toBe(true);
   expect(signals.every((signal) => signal.aborted)).toBe(true);
-  expect(transport).toHaveBeenCalledTimes(5); // public once; two stalled packages twice each
+  // public: its packument, its publish dates and the advisory request; two stalled packages twice each.
+  expect(transport).toHaveBeenCalledTimes(7);
   expect(signals).toHaveLength(4);
   expect(report.unknown?.map((p) => p.name)).toEqual(['@example/one', '@example/two']);
   expect(report.timing.totalMs).toBe(20_000);

@@ -3,23 +3,31 @@
 exports[`Nest terminal design, TTY=false 1`] = `
 "uptide list · synthetic-nest-api · pnpm · 0ms
 
-32 outdated   32 major   0 minor   1 group   21 tooling
+32 outdated   32 major   0 minor   1 group   19 tooling
+
+PRIORITIES  most urgent first · advisories not checked (not available for this registry client)
+  @nestjs/*      @nestjs/swagger: 5 majors behind, 1 file to touch   uptide check --group nestjs
 
 GROUPS  upgrade together
-@nestjs/*      8 packages   → 12.x   uptide check --group nestjs
-  @nestjs/common             10.4.0 → 12.0.0   major ×2   1 file   2 calls
-  @nestjs/core               10.4.0 → 12.0.0   major ×2   1 file   1 call
-  @nestjs/platform-express   10.3.0 → 12.0.0   major ×2   1 file             1 ref
-  @nestjs/platform-fastify   10.4.0 → 12.0.0   major ×2   1 file   1 call
-  @nestjs/swagger             7.4.2 → 12.0.0   major ×5   1 file   1 call
+@nestjs/*      10 packages   → 12.x   uptide check --group nestjs
+  @nestjs/cli                10.0.0 → 12.0.0   major ×2   0 files
+    known configuration or build tool
+  @nestjs/common             10.4.0 → 12.0.0   major ×2   1 file    2 calls
+  @nestjs/core               10.4.0 → 12.0.0   major ×2   1 file    1 call
+  @nestjs/platform-express   10.3.0 → 12.0.0   major ×2   1 file              1 ref
+  @nestjs/platform-fastify   10.4.0 → 12.0.0   major ×2   1 file    1 call
+  @nestjs/schematics         10.0.0 → 12.0.0   major ×2   0 files
+    known configuration or build tool
+    referenced by configuration
+  @nestjs/swagger             7.4.2 → 12.0.0   major ×5   1 file    1 call
   @fastify/static            6.12.0 → 10.1.5   major ×4   peer of @nestjs/platform-fastify
   nodemailer                  6.9.0 → 8.0.0    major ×2   peer of @nestjs/core
   reflect-metadata            0.1.0 → 1.0.0    major      peer of @nestjs/common, @nestjs/core
 
 PACKAGES
-  cookie-plugin               1.0.0 → 2.0.0    major      1 file             1 ref
+  cookie-plugin               1.0.0 → 2.0.0    major      1 file              1 ref
 
-TOOLING  21 packages, used by scripts and config · --all
+TOOLING  19 packages, used by scripts and config · --all
 
 POSSIBLY UNUSED  2 packages, no usage found by Uptide's scan; verify before removing · --all
 
@@ -32,23 +40,31 @@ Next  uptide check --group nestjs
 exports[`Nest terminal design, TTY=true 1`] = `
 "[1muptide list[22m [2m·[22m synthetic-nest-api [2m·[22m pnpm [2m·[22m 0ms
 
-[1m32[22m outdated   [1m32[22m major   [1m0[22m minor   [1m1[22m group   [1m21[22m tooling
+[1m32[22m outdated   [1m32[22m major   [1m0[22m minor   [1m1[22m group   [1m19[22m tooling
+
+[1mPRIORITIES[22m  [2mmost urgent first · advisories not checked (not available for this registry client)[22m
+  [1m@nestjs/*[22m      @nestjs/swagger: 5 majors behind, 1 file to touch   [2muptide check --group nestjs[22m
 
 [1mGROUPS[22m  [2mupgrade together[22m
-[1m@nestjs/*[22m      8 packages   → 12.x   [2muptide check --group nestjs[22m
-  [1m@nestjs/common[22m             10.4.0 → 12.0.0   [33mmajor ×2[39m   1 file   2 calls
-  [1m@nestjs/core[22m               10.4.0 → 12.0.0   [33mmajor ×2[39m   1 file   1 call
-  [1m@nestjs/platform-express[22m   10.3.0 → 12.0.0   [33mmajor ×2[39m   1 file             1 ref
-  [1m@nestjs/platform-fastify[22m   10.4.0 → 12.0.0   [33mmajor ×2[39m   1 file   1 call
-  [1m@nestjs/swagger[22m             7.4.2 → 12.0.0   [33mmajor ×5[39m   1 file   1 call
+[1m@nestjs/*[22m      10 packages   → 12.x   [2muptide check --group nestjs[22m
+  [1m@nestjs/cli[22m                10.0.0 → 12.0.0   [33mmajor ×2[39m   0 files
+[2m    known configuration or build tool[22m
+  [1m@nestjs/common[22m             10.4.0 → 12.0.0   [33mmajor ×2[39m   1 file    2 calls
+  [1m@nestjs/core[22m               10.4.0 → 12.0.0   [33mmajor ×2[39m   1 file    1 call
+  [1m@nestjs/platform-express[22m   10.3.0 → 12.0.0   [33mmajor ×2[39m   1 file              1 ref
+  [1m@nestjs/platform-fastify[22m   10.4.0 → 12.0.0   [33mmajor ×2[39m   1 file    1 call
+  [1m@nestjs/schematics[22m         10.0.0 → 12.0.0   [33mmajor ×2[39m   0 files
+[2m    known configuration or build tool[22m
+[2m    referenced by configuration[22m
+  [1m@nestjs/swagger[22m             7.4.2 → 12.0.0   [33mmajor ×5[39m   1 file    1 call
   [1m@fastify/static[22m            6.12.0 → 10.1.5   [33mmajor ×4[39m   [2mpeer of @nestjs/platform-fastify[22m
   [1mnodemailer[22m                  6.9.0 → 8.0.0    [33mmajor ×2[39m   [2mpeer of @nestjs/core[22m
   [1mreflect-metadata[22m            0.1.0 → 1.0.0    [33mmajor[39m      [2mpeer of @nestjs/common, @nestjs/core[22m
 
 [1mPACKAGES[22m
-  [1mcookie-plugin[22m               1.0.0 → 2.0.0    [33mmajor[39m      1 file             1 ref
+  [1mcookie-plugin[22m               1.0.0 → 2.0.0    [33mmajor[39m      1 file              1 ref
 
-[1mTOOLING[22m  [2m21 packages, used by scripts and config · --all[22m
+[1mTOOLING[22m  [2m19 packages, used by scripts and config · --all[22m
 
 [1mPOSSIBLY UNUSED[22m  [2m2 packages, no usage found by Uptide's scan; verify before removing · --all[22m
 
