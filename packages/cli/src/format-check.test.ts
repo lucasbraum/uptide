@@ -97,14 +97,18 @@ describe('formatCheck, the first screen', () => {
 
   it('labels every rule with what fix will do, from the plan the engine attached', () => {
     const out = formatCheck(storefront, shown);
-    expect(out).toMatch(/✗ 28 breaking in 7 files +24 by rule · 4 by agent/);
-    expect(out).toMatch(/✗ New error API \(required_error → error\) +24 sites +by rule/);
-    expect(out).toMatch(/✗ ZodTypeDef removed +1 fix, 3 errors +by agent/);
-    expect(out).toMatch(/✗ \.ip\(\) removed +monitoring\.ts:6 +by agent/);
-    expect(out).toMatch(/✗ apiVersion no longer matches the SDK +client\.ts:9 +by agent/);
-    expect(out).toMatch(/✗ Subscription billing period moved to items +2 sites +by agent/);
+    expect(out).toMatch(/✗ 28 breaking in 7 files +24 auto-fixable · 4 need the agent \(LLM\)/);
+    expect(out).toMatch(/✗ New error API \(required_error → error\) +24 sites +auto-fixable/);
+    expect(out).toMatch(/✗ ZodTypeDef removed +1 fix, 3 errors +needs the agent \(LLM\)/);
+    expect(out).toMatch(/✗ \.ip\(\) removed +monitoring\.ts:6 +needs the agent \(LLM\)/);
+    expect(out).toMatch(
+      /✗ apiVersion no longer matches the SDK +client\.ts:9 +needs the agent \(LLM\)/,
+    );
+    expect(out).toMatch(
+      /✗ Subscription billing period moved to items +2 sites +needs the agent \(LLM\)/,
+    );
     // A cast the test already had is widened by rule, never by the agent.
-    expect(out).toMatch(/✗ Test fixture casts widened +renewal\.test\.ts:7 +by rule/);
+    expect(out).toMatch(/✗ Test fixture casts widened +renewal\.test\.ts:7 +auto-fixable/);
     expect(out).toContain('1 API change since 2023-10-16 affects your code');
   });
 
@@ -194,8 +198,10 @@ describe('formatCheck, the first screen', () => {
     );
     expect(out).toMatchSnapshot();
     // No migration pack for sharp: no rule is promised; the confirmed sites are the agent's.
-    expect(out).toMatch(/sharp +0\.33\.0 → 0\.35\.0 +minor +✗ 2 breaking in 2 files +2 by agent/);
-    expect(out).toMatch(/✗ sharp\.cache removed +2 sites +by agent/);
+    expect(out).toMatch(
+      /sharp +0\.33\.0 → 0\.35\.0 +minor +✗ 2 breaking in 2 files +2 need the agent \(LLM\)/,
+    );
+    expect(out).toMatch(/✗ sharp\.cache removed +2 sites +needs the agent \(LLM\)/);
     for (const absent of ['@me/shared', '@me/private', 'never', 'current'])
       expect(out).not.toContain(absent);
   });

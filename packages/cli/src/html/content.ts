@@ -1,4 +1,5 @@
 import type { CheckReport, PackageReport, PlanGroup } from '@uptide/core';
+import { BY } from '@uptide/core';
 import type { Row } from '../format-check.js';
 
 export function groupsForHtml(p: PackageReport, plan: PlanGroup[]): PlanGroup[] {
@@ -55,7 +56,7 @@ export function verdict(rows: Row[]): string {
       ? `${n} breaking ${n === 1 ? 'change' : 'changes'} in ${files} ${files === 1 ? 'file' : 'files'}.`
       : 'No confirmed breaking changes.',
     n
-      ? `${by('rule')} fixable by rule, ${by('agent')} by agent${by('manual') ? `, ${by('manual')} manual` : ''}.`
+      ? `${BY.rule(by('rule'))}, ${BY.agent(by('agent'))}${by('manual') ? `, ${by('manual')} manual` : ''}.`
       : '',
     deprecated
       ? `${deprecated} deprecated ${deprecated === 1 ? 'call' : 'calls'} (not blocking).`

@@ -83,7 +83,9 @@ describe('fix transaction', () => {
     expect(git(root, 'branch', '--show-current')).toBe('uptide/zod-4.6.5');
     expect(git(root, 'log', '--oneline', '-2')).toContain('apply mechanical migrations');
     expect(git(root, 'ls-files', '.uptide/pr-body.md')).toBe('');
-    expect(readFileSync(result.prBody, 'utf8')).toContain('1 by rule · 0 by agent');
+    expect(readFileSync(result.prBody, 'utf8')).toContain(
+      '1 auto-fixed · 0 fixed by the agent (LLM)',
+    );
   }, 15000);
   it('refuses dirty trees before running check or installing', async () => {
     const { root, services } = fixture();
@@ -869,7 +871,7 @@ describe('fix --pin-current-api', () => {
     expect(body).toContain(
       '| **Risk** | Low: no behaviour change: the explicit pin equals the SDK default |',
     );
-    expect(body).toContain('**1. Stripe API version pinned** · 2 sites · by rule');
+    expect(body).toContain('**1. Stripe API version pinned** · 2 sites · auto-fixed');
     expect(body).not.toContain('Upgrade stripe');
     expect(formatFix(result)).toContain('Pin the Stripe API version to 2023-10-16');
   });

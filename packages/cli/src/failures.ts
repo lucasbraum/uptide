@@ -4,6 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { ACCEPTED_KEYS, type CheckResult, errorCode } from '@uptide/core';
 import type { PackageManager, Repo } from './detect.js';
 import { CliError } from './errors.js';
+import { INVOCATION } from './invocation.js';
 import type { DependencyStatus } from './status.js';
 
 /**
@@ -80,7 +81,7 @@ export function notADependency(repo: Repo, missing: readonly string[]): CliError
         workspaceCount(repo) > 0
           ? `Looked in the root and ${workspaceCount(repo)} workspace packages.`
           : undefined,
-      next: 'uptide',
+      next: INVOCATION,
     },
   );
 }
@@ -230,7 +231,7 @@ export function noApiKeyNote(only: string): string {
   return [
     `note: no selected-provider API key is set (${ACCEPTED_KEYS}); assisted fixes are off.`,
     '  Rule-based fixes still run; sites they cannot migrate are listed for manual work.',
-    `  Next: uptide fix ${only}   (set ANTHROPIC_API_KEY, OPENAI_API_KEY or GEMINI_API_KEY in your environment first)`,
+    `  Next: ${INVOCATION} fix ${only}   (set ANTHROPIC_API_KEY, OPENAI_API_KEY or GEMINI_API_KEY in your environment first)`,
     '  (or pass --no-llm to keep it that way without this note)',
     '',
   ].join('\n');

@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { UPTIDE_COMMAND } from '../version.js';
 import { storedRunFile } from './isolate.js';
 import { command, git, projectRoot } from './process.js';
 import { publish } from './publish.js';
@@ -31,11 +32,13 @@ export async function openPr(
   const { top, root } = projectRoot(options.cwd);
   const branch = options.branch ?? git(root, 'branch', '--show-current');
   if (!branch)
-    throw new Error('name the migration branch: uptide pr --branch uptide/<package>-<version>');
+    throw new Error(
+      `name the migration branch: ${UPTIDE_COMMAND} pr --branch uptide/<package>-<version>`,
+    );
   const stored = storedRunFile(top, branch);
   if (!stored)
     throw new Error(
-      `no stored migration run for ${branch} in this repository; run \`uptide fix\` first, or \`uptide verify --branch ${branch}\``,
+      `no stored migration run for ${branch} in this repository; run \`${UPTIDE_COMMAND} fix\` first, or \`${UPTIDE_COMMAND} verify --branch ${branch}\``,
     );
   const report = JSON.parse(readFileSync(stored, 'utf8')) as FixReport;
   if (report.branch !== branch)

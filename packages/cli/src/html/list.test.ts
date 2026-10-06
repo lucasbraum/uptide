@@ -75,7 +75,7 @@ it('renders the Nest report with shared check styling, groups first, copy comman
   expect(html).toContain('<span>→ 12.x</span>');
   expect(html).not.toContain('package-command');
   expect(html).toContain(
-    'title="uptide check cookie-plugin" aria-label="uptide check cookie-plugin"',
+    'title="npx uptide check cookie-plugin" aria-label="npx uptide check cookie-plugin"',
   );
   const standalone =
     html.match(/<article class="member-grid has-command"[^>]*>[\s\S]*?<\/article>/g) ?? [];
@@ -97,11 +97,11 @@ it('renders the Nest report with shared check styling, groups first, copy comman
   expect(html).toContain('peer of @nestjs/platform-fastify');
   expect(html).not.toContain('referenced ·');
   expect(html).not.toContain('Top symbols:');
-  expect(html).toContain('<code>uptide check --group nestjs</code>');
+  expect(html).toContain('<code>npx uptide check --group nestjs</code>');
   expect(html).toMatch(/<details class="notes" data-block><summary>04 \/ Tooling/);
   expect(html).toMatch(/<details class="notes" data-block><summary>05 \/ Possibly unused/);
   // Once as the top priority, once on the group itself.
-  expect(html.match(/<code>uptide check --group nestjs<\/code>/g)).toHaveLength(2);
+  expect(html.match(/<code>npx uptide check --group nestjs<\/code>/g)).toHaveLength(2);
   expect(html.match(/data-copy hidden/g)?.length).toBe(
     report.packages.length -
       report.groups.reduce((n, g) => n + g.members.length - 1, 0) +

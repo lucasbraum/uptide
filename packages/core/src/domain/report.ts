@@ -152,6 +152,19 @@ export interface PackageReport {
     unresolvedFiles: string[];
     /** Errors the upgrade causes that no change explains. */
     unattributed: CompileDiagnostic[];
+    /** New type errors at the target: every error the upgrade causes, explained or not. */
+    newErrors?: number;
+  };
+  /**
+   * The breaking count and what verified it, for every analyzed package, zero included:
+   * `0 breaking · compiled against 4.6.5: 0 new type errors`, or `types not verified: <why>`.
+   */
+  verdict?: {
+    breaking: number;
+    compiledAgainst?: string;
+    newErrors?: number;
+    notVerified?: string;
+    summary: string;
   };
   /** Signal C: what loading installed and target in a child Node showed, one entry per member. */
   runtime?: RuntimeReport[];

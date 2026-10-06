@@ -39,11 +39,11 @@ exports[`HTML report > renders clean from report JSON without requiring JS 1`] =
 </div>
 <div class="stat safe">
 <strong>0</strong>
-<span class="label">By rule</span>
+<span class="label">Auto-fixable</span>
 </div>
 <div class="stat ">
 <strong>0</strong>
-<span class="label">By agent</span>
+<span class="label">Need the agent (LLM)</span>
 </div>
 </div>
 <p class="more">No confirmed breaking changes.</p>
@@ -126,11 +126,11 @@ exports[`HTML report > renders skipped from report JSON without requiring JS 1`]
 </div>
 <div class="stat safe">
 <strong>0</strong>
-<span class="label">By rule</span>
+<span class="label">Auto-fixable</span>
 </div>
 <div class="stat ">
 <strong>0</strong>
-<span class="label">By agent</span>
+<span class="label">Need the agent (LLM)</span>
 </div>
 </div>
 <p class="more">No confirmed breaking changes.</p>
@@ -220,14 +220,14 @@ exports[`HTML report > renders stripe from report JSON without requiring JS 1`] 
 </div>
 <div class="stat safe">
 <strong>1</strong>
-<span class="label">By rule</span>
+<span class="label">Auto-fixable</span>
 </div>
 <div class="stat ">
 <strong>3</strong>
-<span class="label">By agent</span>
+<span class="label">Need the agent (LLM)</span>
 </div>
 </div>
-<p class="more">4 breaking changes in 3 files. 1 fixable by rule, 3 by agent.</p>
+<p class="more">4 breaking changes in 3 files. 1 auto-fixable, 3 need the agent (LLM).</p>
 <div class="section-label">
 <h2>01 / Packages</h2>
 <p>Upgrade impact</p>
@@ -246,7 +246,8 @@ exports[`HTML report > renders stripe from report JSON without requiring JS 1`] 
 <span class="mono muted">14.25.0 → 23.0.0 · major ×9 · <span class="verified">verified</span>
 </span>
 </div>
-<div class="breaking">✗ 4 breaking in 3 files<div class="muted">1 by rule · 3 by agent</div>
+<div class="breaking">✗ 4 breaking in 3 files<div class="muted">1 auto-fixable · 3 need the agent (LLM)</div>
+<div class="muted">4 breaking · compiled against 23.0.0</div>
 </div>
 </a>
 </section>
@@ -260,25 +261,26 @@ exports[`HTML report > renders stripe from report JSON without requiring JS 1`] 
 <h2>stripe (packages/api)</h2>
 <span class="mono muted">14.25.0 → 23.0.0 · <span class="verified">verified</span>
 </span>
+<p class="more">4 breaking · compiled against 23.0.0</p>
 </header>
 <details class="group" data-severity="breaking" data-rule="fixture-cast">
 <summary>
 <strong class="breaking">Test fixture casts widened</strong>
-<span class="counts">1 site · 1 by rule</span>
+<span class="counts">1 site · 1 auto-fixable</span>
 <span class="counts">
 </span>
 </summary>[site]</details>
 <details class="group" data-severity="breaking" data-rule="subscription-period">
 <summary>
 <strong class="breaking">Subscription billing period moved to items</strong>
-<span class="counts">2 sites · 2 by agent</span>
+<span class="counts">2 sites · 2 need the agent (LLM)</span>
 <span class="counts">
 </span>
 </summary>[site][site]</details>
 <details class="group" data-severity="breaking" data-rule="api-version">
 <summary>
 <strong class="breaking">apiVersion no longer matches the SDK</strong>
-<span class="counts">1 site · 1 by agent</span>
+<span class="counts">1 site · 1 needs the agent (LLM)</span>
 <span class="counts">The configured API version does not match the target Stripe SDK. Review the API behavior changes before updating it.</span>
 </summary>
 <p class="group-note muted">1 API change since 2023-10-16 affects your code</p>[site]</details>
@@ -348,14 +350,14 @@ exports[`HTML report > renders zod from report JSON without requiring JS 1`] = `
 </div>
 <div class="stat safe">
 <strong>24</strong>
-<span class="label">By rule</span>
+<span class="label">Auto-fixable</span>
 </div>
 <div class="stat ">
 <strong>4</strong>
-<span class="label">By agent</span>
+<span class="label">Need the agent (LLM)</span>
 </div>
 </div>
-<p class="more">28 breaking changes in 7 files. 24 fixable by rule, 4 by agent. 15 deprecated calls (not blocking).</p>
+<p class="more">28 breaking changes in 7 files. 24 auto-fixable, 4 need the agent (LLM). 15 deprecated calls (not blocking).</p>
 <div class="section-label">
 <h2>01 / Packages</h2>
 <p>Upgrade impact</p>
@@ -374,7 +376,8 @@ exports[`HTML report > renders zod from report JSON without requiring JS 1`] = `
 <span class="mono muted">3.25.76 → 4.6.5 · major · <span class="verified">verified</span>
 </span>
 </div>
-<div class="breaking">✗ 28 breaking in 7 files<div class="muted">24 by rule · 4 by agent</div>
+<div class="breaking">✗ 28 breaking in 7 files<div class="muted">24 auto-fixable · 4 need the agent (LLM)</div>
+<div class="muted">28 breaking · compiled against 4.6.5</div>
 </div>
 </a>
 </section>
@@ -388,23 +391,24 @@ exports[`HTML report > renders zod from report JSON without requiring JS 1`] = `
 <h2>zod</h2>
 <span class="mono muted">3.25.76 → 4.6.5 · <span class="verified">verified</span>
 </span>
+<p class="more">28 breaking · compiled against 4.6.5</p>
 </header>
 <details class="group" data-severity="breaking" data-rule="error-params">
 <summary>
 <strong class="breaking">New error API (required_error → error)</strong>
-<span class="counts">24 sites · 24 by rule</span>
+<span class="counts">24 sites · 24 auto-fixable</span>
 <span class="counts">Replace required_error and invalid_type_error with the new error parameter, preserving custom messages.</span>
 </summary>[site][site][site][site][site][site][site][site][site][site][site][site][site][site][site][site][site][site][site][site][site][site][site][site]</details>
 <details class="group" data-severity="breaking" data-rule="types">
 <summary>
 <strong class="breaking">ZodTypeDef removed</strong>
-<span class="counts">3 sites · 3 by agent · 1 fix</span>
+<span class="counts">3 sites · 3 need the agent (LLM) · 1 fix</span>
 <span class="counts">Update the type references that are no longer supported by the target version.</span>
 </summary>[site][site][site]</details>
 <details class="group" data-severity="breaking" data-rule="ip">
 <summary>
 <strong class="breaking">.ip() removed</strong>
-<span class="counts">1 site · 1 by agent</span>
+<span class="counts">1 site · 1 needs the agent (LLM)</span>
 <span class="counts">Replace the removed IP validator with the supported target API.</span>
 </summary>[site]</details>
 <details class="deprecated-section">
@@ -412,19 +416,19 @@ exports[`HTML report > renders zod from report JSON without requiring JS 1`] = `
 <details class="group" data-severity="deprecated" data-rule="string-format">
 <summary>
 <strong class="deprecated">Top-level string formats</strong>
-<span class="counts">13 sites · 8 by rule · 5 by agent</span>
+<span class="counts">13 sites · 8 auto-fixable · 5 need the agent (LLM)</span>
 <span class="counts">Use top-level string format schemas instead of chained string methods.</span>
 </summary>[site][site][site][site][site][site][site][site][site][site][site][site][site]</details>
 <details class="group" data-severity="deprecated" data-rule="ZodError#flatten">
 <summary>
 <strong class="deprecated">ZodError#flatten deprecated</strong>
-<span class="counts">1 site · 1 by agent</span>
+<span class="counts">1 site · 1 needs the agent (LLM)</span>
 <span class="counts">Use the \`z.treeifyError(err)\` function instead.</span>
 </summary>[site]</details>
 <details class="group" data-severity="deprecated" data-rule="ZodIssue">
 <summary>
 <strong class="deprecated">ZodIssue deprecated</strong>
-<span class="counts">1 site · 1 by agent</span>
+<span class="counts">1 site · 1 needs the agent (LLM)</span>
 <span class="counts">Use \`z.core.$ZodIssue\` from \`@zod/core\` instead, especially if you are building a library on top of Zod.</span>
 </summary>[site]</details>
 </details>

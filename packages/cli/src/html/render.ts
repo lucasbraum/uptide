@@ -124,14 +124,14 @@ export function renderHtml(report: CheckReport, opts: HtmlOptions): string {
     const summary = rows
       .map(
         (r, i) =>
-          `<a class="dep" href="#dependency-${i}" data-package="dependency-${i}"><div><strong>${e(r.name)}</strong><span class="mono muted">${e(r.versions)} · ${e(r.bump)}${r.p.tier === 'verified' ? ' · <span class="verified">verified</span>' : ''}</span></div><div class="${r.plan.some((g) => g.severity === 'breaking') ? 'breaking' : r.plan.some((g) => g.severity === 'unverified') || r.p.unanalyzed.length || ['skipped', 'unknown', 'no-types'].includes(r.p.status) ? 'unverified' : r.plan.some((g) => g.severity === 'deprecated') ? 'deprecated' : 'safe'}">${e(r.verdict)}${r.by ? `<div class="muted">${e(r.by)}</div>` : ''}</div></a>`,
+          `<a class="dep" href="#dependency-${i}" data-package="dependency-${i}"><div><strong>${e(r.name)}</strong><span class="mono muted">${e(r.versions)} · ${e(r.bump)}${r.p.tier === 'verified' ? ' · <span class="verified">verified</span>' : ''}</span></div><div class="${r.plan.some((g) => g.severity === 'breaking') ? 'breaking' : r.plan.some((g) => g.severity === 'unverified') || r.p.unanalyzed.length || ['skipped', 'unknown', 'no-types'].includes(r.p.status) ? 'unverified' : r.plan.some((g) => g.severity === 'deprecated') ? 'deprecated' : 'safe'}">${e(r.verdict)}${r.by ? `<div class="muted">${e(r.by)}</div>` : ''}${r.summary ? `<div class="muted">${e(r.summary)}</div>` : ''}</div></a>`,
       )
       .join('');
     const dependencies = rows
       .map((r, i) => {
         const ordinary = r.plan.filter((g) => g.severity !== 'deprecated');
         const deprecated = r.plan.filter((g) => g.severity === 'deprecated');
-        return `<section class="package" id="dependency-${i}"><header><h2>${e(r.name)}</h2><span class="mono muted">${e(r.versions)}${r.p.tier === 'verified' ? ' · <span class="verified">verified</span>' : ''}</span></header>${ordinary.map((g) => group(r.p, g)).join('')}${deprecated.length ? `<details class="deprecated-section"><summary class="deprecated">Deprecated calls · ${deprecated.reduce((n, g) => n + g.sites, 0)} sites</summary>${deprecated.map((g) => group(r.p, g)).join('')}</details>` : ''}${!r.plan.length ? `<p class="more">${e(r.verdict)}</p>` : ''}</section>`;
+        return `<section class="package" id="dependency-${i}"><header><h2>${e(r.name)}</h2><span class="mono muted">${e(r.versions)}${r.p.tier === 'verified' ? ' · <span class="verified">verified</span>' : ''}</span>${r.summary ? `<p class="more">${e(r.summary)}</p>` : ''}</header>${ordinary.map((g) => group(r.p, g)).join('')}${deprecated.length ? `<details class="deprecated-section"><summary class="deprecated">Deprecated calls · ${deprecated.reduce((n, g) => n + g.sites, 0)} sites</summary>${deprecated.map((g) => group(r.p, g)).join('')}</details>` : ''}${!r.plan.length ? `<p class="more">${e(r.verdict)}</p>` : ''}</section>`;
       })
       .join('');
     const commands = nextCommands(rows, {
@@ -161,7 +161,7 @@ export function renderHtml(report: CheckReport, opts: HtmlOptions): string {
           { label: 'Breaking', value: report.summary.breaking, tone: 'warn' },
           { label: 'Deprecated', value: report.summary.deprecated },
           {
-            label: 'By rule',
+            label: 'Auto-fixable',
             value: rows.reduce(
               (n, r) =>
                 n +
@@ -171,7 +171,7 @@ export function renderHtml(report: CheckReport, opts: HtmlOptions): string {
             tone: 'safe',
           },
           {
-            label: 'By agent',
+            label: 'Need the agent (LLM)',
             value: rows.reduce(
               (n, r) =>
                 n +

@@ -121,13 +121,18 @@ export function dependencyGroups(
         ).size;
       const peersInGroup = (name: string): number =>
         peersOf(name).filter((peer) => inGroup.has(peer)).length;
+      // On a tie, a package outside every family that is nobody's peer is the hub joining
+      // them: `ai`, not the `@ai-sdk/*` member it links to, however many more files use that
+      // member. A peer hanging off one member (`cli-peer` of `@nestjs/cli`) is no hub.
+      const hub = (name: string): boolean =>
+        !familyOf(name) && !members.some((m) => peersOf(m.name).includes(name));
       const lead = [...members].sort(
         (a, b) =>
           degree(b.name) - degree(a.name) ||
+          Number(hub(b.name)) - Number(hub(a.name)) ||
           peersInGroup(b.name) - peersInGroup(a.name) ||
           Number(b.classification === 'used') - Number(a.classification === 'used') ||
           b.usage.files - a.usage.files ||
-          Number(!!scopeOf(a.name)) - Number(!!scopeOf(b.name)) ||
           a.name.localeCompare(b.name),
       )[0] as ListedDependency;
       const families = [

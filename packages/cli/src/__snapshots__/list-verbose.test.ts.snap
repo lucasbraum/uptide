@@ -29,6 +29,6 @@ PACKAGES
 
 Usage is a syntax scan, no type analysis.
 Generic analysis is the default; verified means a migration…
-Next  uptide check axios
+Next  npx uptide check axios
 "
 `;

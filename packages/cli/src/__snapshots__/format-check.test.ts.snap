@@ -1,14 +1,20 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`formatCheck, the first screen > gives each kind of verdict one row, and no row to what needs no decision 1`] = `
-"sharp          0.33.0 → 0.35.0   minor                      ✗ 2 breaking in 2 files                   2 by agent
+"sharp          0.33.0 → 0.35.0   minor                      ✗ 2 breaking in 2 files                   2 need the agent (LLM)
 twilio          5.0.1 → 5.3.0    minor · latest on npm      ✓ no impact (12 call sites)
 lodash          5.0.1 → 5.3.0    minor · latest on npm      – not analyzed: types in @types/lodash
 joi             5.0.1 → 5.3.0    minor · latest on npm      ✓ no impact in 12 sites, 2 not analyzed
 pg              5.0.1 → 5.3.0    minor · latest on npm      ? 1 of 1 site not analyzed
 
-sharp
-  ✗ sharp.cache removed   2 sites   by agent
+sharp   2 breaking · types not verified: the compiler did not run
+  ✗ sharp.cache removed   2 sites   needs the agent (LLM)
+
+twilio   0 breaking · types not verified: the compiler did not run
+
+joi   0 breaking · types not verified: the compiler did not run
+
+pg   0 breaking · types not verified: the compiler did not run
 
 Next
   npx uptide check sharp twilio lodash joi pg --details    every site and reason
@@ -18,23 +24,25 @@ Next
 exports[`formatCheck, the first screen > summarizes a real workspace: a row per dependency, a line per rule, the next commands 1`] = `
 "uptide check · storefront · pnpm · 25s
 
-zod                     3.25.76 → 4.6.5    major · latest on npm      verified   ✗ 28 breaking in 7 files     24 by rule · 4 by agent
-stripe (packages/api)   14.25.0 → 23.0.0   major ×9 · latest on npm   verified   ✗ 4 breaking in 3 files      1 by rule · 3 by agent
+zod                     3.25.76 → 4.6.5    major · latest on npm      verified   ✗ 28 breaking in 7 files     24 auto-fixable · 4 need the agent (LLM)
+stripe (packages/api)   14.25.0 → 23.0.0   major ×9 · latest on npm   verified   ✗ 4 breaking in 3 files      1 auto-fixable · 3 need the agent (LLM)
 vitest                    3.2.4 → 5.0.3    major ×2 · latest on npm              ✓ no impact (9 call sites)
 
 verified: migration pack · generic: no pack, breaking only if the compiler or the runtime probe confirms it
 
-zod
-  ✗ New error API (required_error → error)   24 sites          by rule
-  ✗ ZodTypeDef removed                       1 fix, 3 errors   by agent
-  ✗ .ip() removed                            monitoring.ts:6   by agent
-  ! 15 deprecated calls (.uuid, .datetime, .email, ...)   8 by rule
+zod   28 breaking · compiled against 4.6.5
+  ✗ New error API (required_error → error)   24 sites          auto-fixable
+  ✗ ZodTypeDef removed                       1 fix, 3 errors   needs the agent (LLM)
+  ✗ .ip() removed                            monitoring.ts:6   needs the agent (LLM)
+  ! 15 deprecated calls (.uuid, .datetime, .email, ...)   8 auto-fixable
 
-stripe
-  ✗ Test fixture casts widened                   renewal.test.ts:7   by rule
-  ✗ Subscription billing period moved to items   2 sites             by agent
-  ✗ apiVersion no longer matches the SDK         client.ts:9         by agent
+stripe   4 breaking · compiled against 23.0.0
+  ✗ Test fixture casts widened                   renewal.test.ts:7   auto-fixable
+  ✗ Subscription billing period moved to items   2 sites             needs the agent (LLM)
+  ✗ apiVersion no longer matches the SDK         client.ts:9         needs the agent (LLM)
     1 API change since 2023-10-16 affects your code
+
+vitest   0 breaking · compiled against 5.0.3
 
 Next
   npx uptide@next fix zod                              migrate on a new branch, verify, no push
@@ -47,10 +55,10 @@ Next
 exports[`formatCheck, the first screen > summarizes the pnpm smoke fixture, by default and with --details 1`] = `
 "uptide check · smoke-pnpm · pnpm · 3.1s
 
-zod            3.23.8 → 4.6.5   major · latest on npm      ✗ 4 breaking in 2 files   4 by rule
+zod            3.23.8 → 4.6.5   major · latest on npm      ✗ 4 breaking in 2 files   4 auto-fixable
 
-zod
-  ✗ New error API (required_error → error)   4 sites   by rule
+zod   4 breaking · compiled against 4.6.5
+  ✗ New error API (required_error → error)   4 sites   auto-fixable
 
 Next
   npx uptide@next fix zod                migrate on a new branch, verify, no push

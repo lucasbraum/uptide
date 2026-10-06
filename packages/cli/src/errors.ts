@@ -5,6 +5,7 @@ import {
   VersionNotFoundError,
 } from '@uptide/core';
 import pc from 'picocolors';
+import { runnable } from './invocation.js';
 
 /** Exit codes are the contract with scripts and CI: 0 nothing breaking, 1 breaking found, 2 the tool could not answer. */
 export const EXIT = { ok: 0, breaking: 1, error: 2 } as const;
@@ -37,7 +38,7 @@ export function renderError(err: unknown, color: boolean): string {
   const lines = [`${colors.red('error:')} ${explain(err)}`];
   if (err instanceof CliError) {
     if (err.options.why) lines.push(`  ${err.options.why}`);
-    if (err.options.next) lines.push(`  ${colors.bold('Next:')} ${err.options.next}`);
+    if (err.options.next) lines.push(`  ${colors.bold('Next:')} ${runnable(err.options.next)}`);
   }
   return `${lines.join('\n')}\n`;
 }

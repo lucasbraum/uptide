@@ -1,11 +1,13 @@
 import { basename } from 'node:path';
 import {
+  BY,
   type CheckReport,
   isFailure,
   type PackageReport,
   type PlanGroup,
   planPackage,
   TIER_LEGEND,
+  verdictOf,
 } from '@uptide/core';
 import pc from 'picocolors';
 import { formatCheckDetails } from './format-check-details.js';
@@ -84,7 +86,7 @@ function bump(installed: string, target: string): string {
         : '';
 }
 
-/** `21 by rule · 4 by agent`: who migrates the sites, in the words `fix` reports them with. */
+/** `21 auto-fixable · 4 need the agent (LLM)`: who migrates the sites. */
 export function byLine(groups: PlanGroup[]): string {
   const total = { rule: 0, agent: 0, manual: 0 };
   for (const g of groups) {
@@ -93,8 +95,8 @@ export function byLine(groups: PlanGroup[]): string {
     total.manual += g.by.manual;
   }
   return [
-    total.rule > 0 ? `${total.rule} by rule` : '',
-    total.agent > 0 ? `${total.agent} by agent` : '',
+    total.rule > 0 ? BY.rule(total.rule) : '',
+    total.agent > 0 ? BY.agent(total.agent) : '',
     total.manual > 0 ? `${total.manual} manual` : '',
   ]
     .filter(Boolean)
@@ -103,8 +105,8 @@ export function byLine(groups: PlanGroup[]): string {
 
 const byLabel = (g: PlanGroup): string =>
   [
-    g.by.rule > 0 ? 'by rule' : '',
-    g.by.agent > 0 ? 'by agent' : '',
+    g.by.rule > 0 ? BY.ruleTag : '',
+    g.by.agent > 0 ? BY.agentTag : '',
     g.by.manual > 0 ? 'manual' : '',
   ]
     .filter(Boolean)
@@ -124,7 +126,14 @@ export interface Row {
   plan: PlanGroup[];
   /** Nothing to act on: no breaking, unverified or deprecated site shown. */
   quiet: boolean;
+  /** `0 breaking · compiled against 4.6.5: 0 new type errors`, for an analyzed package. */
+  summary?: string;
 }
+
+const ANALYZED = ['breaking', 'deprecated', 'safe', 'partial', 'unknown'];
+/** The package's verdict line; reports stored before it was kept get one derived. */
+export const verdictLine = (p: PackageReport): string | undefined =>
+  p.verdict?.summary ?? (ANALYZED.includes(p.status) ? verdictOf(p).summary : undefined);
 
 /** Packages with nothing to decide (never imported, linked, private, up to date) have no row. */
 function rowOf(p: PackageReport, multi: boolean, colors: Colors): Row | undefined {
@@ -190,6 +199,7 @@ function rowOf(p: PackageReport, multi: boolean, colors: Colors): Row | undefine
     plan,
     quiet:
       plan.length === 0 && gaps === 0 && !['no-types', 'skipped', 'unknown'].includes(p.status),
+    ...(verdictLine(p) ? { summary: verdictLine(p) } : {}),
   };
 }
 
@@ -224,13 +234,17 @@ function sectionLines(row: Row, colors: Colors): string[] {
         ]
       : [];
   });
+  // Every analyzed package says its verdict and what verified it, zero breaking included.
+  const heading = row.summary
+    ? `${colors.bold(row.p.name)}   ${colors.dim(row.summary)}`
+    : colors.bold(row.p.name);
   if (
     acting.length === 0 &&
     deprecated.length === 0 &&
     importers.length === 0 &&
     peers.length === 0
   )
-    return [];
+    return row.summary ? [heading] : [];
   const scope = (g: PlanGroup): string => {
     if (g.fixes !== g.sites)
       return `${plural(g.fixes, 'fix', 'fixes')}, ${plural(g.sites, 'error')}`;
@@ -243,7 +257,7 @@ function sectionLines(row: Row, colors: Colors): string[] {
   const listed = acting.length > MAX_RULE_LINES ? acting.slice(0, MAX_RULE_LINES - 1) : acting;
   const titleWidth = Math.max(...listed.map((g) => g.title.length), 0);
   const scopeWidth = Math.max(...listed.map((g) => scope(g).length), 0);
-  const lines = [colors.bold(row.p.name)];
+  const lines = [heading];
   for (const g of listed) {
     const mark = g.severity === 'breaking' ? colors.red('✗') : colors.magenta('?');
     lines.push(
@@ -262,7 +276,7 @@ function sectionLines(row: Row, colors: Colors): string[] {
   if (deprecated.length > 0) {
     const sites = sitesOf(deprecated);
     const byRule = deprecated.reduce((n, g) => n + g.by.rule, 0);
-    const who = byRule > 0 ? `${byRule} by rule` : byLine(deprecated);
+    const who = byRule > 0 ? BY.rule(byRule) : byLine(deprecated);
     lines.push(
       `  ${colors.yellow('!')} ${plural(sites, 'deprecated call')} (${deprecatedNames(deprecated)})   ${colors.dim(who)}`,
     );
@@ -437,8 +451,15 @@ export function formatCheck(report: CheckReport, opts: FormatCheckOptions = {}):
     );
     if (folded.length > 0) {
       const named = folded.slice(0, 6).map((r) => r.p.name);
+      // Folded, they still say what verified them: all compiled clean, or how many were not.
+      const unverified = folded.filter((r) => r.p.verdict?.notVerified ?? !r.p.compile).length;
+      const counted = folded.every((r) => r.p.compile?.newErrors === 0);
+      const how =
+        unverified > 0
+          ? `${unverified} not verified by the compiler (--details)`
+          : `compiled against their targets${counted ? ': 0 new type errors' : ''}`;
       lines.push(
-        `${colors.green('✓')} ${folded.length} more with no impact on your code: ${named.join(', ')}${folded.length > named.length ? `, and ${folded.length - named.length} more` : ''}`,
+        `${colors.green('✓')} ${folded.length} more with no impact on your code: ${named.join(', ')}${folded.length > named.length ? `, and ${folded.length - named.length} more` : ''} ${colors.dim(`· 0 breaking · ${how}`)}`,
       );
     }
     const missing = notAnalyzed(report, opts, colors);
@@ -447,7 +468,7 @@ export function formatCheck(report: CheckReport, opts: FormatCheckOptions = {}):
     if (rows.some((r) => r.p.tier === 'generic')) lines.push('', colors.dim(TIER_LEGEND));
     lines.push('');
     if (missing.length > 0) lines.push(...missing, '');
-    for (const row of rows) {
+    for (const row of rows.filter((r) => !folded.includes(r))) {
       const section = sectionLines(row, colors);
       if (section.length > 0) lines.push(...section, '');
     }

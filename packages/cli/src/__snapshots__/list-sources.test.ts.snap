@@ -25,7 +25,7 @@ TOOLING  1 package, used by scripts and config · --all
 
 Usage is a syntax scan, no type analysis.
 Generic analysis is the default; verified means a migration pack is available.
-Next  uptide check ordinary
+Next  npx uptide check ordinary
 "
 `;
 
@@ -54,6 +54,6 @@ exports[`collapses non-registry sources by reason in the terminal (TTY=true) 1`]
 
 [2mUsage is a syntax scan, no type analysis.[22m
 [2mGeneric analysis is the default; verified means a migration pack is available.[22m
-[1mNext[22m  uptide check ordinary
+[1mNext[22m  npx uptide check ordinary
 "
 `;

@@ -14,7 +14,7 @@ import { payloadApiVersions, stripeUsageContext } from '../packs/stripe/relevanc
 import type { MigrationPack, PackContext } from '../packs/types.js';
 import { zodPack } from '../packs/zod/index.js';
 import { resetSharedState } from '../shared-state.js';
-import { uptideVersionInfo } from '../version.js';
+import { UPTIDE_COMMAND, uptideVersionInfo } from '../version.js';
 import { assist } from './assisted.js';
 import { behaviorCheck } from './behavior.js';
 import { type Generated, generateClients } from './generate.js';
@@ -546,13 +546,13 @@ export async function publishVerified(
     if (!options.yes && /requires --yes/.test(message)) {
       // Without --yes the plan is the point: printed, and the run stands as verified.
       result.notes.push(
-        `Publication plan printed, nothing pushed (no --yes): \`uptide pr --branch ${result.branch} --yes\` opens the PR.`,
+        `Publication plan printed, nothing pushed (no --yes): \`${UPTIDE_COMMAND} pr --branch ${result.branch} --yes\` opens the PR.`,
       );
       return;
     }
     result.publication = { refused: [], failed: message.split('\n')[0] ?? message };
     result.notes.push(
-      `PR not opened: ${result.publication.failed}. The verified run is stored; \`uptide pr --branch ${result.branch} --yes\` retries the publish step alone.`,
+      `PR not opened: ${result.publication.failed}. The verified run is stored; \`${UPTIDE_COMMAND} pr --branch ${result.branch} --yes\` retries the publish step alone.`,
     );
     return;
   }

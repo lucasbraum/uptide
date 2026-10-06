@@ -67,7 +67,7 @@ describe('friendly failures: each says what to run next', () => {
     const { code, stderr, engine } = await fail(['fix', '--only', 'zod'], root);
     expect(code).toBe(2);
     expect(stderr).toContain('error: fix does not support bun repositories yet');
-    expect(stderr).toContain('Next: uptide check zod --details');
+    expect(stderr).toContain('Next: npx uptide check zod --details');
     expect(engine.calls).toEqual([]);
   });
 
@@ -143,7 +143,7 @@ describe('friendly failures: each says what to run next', () => {
     const { code, stderr } = await fail(['check', '--only', 'stripe'], npmRepo(), engine);
     expect(code).toBe(2);
     expect(stderr).toContain('error: stripe is not a dependency of shop');
-    expect(stderr).toContain('Next: uptide\n');
+    expect(stderr).toContain('Next: npx uptide\n');
   });
 
   it('no network: the engine skipped everything because the registry is unreachable', async () => {
@@ -307,7 +307,7 @@ describe('friendly failures: each says what to run next', () => {
       'note: no selected-provider API key is set (ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY); assisted fixes are off.',
     );
     expect(stderr).toContain('Rule-based fixes still run');
-    expect(stderr).toContain('Next: uptide fix zod');
+    expect(stderr).toContain('Next: npx uptide fix zod');
     expect(engine.calls).toHaveLength(1);
   });
 
@@ -326,7 +326,7 @@ describe('friendly failures: each says what to run next', () => {
     const below = await fail(['fix', '--only', 'zod'], join(root, 'packages/api'));
     expect(below.code).toBe(2);
     expect(below.stderr).toContain('error: fix has to run at the project root');
-    expect(below.stderr).toContain(`Next: uptide fix --only zod --cwd ${root}`);
+    expect(below.stderr).toContain(`Next: npx uptide fix --only zod --cwd ${root}`);
 
     writeFileSync(join(root, 'scratch.ts'), '');
     const dirty = await fail(['fix', '--only', 'zod'], root);

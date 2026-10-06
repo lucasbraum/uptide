@@ -299,10 +299,23 @@ describe('prioritize', () => {
         signal: 'deprecated',
         urgency: 4,
         effort: 7,
-        reason: '@ai-sdk/openai: deprecated: use v2',
+        reason: '@ai-sdk/openai deprecated: use v2',
       },
     ]);
   });
+  it('names a member before its reason, after the dev prefix', () => {
+    const lead = { ...pkg('eslint', {}), classification: 'tooling' };
+    const member = {
+      ...pkg('@eslint/js', { deprecated: 'use eslint/js', dev: true }),
+      classification: 'tooling',
+    };
+    const { priorities } = prioritize(
+      [lead, member],
+      [{ id: 'eslint', name: 'eslint', lead: 'eslint', members: [lead, member] }],
+    );
+    expect(priorities[0]?.reason).toBe('dev · @eslint/js deprecated: use eslint/js');
+  });
+
   it('does not make a group urgent only because its members move together or hold each other back', () => {
     const a = pkg('a', { movesWith: ['b'], blocks: ['b 2'] });
     const b = pkg('b', { movesWith: ['a'] });

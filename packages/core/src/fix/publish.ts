@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { UptideError } from '../errors.js';
-import { uptideVersionInfo } from '../version.js';
+import { UPTIDE_COMMAND, uptideVersionInfo } from '../version.js';
 import { command, git } from './process.js';
 import type { FixReport } from './types.js';
 
@@ -127,13 +127,13 @@ export async function publishTarget(
         `--pr needs push access to ${own.nameWithOwner ?? remote}; this account has ${own.viewerPermission.toLowerCase()} access only.`,
         'What fixes it:',
         '  ask for write access to the repository, or',
-        `  fork it and run from the fork (gh repo fork ${own.nameWithOwner ?? ''} --clone), then \`uptide pr --repo ${own.nameWithOwner ?? '<owner/name>'}\` opens the PR upstream`,
+        `  fork it and run from the fork (gh repo fork ${own.nameWithOwner ?? ''} --clone), then \`${UPTIDE_COMMAND} pr --repo ${own.nameWithOwner ?? '<owner/name>'}\` opens the PR upstream`,
         ...(owner
           ? [
               `  if you do have write access through ${owner}, authorize the token for its SSO: https://github.com/orgs/${owner}/sso`,
             ]
           : []),
-        'Nothing was cloned or changed. Without --pr the migration still runs, and `uptide pr` publishes it later.',
+        `Nothing was cloned or changed. Without --pr the migration still runs, and \`${UPTIDE_COMMAND} pr\` publishes it later.`,
       ].join('\n'),
     );
   const target = repo ? await viewRepository(cwd, repo, io) : own;
@@ -252,7 +252,7 @@ export async function publish(
     if (report.head && at !== report.head)
       throw new UptideError(
         'RUN_STALE',
-        `${branch} is at ${at.slice(0, 12)}, not the verified ${report.head.slice(0, 12)}; run \`uptide verify --branch ${branch}\` first`,
+        `${branch} is at ${at.slice(0, 12)}, not the verified ${report.head.slice(0, 12)}; run \`${UPTIDE_COMMAND} verify --branch ${branch}\` first`,
       );
   } else if (io.git(cwd, 'branch', '--show-current') !== branch)
     throw new Error('publication branch does not match the verified migration');
@@ -292,7 +292,7 @@ export async function publish(
   if (body.length > GITHUB_BODY_LIMIT)
     throw new UptideError(
       'PUBLICATION_REFUSED',
-      `the PR description is ${body.length.toLocaleString('en-US')} characters; GitHub accepts ${GITHUB_BODY_LIMIT.toLocaleString('en-US')}. Nothing was pushed. \`uptide pr --branch ${branch}\` renders it again within the limit`,
+      `the PR description is ${body.length.toLocaleString('en-US')} characters; GitHub accepts ${GITHUB_BODY_LIMIT.toLocaleString('en-US')}. Nothing was pushed. \`${UPTIDE_COMMAND} pr --branch ${branch}\` renders it again within the limit`,
     );
   if (!yes) throw new Error('publication requires --yes; nothing pushed');
   if (io.git(cwd, 'rev-parse', branch) !== head)

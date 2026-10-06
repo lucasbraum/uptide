@@ -6,10 +6,10 @@ exports[`Nest terminal design, TTY=false 1`] = `
 32 outdated   32 major   0 minor   1 group   19 tooling
 
 PRIORITIES  most urgent first · advisories not checked (not available for this registry client)
-  @nestjs/*      @nestjs/swagger: 5 majors behind, 1 file to touch   uptide check --group nestjs
+  @nestjs/*      @nestjs/swagger 5 majors behind, 1 file to touch   npx uptide check --group nestjs
 
 GROUPS  upgrade together
-@nestjs/*      10 packages   → 12.x   uptide check --group nestjs
+@nestjs/*      10 packages   → 12.x   npx uptide check --group nestjs
   @nestjs/cli                10.0.0 → 12.0.0   major ×2   0 files
     known configuration or build tool
   @nestjs/common             10.4.0 → 12.0.0   major ×2   1 file    2 calls
@@ -33,7 +33,7 @@ POSSIBLY UNUSED  2 packages, no usage found by Uptide's scan; verify before remo
 
 Usage is a syntax scan, no type analysis.
 Generic analysis is the default; verified means a migration pack is available.
-Next  uptide check --group nestjs
+Next  npx uptide check --group nestjs
 "
 `;
 
@@ -43,10 +43,10 @@ exports[`Nest terminal design, TTY=true 1`] = `
 [1m32[22m outdated   [1m32[22m major   [1m0[22m minor   [1m1[22m group   [1m19[22m tooling
 
 [1mPRIORITIES[22m  [2mmost urgent first · advisories not checked (not available for this registry client)[22m
-  [1m@nestjs/*[22m      @nestjs/swagger: 5 majors behind, 1 file to touch   [2muptide check --group nestjs[22m
+  [1m@nestjs/*[22m      @nestjs/swagger 5 majors behind, 1 file to touch   [2mnpx uptide check --group nestjs[22m
 
 [1mGROUPS[22m  [2mupgrade together[22m
-[1m@nestjs/*[22m      10 packages   → 12.x   [2muptide check --group nestjs[22m
+[1m@nestjs/*[22m      10 packages   → 12.x   [2mnpx uptide check --group nestjs[22m
   [1m@nestjs/cli[22m                10.0.0 → 12.0.0   [33mmajor ×2[39m   0 files
 [2m    known configuration or build tool[22m
   [1m@nestjs/common[22m             10.4.0 → 12.0.0   [33mmajor ×2[39m   1 file    2 calls
@@ -70,6 +70,6 @@ exports[`Nest terminal design, TTY=true 1`] = `
 
 [2mUsage is a syntax scan, no type analysis.[22m
 [2mGeneric analysis is the default; verified means a migration pack is available.[22m
-[1mNext[22m  uptide check --group nestjs
+[1mNext[22m  npx uptide check --group nestjs
 "
 `;

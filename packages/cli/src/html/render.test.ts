@@ -59,9 +59,9 @@ describe('HTML report', () => {
     const before = JSON.stringify(report);
     const html = renderHtml(report, opts);
     expect(html).toContain(
-      '32 breaking changes in 10 files. 25 fixable by rule, 7 by agent. 15 deprecated calls (not blocking).',
+      '32 breaking changes in 10 files. 25 auto-fixable, 7 need the agent (LLM). 15 deprecated calls (not blocking).',
     );
-    expect(html).toContain('13 sites · 8 by rule · 5 by agent');
+    expect(html).toContain('13 sites · 8 auto-fixable · 5 need the agent (LLM)');
     expect(html.match(/Top-level string formats/g)).toHaveLength(1);
     expect(html.match(/New error API/g)).toHaveLength(1);
     expect(html).not.toContain('low-confidence');
@@ -180,6 +180,6 @@ it('omits workspace paths from check rows by default and counts breaking fixes c
   const html = renderHtml(report, { ...opts, details: false });
   for (const workspace of report.workspaces.filter((w) => w !== '.'))
     expect(html).not.toContain(workspace);
-  expect(html).toContain('<strong>25</strong><span class="label">By rule</span>');
-  expect(html).toContain('<strong>7</strong><span class="label">By agent</span>');
+  expect(html).toContain('<strong>25</strong><span class="label">Auto-fixable</span>');
+  expect(html).toContain('<strong>7</strong><span class="label">Need the agent (LLM)</span>');
 });
