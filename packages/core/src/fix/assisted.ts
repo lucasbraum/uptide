@@ -7,6 +7,7 @@ import { ACCEPTED_KEYS } from '../llm/config.js';
 import { CostLimitError, DEFAULT_MAX_COST_USD } from '../llm/fixer.js';
 import { nanos } from '../llm/pricing.js';
 import type { MigrationPack, PackContext } from '../packs/types.js';
+import { resetSharedState } from '../shared-state.js';
 import { applyFilePatch } from './patch.js';
 import { git } from './process.js';
 import { siteKey } from './report.js';
@@ -299,6 +300,9 @@ export async function assist(
           stopForBudget(site, e.message);
           break;
         }
+        // The attempt may have failed inside TypeScript (a transform, a verification
+        // program): the next attempt and the next site start from fresh shared state.
+        resetSharedState();
         retry = e instanceof Error ? e.message : String(e);
       } finally {
         log.durationMs = performance.now() - started;

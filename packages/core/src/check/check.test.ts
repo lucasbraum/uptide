@@ -10,7 +10,9 @@ import type { ProgressEvent } from '../domain/progress.js';
 import type { Finding, PackageReport } from '../domain/report.js';
 import type { ApiSurface } from '../domain/surface.js';
 import { UptideError } from '../errors.js';
-import { isolatedPnpmWorkspace } from '../fix/test-fixture.js';
+import { fix } from '../fix/run.js';
+import { isolatedPnpmWorkspace, zodFixture } from '../fix/test-fixture.js';
+import { onReset } from '../shared-state.js';
 import {
   check,
   mergeAcrossWorkspaces,
@@ -1092,6 +1094,54 @@ describe('recursive declarations (uptide-dev/uptide#4)', () => {
     expect(stable(after.packages.find((p) => p.name === 'logkit'))).toBe(
       stable(alone.packages.find((p) => p.name === 'logkit')),
     );
+  });
+
+  it("leaves no state behind after a failed fix: the next package's check is byte-identical to its own run", async () => {
+    let resets = 0;
+    onReset(() => {
+      resets++;
+    });
+    const f = ts.factory;
+    const boom = f.createIdentifier('Boom');
+    Object.defineProperty(boom, 'escapedText', {
+      get() {
+        throw new RangeError('Maximum call stack size exceeded');
+      },
+    });
+    const checkLogkit = () =>
+      check({
+        cwd: consumer(),
+        only: ['logkit'],
+        adapter,
+        fetcher: recursiveFetcher,
+        cache: memoryCache(),
+        runtime: false,
+      });
+    const stable = (report: PackageReport | undefined) =>
+      JSON.stringify(report, (key, value) =>
+        key === 'timing' || key === 'ms' ? undefined : value,
+      ).replace(/\/[^"]*uptide-[^"/]*/g, '<tmp>');
+    const alone = stable((await checkLogkit()).packages.find((p) => p.name === 'logkit'));
+    // As the Action does: fix one detected upgrade, then check the next. This fix fails
+    // inside TypeScript's printer while analyzing zod.
+    const { root, services } = zodFixture(mkdtempSync(join(tmpdir(), 'uptide-failing-fix-')));
+    const before = resets;
+    await expect(
+      fix(
+        { cwd: root, only: 'zod', fixer: null },
+        {
+          ...services,
+          check: async () => {
+            printCompilerNode(
+              f.createTypeReferenceNode('Partial', [f.createTypeReferenceNode(boom)]),
+            );
+            throw new Error('unreachable');
+          },
+        },
+      ),
+    ).rejects.toThrow('Maximum call stack size exceeded');
+    expect(resets).toBe(before + 1);
+    expect(stable((await checkLogkit()).packages.find((p) => p.name === 'logkit'))).toBe(alone);
   });
 
   it('fails a package alone: the others keep their results, and the failure says which and why', async () => {

@@ -51,7 +51,7 @@ interface FileIndex {
   computedLoads: string[];
 }
 
-const repoIndexes = new WeakMap<LoadedRepo, Map<string, FileIndex>>();
+let repoIndexes = new WeakMap<LoadedRepo, Map<string, FileIndex>>();
 
 function packageNameOf(specifier: string): string | undefined {
   if (specifier.startsWith('.') || specifier.startsWith('/') || specifier.startsWith('node:'))
@@ -127,7 +127,10 @@ const detailed = new Map<
   string,
   Promise<Awaited<ReturnType<TypescriptAdapter['extractSurfaceDetailed']>>>
 >();
-onReset(() => detailed.clear());
+onReset(() => {
+  detailed.clear();
+  repoIndexes = new WeakMap();
+});
 
 function detailedSurfaceOf(
   adapter: TypescriptAdapter,

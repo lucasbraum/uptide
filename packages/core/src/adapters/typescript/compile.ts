@@ -6,6 +6,7 @@ import { ts } from 'ts-morph';
 import type { CompileOptions, RepoDir } from '../../domain/adapter.js';
 import type { CompileDiagnostic, CompileSignal } from '../../domain/usage.js';
 import { satisfies } from '../../fetch/range.js';
+import { onReset } from '../../shared-state.js';
 import { findCause } from './cause.js';
 import { type LoadedRepo, loadedRepo, ownsFile } from './repo.js';
 import {
@@ -107,7 +108,7 @@ function isRepoError(d: ts.Diagnostic, repoDir: string): boolean {
 }
 
 /** Semantic errors of one file, at the installed version, computed once per workspace and file. */
-const baselines = new WeakMap<LoadedRepo, Map<string, ts.Diagnostic[]>>();
+let baselines = new WeakMap<LoadedRepo, Map<string, ts.Diagnostic[]>>();
 
 function baselineErrorsOf(
   repo: LoadedRepo,
@@ -128,7 +129,7 @@ function baselineErrorsOf(
 }
 
 /** file → files importing it, over the repository's own sources, computed once per workspace. */
-const importers = new WeakMap<LoadedRepo, Map<string, Set<string>>>();
+let importers = new WeakMap<LoadedRepo, Map<string, Set<string>>>();
 
 function importersOf(repo: LoadedRepo): Map<string, Set<string>> {
   let map = importers.get(repo);
@@ -335,7 +336,13 @@ function usageModes(
 }
 
 /** The baseline with JavaScript checked, once per workspace: the ts-morph program has the repo's own `checkJs`. */
-const checkedBaselines = new WeakMap<LoadedRepo, ts.Program>();
+let checkedBaselines = new WeakMap<LoadedRepo, ts.Program>();
+// Keyed by a repository a reset already discards; dropped explicitly all the same.
+onReset(() => {
+  baselines = new WeakMap();
+  importers = new WeakMap();
+  checkedBaselines = new WeakMap();
+});
 
 function checkedBaseline(repo: LoadedRepo, base: ts.Program): ts.Program {
   let program = checkedBaselines.get(repo);
