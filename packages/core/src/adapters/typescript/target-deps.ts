@@ -70,6 +70,7 @@ export function consumerCopySatisfies(
   return satisfies(consumerVersion, range);
 }
 
+// shared-state: not TS-dependent
 const manifests = new Map<string, Manifest | undefined>();
 
 export function readManifest(dir: string): Manifest | undefined {

@@ -131,6 +131,7 @@ function resolveWorkspaces(root: string): string[] {
 }
 
 /** Per root, for the life of the process: probes call this for every directory they walk. */
+// shared-state: not TS-dependent
 const resolved = new Map<string, string[] | UptideError>();
 
 /**
