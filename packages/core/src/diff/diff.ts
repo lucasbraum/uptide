@@ -1,5 +1,5 @@
 import type { Change } from '../domain/change.js';
-import { leafOf, parentOf } from '../domain/path.js';
+import { joinPath, leafOf, parentOf, splitPath } from '../domain/path.js';
 import type { ApiSurface, ApiSymbol } from '../domain/surface.js';
 import { classify, type UnclassifiedChange } from './classify.js';
 import { asCallable, callableShape } from './signature-parse.js';
@@ -65,6 +65,12 @@ interface Equivalence {
   normalize(signature: string): string;
 }
 
+/** Drops a `name.` qualifier before identifiers: `pino.Logger` reads as `Logger`. */
+function unqualify(name: string): (signature: string) => string {
+  const qualifier = new RegExp(`\\b${name.replace(/[$]/g, '\\$&')}\\.(?=[A-Za-z_$])`, 'g');
+  return (signature) => signature.replace(qualifier, '');
+}
+
 function esmEquivalence(from: ApiSurface, other: Map<string, ApiSymbol>): Equivalence {
   const identity: Equivalence = {
     active: false,
@@ -79,7 +85,6 @@ function esmEquivalence(from: ApiSurface, other: Map<string, ApiSymbol>): Equiva
   if (!otherRoot || otherRoot.exportEquals) return identity;
   const name = root.path;
   const rootPath = otherRoot.path;
-  const qualifier = new RegExp(`\\b${name.replace(/[$]/g, '\\$&')}\\.(?=[A-Za-z_$])`, 'g');
   return {
     active: true,
     lookup(path) {
@@ -99,11 +104,49 @@ function esmEquivalence(from: ApiSurface, other: Map<string, ApiSymbol>): Equiva
       if (path === `${rootPath}.new()`) return own.get(`${name}.new()`);
       return own.get(`${name}.${path}`);
     },
-    normalize: (signature) => signature.replace(qualifier, ''),
+    normalize: unqualify(name),
   };
 }
 
 /** The textual comparison before severity is assigned; `diffPackage` refines it with the type checker first. */
+/** What the extraction records instead of walking a declaration again: `recursive type pino (compared by name)`. */
+const CUT = /^recursive type (.+) \(compared by name\)$/;
+const isCut = (s: ApiSymbol | undefined): s is ApiSymbol => !!s && CUT.test(s.signature);
+
+/**
+ * A path looked up on one side through that side's cycle cuts: when `pino.pino` was cut as
+ * a cycle back to `pino`, `pino.pino.stdTimeFunctions` is `pino.stdTimeFunctions`. Undefined
+ * when no cut covers the path or the rewritten path is not there either.
+ */
+export function throughCuts(
+  symbols: Map<string, ApiSymbol>,
+): (path: string) => ApiSymbol | undefined {
+  const cuts = new Map<string, string>();
+  for (const s of symbols.values()) {
+    const target = CUT.exec(s.signature)?.[1];
+    if (target !== undefined) cuts.set(s.path, target);
+  }
+  return (path) => {
+    let current = path;
+    // Cuts can lead to cuts; each hop shortens nothing, so the hops are bounded.
+    for (let hop = 0; cuts.size > 0 && hop < 16; hop++) {
+      const parts = splitPath(current);
+      let rewritten: string | undefined;
+      for (let n = parts.segments.length; n >= 1 && rewritten === undefined; n--) {
+        const target = cuts.get(joinPath({ ...parts, segments: parts.segments.slice(0, n) }));
+        if (target === undefined) continue;
+        const into = splitPath(target);
+        rewritten = joinPath({ ...into, segments: [...into.segments, ...parts.segments.slice(n)] });
+      }
+      if (rewritten === undefined) return undefined;
+      const found = symbols.get(rewritten);
+      if (found && !isCut(found)) return found;
+      current = rewritten;
+    }
+    return undefined;
+  };
+}
+
 export function rawDiff(a: ApiSurface, b: ApiSurface): UnclassifiedChange[] {
   const meta = { package: b.package, from: a.version, to: b.version };
   const inA = new Map(a.symbols.map((s) => [s.path, s]));
@@ -113,9 +156,25 @@ export function rawDiff(a: ApiSurface, b: ApiSurface): UnclassifiedChange[] {
   const added: ApiSymbol[] = [];
   const equivB = esmEquivalence(a, inB);
   const equivA = esmEquivalence(b, inA);
+  const viaB = throughCuts(inB);
+  const viaA = throughCuts(inA);
 
-  for (const original of a.symbols) {
-    const found = equivB.lookup(original.path);
+  for (const cut of a.symbols) {
+    let found = equivB.lookup(cut.path);
+    // A cycle cut on one side only is compared with what it stands for on that side, under
+    // this path; cut on both sides, the two compare by name like any signature.
+    const resolvedB = !found || (isCut(found) && !isCut(cut)) ? viaB(cut.path) : undefined;
+    if (resolvedB) found = { ...resolvedB, path: cut.path };
+    const resolvedA = isCut(cut) && found && !isCut(found) ? viaA(cut.path) : undefined;
+    let original = resolvedA ? { ...resolvedA, path: cut.path } : cut;
+    // Through a cut back to namespace `pino`, one side names its members `pino.Logger` and
+    // the other, declared inside the namespace, `Logger`: the same types, read unqualified.
+    const through = resolvedB ?? resolvedA;
+    if (through && found) {
+      const plain = unqualify(leafOf(through.path));
+      original = { ...original, signature: plain(original.signature) };
+      found = { ...found, signature: plain(found.signature) };
+    }
     // Under the ESM equivalence both sides are read without the namespace qualifier.
     const before = equivB.active
       ? { ...original, signature: equivB.normalize(original.signature) }
@@ -147,7 +206,8 @@ export function rawDiff(a: ApiSurface, b: ApiSurface): UnclassifiedChange[] {
     compareSymbol(meta, before, after, raw);
   }
   for (const after of b.symbols) {
-    if (!equivA.lookup(after.path) && !equivB.reverse(after.path, inA)) added.push(after);
+    if (!equivA.lookup(after.path) && !equivB.reverse(after.path, inA) && !viaA(after.path))
+      added.push(after);
   }
 
   const hints = renameHints(removed, added, a.symbols, b.symbols);
