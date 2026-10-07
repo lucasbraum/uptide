@@ -35,6 +35,7 @@ import type { MigrationPack } from '../packs/types.js';
 import { diffRuntime, probeRuntime } from '../runtime/runtime.js';
 import { resetSharedState } from '../shared-state.js';
 import { requireFindUsages } from './capabilities.js';
+import { type CompanionPlan, companionsOf, type InstalledDependency } from './companions.js';
 import { arbitrateUnchecked } from './file-kind.js';
 import { groupName, releaseGroups } from './groups.js';
 import { importedByText, importFileCounts } from './importers.js';
@@ -117,6 +118,11 @@ export interface CheckOptions {
   /** Set by `check` for its workspace jobs: the dependencies with something to analyze. */
   behind?: string[];
   /**
+   * Set by `check`: for each package asked for by name, what moves with it (its group, at the
+   * versions that agree with its target). Analyzed as one group led by it, as `fix` upgrades.
+   */
+  companions?: Record<string, CompanionPlan>;
+  /**
    * The packs to use instead of the verified ones (`uptide pack test` passes a candidate).
    * Packs are code, which no worker receives: with this set, workspaces are checked in this
    * thread.
@@ -156,7 +162,7 @@ export async function check(opts: CheckOptions): Promise<CheckResult> {
 
   const root: RepoDir = { dir: opts.cwd };
   const workspaces = (await adapter.workspacePackages?.(root)) ?? ['.'];
-  const ctx: Ctx = { adapter, fetcher: memoizingFetcher(fetcher), cache, findUsages, opts };
+  const memo = memoizingFetcher(fetcher);
   const installedByWorkspace: Record<string, Record<string, string>> = {};
   const catalogByWorkspace: Record<string, string[]> = {};
   for (const workspace of workspaces) {
@@ -167,6 +173,19 @@ export async function check(opts: CheckOptions): Promise<CheckResult> {
       .filter(([, spec]) => spec.startsWith('catalog:'))
       .map(([name]) => name);
   }
+  // What moves with each package asked for by name, analyzed with it at the versions that
+  // agree with its target: the upgrade `fix` makes, not one no install ever produces.
+  const plans = await companionPlans(opts, memo, adapter, workspaces, installedByWorkspace);
+  const moving = Object.values(plans).flatMap((p) => p.companions);
+  if (opts.only && moving.length > 0)
+    opts = {
+      ...opts,
+      only: [...new Set([...opts.only, ...moving.map((c) => c.name)])],
+      targets: { ...Object.fromEntries(moving.map((c) => [c.name, c.to])), ...opts.targets },
+      companions: plans,
+    };
+  else if (Object.keys(plans).length > 0) opts = { ...opts, companions: plans };
+  const ctx: Ctx = { adapter, fetcher: memo, cache, findUsages, opts };
   // Who imports what, whether or not they declare it: the candidates are the packages asked
   // for, or every package some workspace declares.
   const candidates = opts.only ?? [
@@ -819,13 +838,25 @@ async function checkWorkspace(ctx: Ctx, job: WorkspaceJob): Promise<PackageRepor
         (opts.allDeps ||
           (!name.startsWith('@types/') && (imported === undefined || imported.has(name)))),
     );
-    const groups = releaseGroups(
+    let groups = releaseGroups(
       analyzable.map(([name, version]) => ({
         name,
         installed: version,
         dependsOn: dependsOnOf(installedPackageDirOf(adapter, repo, name, version)?.dir),
       })),
     );
+    // A package asked for by name leads its companions' group, and absorbs any release group
+    // one of them was in: one overlay with every target linked.
+    for (const [lead, plan] of Object.entries(opts.companions ?? {})) {
+      const members = [lead, ...plan.companions.map((c) => c.name)].filter((n) =>
+        analyzable.some(([name]) => name === n),
+      );
+      if (!members.includes(lead) || members.length < 2) continue;
+      for (const g of groups)
+        if (g.some((m) => members.includes(m)))
+          for (const m of g) if (!members.includes(m)) members.push(m);
+      groups = [...groups.filter((g) => !g.some((m) => members.includes(m))), members];
+    }
     const groupOf = new Map(groups.flatMap((g) => g.map((m) => [m, g] as const)));
     const done = new Set<string>();
     // The analysis is CPU-bound on one thread: six at once finish together, late, and each
@@ -955,9 +986,76 @@ interface RunFetcher extends PackageFetcher {
  * per package, and one extraction per `name@version`, however many workspaces or target
  * dependency graphs need it. Extracted directories live until the run ends.
  */
+/**
+ * For each package `check` was asked about by name, what has to move with it: its group as
+ * `list` draws it, at the versions that agree with its target (`companions.ts`). From the
+ * manifests installed in the workspaces that declare it, and one packument per candidate.
+ */
+async function companionPlans(
+  opts: CheckOptions,
+  fetcher: RunFetcher,
+  adapter: LanguageAdapter,
+  workspaces: string[],
+  installedByWorkspace: Record<string, Record<string, string>>,
+): Promise<Record<string, CompanionPlan>> {
+  const plans: Record<string, CompanionPlan> = {};
+  const manifests = fetcher.manifests;
+  if (!opts.only || !manifests) return plans;
+  const linked = (version: string) => /^(link|workspace|file):/.test(version);
+  for (const lead of opts.only) {
+    const declaring = workspaces.filter((w) => {
+      const version = installedByWorkspace[w]?.[lead];
+      return version !== undefined && !linked(version);
+    });
+    if (declaring.length === 0) continue;
+    const target =
+      opts.targets?.[lead] ?? (await fetcher.resolve(lead, 'latest').catch(() => undefined));
+    if (!target) continue;
+    const installed = new Map<string, InstalledDependency>();
+    for (const workspace of declaring)
+      for (const [name, version] of Object.entries(installedByWorkspace[workspace] ?? {})) {
+        if (linked(version)) continue;
+        const known = installed.get(`${name}@${version}`);
+        if (known) {
+          known.workspaces.push(workspace);
+          continue;
+        }
+        const dir = installedPackageDirOf(
+          adapter,
+          { dir: resolve(opts.cwd, workspace) },
+          name,
+          version,
+        )?.dir;
+        let manifest = {};
+        try {
+          if (dir) manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
+        } catch {
+          // Unreadable: it can still be named in another package's manifest.
+        }
+        installed.set(`${name}@${version}`, { name, version, manifest, workspaces: [workspace] });
+      }
+    try {
+      const plan = await companionsOf({
+        name: lead,
+        target,
+        installed: [...installed.values()],
+        manifests: (name) => manifests(name),
+      });
+      if (plan.companions.length > 0 || plan.conflicts.length > 0) plans[lead] = plan;
+    } catch {
+      // A registry that cannot answer leaves the package alone, as before.
+    }
+  }
+  return plans;
+}
+
 function memoizingFetcher(inner: PackageFetcher): RunFetcher {
   const resolved = new Map<string, Promise<string>>();
   const versions = new Map<string, Promise<string[]>>();
+  const manifests = new Map<
+    string,
+    Promise<Awaited<ReturnType<NonNullable<PackageFetcher['manifests']>>>>
+  >();
   const fetched = new Map<string, Promise<PackageDir>>();
   const once = <T>(
     map: Map<string, Promise<T>>,
@@ -979,6 +1077,12 @@ function memoizingFetcher(inner: PackageFetcher): RunFetcher {
       ? {
           versions: (name: string) =>
             once(versions, name, () => inner.versions?.(name) ?? Promise.resolve([])),
+        }
+      : {}),
+    ...(inner.manifests
+      ? {
+          manifests: (name: string) =>
+            once(manifests, name, () => inner.manifests?.(name) ?? Promise.resolve({})),
         }
       : {}),
     async dispose() {
@@ -1355,7 +1459,12 @@ async function checkGroup(
   // A member with nothing to analyze (up to date, unused, unanalyzable) leaves the group; a lone package reports as itself.
   if (prepared.length === 0)
     return early.length === 1 ? (early[0] as PackageReport) : mergeEarly(workspace, early);
-  const name = groupName(prepared.map((p) => p.name));
+  // Led by the package asked for, when its companions are in the group: it names the report,
+  // and its versions are the upgrade's.
+  const plans = ctx.opts.companions ?? {};
+  const leader = prepared.find((p) => plans[p.name] !== undefined && prepared.length > 1);
+  const plan = leader ? plans[leader.name] : undefined;
+  const name = leader?.name ?? groupName(prepared.map((p) => p.name));
   const notes = prepared.flatMap((p) =>
     prepared.length > 1 ? p.notes.map((n) => `${p.name}: ${n}`) : p.notes,
   );
@@ -1375,9 +1484,12 @@ async function checkGroup(
           })),
         }
       : {}),
-    installed: installed[0] as string,
-    latest: (prepared.length === 1 ? prepared[0]?.latest : targets.at(-1)) as string,
-    target: targets.at(-1) as string,
+    installed: (leader?.installedVersion ?? installed[0]) as string,
+    latest: (leader?.latest ??
+      (prepared.length === 1 ? prepared[0]?.latest : targets.at(-1))) as string,
+    target: (leader?.target ?? targets.at(-1)) as string,
+    ...(plan?.companions.length ? { companions: plan.companions } : {}),
+    ...(plan?.conflicts.length ? { companionConflicts: plan.conflicts } : {}),
     majorsBehind: Math.max(...prepared.map((p) => majorsBehind(p.installedVersion, p.target))),
     findings: [],
     callSitesChecked: 0,
@@ -1791,7 +1903,8 @@ async function checkGroup(
     findings.push(...arbitrated);
     // A pack can see what no type diff shows: a client the SDK bump reconfigures at runtime.
     const pack = packsOf(ctx.opts).find((candidate) => candidate.name === name);
-    const only = prepared.length === 1 ? prepared[0] : undefined;
+    // The pack speaks for the package it covers: alone, or leading its companions.
+    const only = leader ?? (prepared.length === 1 ? prepared[0] : undefined);
     const packDirs = (p: Prepared) => {
       const target = fetched.find((f) => f.p === p);
       return {
@@ -1823,7 +1936,12 @@ async function checkGroup(
       }
     }
     // Without a pack, only what the compiler or the runtime probe confirms is called breaking.
-    const tier = tierOf(packsOf(ctx.opts), name, installed[0] as string, targets.at(-1) as string);
+    const tier = tierOf(
+      packsOf(ctx.opts),
+      name,
+      (leader?.installedVersion ?? installed[0]) as string,
+      (leader?.target ?? targets.at(-1)) as string,
+    );
     const evidence = (f: Finding): Finding['evidence'] => {
       const p = runtimeOf(f);
       return evidenceOf(f, p?.runtime, p ? loadRootOf(p) : undefined);

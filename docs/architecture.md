@@ -77,6 +77,22 @@ never fetched as dependencies of one another), findings per member, and one repo
 `@aws-sdk/* (3 packages)` with `members` listed. A member with nothing to analyze leaves
 the group.
 
+### Companions
+
+A package can also have to move with packages outside its scope (`src/check/companions.ts`).
+`ai` and the `@ai-sdk/*` packages pin the same `@ai-sdk/provider`: `ai` 7 next to
+`@ai-sdk/react` 3 is an install no real upgrade has, with two copies of the provider's
+types. When `check` is asked about one package, the group is the one `list` draws
+(`dependencyGroups`: family, peer link, shared pin) among the dependencies installed in its
+workspaces, and each member moves to the version that agrees with the target: the version
+the target pins exactly; else its newest release that pins or accepts the target; else its
+newest release whose exact pins agree with the target's. The report is the lead's
+(`ai (3 packages)`) with `companions` (name, from, to, why) and `companionConflicts` (a member
+no release agrees with). `fix` installs them together: the version is resolved exactly first
+and the range style restored after, so `^4.0.1` stays at the 4.0.1 the target pins; the
+lockfile may change inside any of their subtrees and nowhere else. A conflict stops `fix`
+before it writes anything.
+
 ### One dependency, one decision
 
 A dependency at the same installed version and target in several workspaces is one entry

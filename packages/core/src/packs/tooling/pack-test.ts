@@ -2,6 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createFsSurfaceCache } from '../../cache/fs-surface-cache.js';
 import { check } from '../../check/check.js';
+import type { Companion } from '../../check/companions.js';
 import type { CheckReport } from '../../domain/report.js';
 import {
   type GroundTruth,
@@ -45,6 +46,10 @@ export interface RepoScore {
   error?: string;
   /** What the lockfile says is installed, when it is not the ground truth's `from`. */
   installedMismatch?: string;
+  /** What `check` moves with the package there, at versions that agree (`fix` installs them together). */
+  companions?: Companion[];
+  /** Packages the real upgrade moved (`with`) that `check` would leave behind, or cannot move consistently. */
+  leftBehind?: string[];
   predicted: ScoredSite[];
   expected: ScoredSite[];
   /** Predicted sites no expected finding has, at the line level. */
@@ -186,8 +191,24 @@ async function scoreRepo(
     ];
     if (installed.length > 0 && !installed.includes(entry.from))
       base.installedMismatch = `the lockfile has ${installed.join(', ')}, the ground truth says ${entry.from}`;
+    const own = report.packages.filter((p) => p.name === pack.name);
+    const companions = [
+      ...new Map(own.flatMap((p) => p.companions ?? []).map((c) => [c.name, c])).values(),
+    ].sort((a, b) => a.name.localeCompare(b.name));
+    const leftBehind = [
+      ...new Set(own.flatMap((p) => p.companionConflicts ?? [])),
+      ...Object.entries(entry.with ?? {})
+        .filter(([name]) => !companions.some((c) => c.name === name))
+        .map(([name, version]) => `${name}: the upgrade moved it to ${version}, check leaves it`),
+    ];
     const predicted = predictedSites(report, pack);
-    return { ...base, predicted, ...scoreSites(predicted, expected) };
+    return {
+      ...base,
+      ...(companions.length ? { companions } : {}),
+      ...(leftBehind.length ? { leftBehind } : {}),
+      predicted,
+      ...scoreSites(predicted, expected),
+    };
   } catch (err) {
     return { ...base, error: (err as Error).message };
   }
@@ -275,8 +296,9 @@ export async function testPack(
     if (tp + rfp + rfn > 0) rules[id] = tally(tp, rfp, rfn);
   }
 
+  // A pack whose upgrade leaves part of the group behind produces an inconsistent install.
   const status: PackStatus =
-    repos.some((r) => r.error) || options.fixturesOnly
+    repos.some((r) => r.error || r.leftBehind?.length) || options.fixturesOnly
       ? 'candidate'
       : statusOf(truth, { falsePositives: breakingFp.length, predicted: breakingPredicted.length });
   const verification: PackVerification = {
@@ -298,7 +320,12 @@ export async function testPack(
     writeVerification(options.root, entry.dir, verification);
     stale = false;
   }
-  const passed = scoredAll && fixturesPass(fixtures) && breakingFp.length === 0 && !stale;
+  const passed =
+    scoredAll &&
+    fixturesPass(fixtures) &&
+    breakingFp.length === 0 &&
+    !repos.some((r) => r.leftBehind?.length) &&
+    !stale;
   return {
     package: pack.name,
     dir: entry.dir,

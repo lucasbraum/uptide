@@ -10,6 +10,10 @@ export interface LockGraph {
   metadata: unknown;
 }
 const sections = ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies'];
+/** What an upgrade moves: one package, or a package and the companions that move with it. */
+export type Targets = string | readonly string[];
+export const targetNames = (targets: Targets): readonly string[] =>
+  typeof targets === 'string' ? [targets] : targets;
 function stable(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(stable).join(',')}]`;
   if (value && typeof value === 'object')
@@ -21,12 +25,13 @@ function stable(value: unknown): string {
 }
 export function withoutTarget(
   value: Record<string, unknown>,
-  target: string,
+  target: Targets,
 ): Record<string, unknown> {
   const result = structuredClone(value);
   for (const section of sections) {
     if (result[section] && typeof result[section] === 'object')
-      delete (result[section] as Record<string, unknown>)[target];
+      for (const name of targetNames(target))
+        delete (result[section] as Record<string, unknown>)[name];
   }
   return result;
 }
@@ -37,10 +42,11 @@ export interface LockDiff {
   allowed: string[];
 }
 /** Compare entries, not lines: formatting changes cannot disguise an unrelated resolution. */
-export function assertLockScope(before: LockGraph, after: LockGraph, target: string): LockDiff {
+export function assertLockScope(before: LockGraph, after: LockGraph, target: Targets): LockDiff {
+  const names = targetNames(target);
   const allowed = new Set<string>();
   for (const graph of [before, after]) {
-    const queue = [...graph.records].filter(([, r]) => r.name === target).map(([k]) => k);
+    const queue = [...graph.records].filter(([, r]) => names.includes(r.name)).map(([k]) => k);
     const visited = new Set<string>();
     for (const key of queue) {
       if (visited.has(key)) continue;
@@ -80,7 +86,7 @@ export function assertLockScope(before: LockGraph, after: LockGraph, target: str
     });
     throw new UptideError(
       'LOCKFILE_OUT_OF_SCOPE',
-      `Install changed entries outside ${target}'s dependency subtree: ${described.join('; ')}. No upgrade will be committed.`,
+      `Install changed entries outside ${names.join(', ')}'s dependency subtree: ${described.join('; ')}. No upgrade will be committed.`,
     );
   }
   return diff;

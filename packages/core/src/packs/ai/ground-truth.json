@@ -1,5 +1,5 @@
 {
-  "$comment": "Ground truth for the ai pack (docs/packs.md, \"Ground truth\"). Each public repository is pinned at the commit before its own AI SDK 6 to 7 upgrade. Expected findings come from two sources that are not Uptide, drafted by pnpm packs:truth and read by hand: the diagnostics the repository's TypeScript reports with the target and the companions its upgrade moved with it linked in (@ai-sdk/react, @ai-sdk/provider, the providers; their versions from the upgrade's lockfile) and not without them, errors and deprecations, and the lines the upgrade commit changed for ai (one site per construct; comments, insertions and other packages' changes such as @ai-sdk/react's experimental_throttle left out). Rules are assigned from each site's code and text.",
+  "$comment": "Ground truth for the ai pack (docs/packs.md, \"Ground truth\"). Each public repository is pinned at the commit before its own AI SDK 6 to 7 upgrade. Expected findings come from two sources that are not Uptide, drafted by pnpm packs:truth and read by hand: the diagnostics the repository's TypeScript reports with the target and the companions its upgrade moved with it linked in (@ai-sdk/react, @ai-sdk/provider, the providers; their versions from the upgrade's lockfile) and not without them, errors and deprecations, and the lines the upgrade commit changed for ai (one site per construct; comments, insertions and other packages' changes such as @ai-sdk/react's experimental_throttle left out). Rules are assigned from each site's code and text. Each entry's `with` lists the packages that upgrade moved with ai (from its package.json); pack test fails when check would not move each of them.",
   "package": "ai",
   "repos": [
     {
@@ -8,6 +8,10 @@
       "migration": "https://github.com/vercel/chatbot/commit/2397c783b505997a09968c4619ec42dc450cc705",
       "from": "6.0.116",
       "to": "7.0.9",
+      "with": {
+        "@ai-sdk/provider": "4.0.1",
+        "@ai-sdk/react": "4.0.10"
+      },
       "why": "Next.js chat app: streamText with tools, artifact streams over fullStream, UI message streams, telemetry",
       "findings": [
         {
@@ -180,6 +184,15 @@
       "migration": "https://github.com/miurla/morphic/commit/0ec2ca733c8cadb589d741097a2766f67e1766a3",
       "from": "6.0.180",
       "to": "7.0.66",
+      "with": {
+        "@ai-sdk/anthropic": "4.0.39",
+        "@ai-sdk/gateway": "4.0.52",
+        "@ai-sdk/google": "4.0.44",
+        "@ai-sdk/openai": "4.0.42",
+        "@ai-sdk/openai-compatible": "3.0.31",
+        "@ai-sdk/react": "4.0.69",
+        "ai-sdk-ollama": "4.1.0"
+      },
       "why": "Next.js research agent on bun: ToolLoopAgent, telemetry metadata moved to runtimeContext, tool execute options, UI message streams, tests that mock ai",
       "findings": [
         {

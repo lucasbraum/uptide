@@ -142,6 +142,7 @@ Runtime never downloads instructions: they are checked in, with the date they we
       "directory": "web",
       "from": "3.25.76",
       "to": "4.6.5",
+      "with": { "@scope/companion": "2.0.1" },
       "why": "what this repository exercises",
       "findings": [{ "file": "src/schema.ts", "line": 12, "rule": "error-params" }]
     }
@@ -188,6 +189,13 @@ source has is a false positive, and it stays one.
 
 `directory` is the project inside the repository when it is not at the root; `from` is the
 version its lockfile has at `commit`, and `pack test` says so when it is not.
+
+`with` lists the packages the repository's own upgrade moved together with this one, at the
+versions it chose (from its `package.json` at the upgrade commit). `pack test` prints what
+`check` moves with the package there and fails when it would leave one of them behind, or
+cannot move one consistently: a pack whose `fix` produces an install the real upgrade never
+had is not verified. Versions may differ (check picks the release that agrees with `to`);
+the names may not.
 
 `fixture` entries (`"fixture": "fixtures/repos/storefront"`) are repositories in this tree.
 They are scored like the others and never count toward `verified`.

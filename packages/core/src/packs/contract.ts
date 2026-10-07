@@ -113,6 +113,12 @@ export interface GroundTruthRepo {
   /** The exact version installed at `commit` and the one to check against. */
   from: string;
   to: string;
+  /**
+   * The packages the repository's own upgrade moved with this one, at the versions it chose
+   * (`@ai-sdk/react` with `ai`). `pack test` fails when `check` would not move each of them:
+   * the package upgraded alone is an install the real upgrade never had.
+   */
+  with?: Record<string, string>;
   why: string;
   /** Repository-relative `file`, 1-based `line`, and the rule (or behavior note) id. */
   findings: GroundTruthFinding[];

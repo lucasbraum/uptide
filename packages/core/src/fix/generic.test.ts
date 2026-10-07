@@ -294,3 +294,64 @@ describe('fix for a dependency without a pack', () => {
     expect(result.sites).toEqual([]);
   }, 20000);
 });
+
+describe('fix with companions', () => {
+  /** `paint` with `brush` installed beside it: check says brush has to move with paint 2. */
+  function withBrush(conflicts: string[] = []) {
+    const fixture = paintFixture();
+    const { root, report, services } = fixture;
+    const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+    manifest.dependencies.brush = '1.0.0';
+    writeFileSync(join(root, 'package.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+    git(root, 'commit', '-am', 'brush');
+    const lead = report.packages[0] as CheckReport['packages'][number];
+    lead.companions = [
+      { name: 'brush', from: '1.0.0', to: '2.0.0', reason: 'brush 2.0.0 pins paint 2.0.0' },
+    ];
+    if (conflicts.length) lead.companionConflicts = conflicts;
+    const installs: Parameters<FixServices['install']>[1][] = [];
+    const install = services.install;
+    services.install = async (dir, upgrade) => {
+      installs.push(upgrade);
+      await install(dir, upgrade);
+    };
+    return { ...fixture, installs };
+  }
+
+  it('installs the package and every companion in one step, and says so', async () => {
+    // Moving paint alone would leave brush 1 pinned to paint 1: the install only
+    // agrees when both move.
+    const { root, services, fixer, installs } = withBrush();
+    const result = await fix({ cwd: root, only: 'paint', fixer: fixer(0.01) }, services);
+    expect(installs).toHaveLength(1);
+    expect(installs[0]).toMatchObject({
+      name: 'paint',
+      version: '2.0.0',
+      also: [{ name: 'brush', version: '2.0.0' }],
+    });
+    const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+    expect(manifest.dependencies).toEqual({ paint: '2.0.0', brush: '2.0.0' });
+    expect(git(root, 'log', '--format=%s', '-n', '1', 'HEAD~1')).toBe(
+      'chore: upgrade paint to 2.0.0 with brush 2.0.0',
+    );
+    expect(result.companions).toEqual([
+      { name: 'brush', from: '1.0.0', to: '2.0.0', reason: 'brush 2.0.0 pins paint 2.0.0' },
+    ]);
+    expect(prBody(result)).toContain(
+      'Upgraded with paint, so the install stays consistent:\n\n- `brush` 1.0.0 → 2.0.0 (brush 2.0.0 pins paint 2.0.0)',
+    );
+  }, 20000);
+
+  it('changes nothing when a companion has no version that agrees', async () => {
+    const { root, services, fixer, installs } = withBrush([
+      'brush 1.0.0 has no release that agrees with paint 2.0.0',
+    ]);
+    const head = git(root, 'rev-parse', 'HEAD');
+    await expect(
+      fix({ cwd: root, only: 'paint', fixer: fixer(0.01) }, services),
+    ).rejects.toMatchObject({ code: 'INCONSISTENT_UPGRADE' });
+    expect(installs).toEqual([]);
+    expect(git(root, 'rev-parse', 'HEAD')).toBe(head);
+    expect(git(root, 'status', '--porcelain')).toBe('');
+  });
+});

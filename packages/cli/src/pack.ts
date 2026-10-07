@@ -97,6 +97,9 @@ export function formatPackTest(report: PackTestReport, color = false): string {
         `${head}  predicted ${r.predicted.length}, expected ${r.expected.length}, false positives ${r.falsePositives.length}, false negatives ${r.falseNegatives.length}`,
       );
       if (r.installedMismatch) out.push(`    ${c.yellow('!')} ${r.installedMismatch}`);
+      if (r.companions?.length)
+        out.push(`    with ${r.companions.map((m) => `${m.name} ${m.from} → ${m.to}`).join(', ')}`);
+      for (const left of r.leftBehind ?? []) out.push(`    ${c.red('✗')} ${left}`);
     }
     out.push('');
     out.push(

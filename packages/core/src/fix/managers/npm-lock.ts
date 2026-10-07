@@ -1,12 +1,18 @@
 import { dirname } from 'node:path';
 import { UptideError } from '../../errors.js';
-import { type LockGraph, type LockRecord, withoutTarget } from './lock-guard.js';
+import {
+  type LockGraph,
+  type LockRecord,
+  type Targets,
+  targetNames,
+  withoutTarget,
+} from './lock-guard.js';
 
 type Entry = Record<string, unknown> & {
   dependencies?: Record<string, Entry | string>;
   requires?: Record<string, string>;
 };
-export function npmGraph(text: string, target: string): LockGraph {
+export function npmGraph(text: string, target: Targets): LockGraph {
   const lock = JSON.parse(text);
   if (![2, 3].includes(lock.lockfileVersion) || !lock.packages)
     throw new UptideError(
@@ -32,7 +38,7 @@ export function npmGraph(text: string, target: string): LockGraph {
           : undefined;
       if (workspace && Object.hasOwn(importers, workspace) && own.requires) {
         own.requires = { ...own.requires };
-        delete own.requires[target];
+        for (const name of targetNames(target)) delete own.requires[name];
       }
       nodes.set(key, own);
       if (dependencies) legacy(dependencies, key);

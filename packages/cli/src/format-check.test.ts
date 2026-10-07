@@ -228,6 +228,39 @@ describe('formatCheck, the first screen', () => {
     expect(out).toContain('@aws-sdk/* (2 packages)  ');
   });
 
+  it('names what moves with the package, why, and offers fix for the whole group', () => {
+    const out = formatCheck(
+      report([
+        pkg({
+          name: 'ai',
+          installed: '6.0.116',
+          latest: '7.0.9',
+          target: '7.0.9',
+          majorsBehind: 1,
+          status: 'breaking',
+          findings: [removed('app/chat.ts', 3)],
+          members: [
+            { name: 'ai', installed: '6.0.116', target: '7.0.9' },
+            { name: '@ai-sdk/react', installed: '3.0.118', target: '4.0.10' },
+          ],
+          companions: [
+            {
+              name: '@ai-sdk/react',
+              from: '3.0.118',
+              to: '4.0.10',
+              reason: '@ai-sdk/react 4.0.10 pins ai 7.0.9',
+            },
+          ],
+        }),
+      ]),
+      { ...shown, fixable: ['ai'] },
+    );
+    expect(out).toContain(
+      '↑ upgrades with @ai-sdk/react 3.0.118 → 4.0.10   @ai-sdk/react 4.0.10 pins ai 7.0.9',
+    );
+    expect(out).toContain('npx uptide@next fix ai');
+  });
+
   it('says where each target came from: the npm dist-tag, or the one asked for', () => {
     const latest = formatCheck(report([pkg({ name: 'twilio' })]), shown);
     expect(latest).toContain('5.0.1 → 5.3.0   minor · latest on npm');

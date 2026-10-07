@@ -117,6 +117,13 @@ export interface PackageReport {
   /** A dependency, or a release group (`@aws-sdk/*`) upgraded together; `members` lists the group. */
   name: string;
   members?: { name: string; installed: string; target: string }[];
+  /**
+   * What moves with the package `check` was asked about (`check/companions.ts`): its group at
+   * the versions that agree with its target, each with why; `fix` upgrades them together.
+   */
+  companions?: { name: string; from: string; to: string; reason: string }[];
+  /** Members of that group with no release that agrees with the target. */
+  companionConflicts?: string[];
   /** Set when the entry merges several workspaces (`workspace` is then `*`). */
   workspaces?: string[];
   /**

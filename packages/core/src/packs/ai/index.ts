@@ -262,12 +262,6 @@ export const aiPack = definePack({
       reported: ['decision'],
     },
     {
-      id: 'companion-packages',
-      summary:
-        "`@ai-sdk/react`, `@ai-sdk/provider` and the provider packages move to their AI SDK 7 majors with `ai`; this upgrade bumps `ai` alone, so bump them on the same branch (ai 7 next to @ai-sdk/react 3 mixes two majors' types)",
-      reported: ['decision'],
-    },
-    {
       id: 'esm-only',
       summary: 'every `ai` and `@ai-sdk/*` package is ESM-only and needs Node 22 or later',
       reported: ['decision'],
