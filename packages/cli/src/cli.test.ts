@@ -1,4 +1,5 @@
-import { writeFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { FixReport } from '@uptide/core';
 import { describe, expect, it } from 'vitest';
@@ -480,12 +481,15 @@ describe('uptide verify', () => {
     );
   });
   it('ends with the summary and the next commands, never the PR body', async () => {
+    // The stored run lives in the source repository's .git, outside the working directory.
+    const source = mkdtempSync(join(tmpdir(), 'uptide-source-'));
+    const stored = join(source, '.git/uptide/uptide__zod-4.6.5');
     const engine = fakeEngine({
       fix: async () => ({
         ...fixReport(true),
-        source: '/repo',
+        source,
         base: 'main',
-        html: '/repo/.git/uptide/uptide__zod-4.6.5/report.html',
+        prBody: join(stored, 'pr-body.md'),
       }),
     });
     const io = memoryIo({ cwd: pnpmGitRepo() });
@@ -494,7 +498,7 @@ describe('uptide verify', () => {
     expect(io.stdout()).toContain('  Risk      ');
     expect(io.stdout()).toContain('pr --branch uptide/zod-4.6.5');
     // A path outside the working directory stays absolute, so it works as typed.
-    expect(io.stdout()).toContain('open /repo/.git/uptide/uptide__zod-4.6.5/report.html');
+    expect(io.stdout()).toContain(`open ${join(stored, 'report.html')}`);
     expect(io.stdout()).not.toContain('### What changed');
     expect(io.stdout()).not.toContain('## Upgrade');
   });

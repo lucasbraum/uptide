@@ -120,7 +120,9 @@ export function fixReport(passed: boolean): FixReport {
     },
     llm: { inputTokens: 0, outputTokens: 0, costUsd: 0, available: false },
     timingMs: 1,
-    prBody: '/repo/.uptide/pr-body.md',
+    // A real directory of its own: `fix` writes the report page next to the stored run, and
+    // a fixed path outside the temp dir is written to wherever the tests run as root.
+    prBody: join(mkdtempSync(join(tmpdir(), 'uptide-cli-run-')), 'pr-body.md'),
     notes: [],
   };
 }
