@@ -161,10 +161,18 @@ async function scoreRepo(
   try {
     const dir = entry.fixture
       ? await ensureFixture(root, entry.fixture, options)
-      : await ensureRepo({ repo: entry.repo as string, commit: entry.commit as string }, options);
+      : await ensureRepo(
+          {
+            repo: entry.repo as string,
+            commit: entry.commit as string,
+            ...(entry.directory ? { directory: entry.directory } : {}),
+          },
+          options,
+        );
+    const project = entry.directory ? join(dir, entry.directory) : dir;
     options.log?.(`checking ${pack.name} ${entry.from} → ${entry.to} in ${label(entry)}`);
     const report = await check({
-      cwd: dir,
+      cwd: project,
       only: [pack.name],
       targets: { [pack.name]: entry.to },
       packs: [pack],

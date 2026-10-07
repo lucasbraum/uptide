@@ -98,6 +98,8 @@ export interface GroundTruthRepo {
   commit?: string;
   /** A repository inside this one, relative to its root, instead of `repo` and `commit`. */
   fixture?: string;
+  /** The project inside the repository, when it is not at its root (`frontend`). */
+  directory?: string;
   /** Where the expected findings come from: the commit or pull request that made the upgrade. */
   migration?: string;
   /** The exact version installed at `commit` and the one to check against. */

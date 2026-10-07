@@ -20,6 +20,8 @@ export function truthCacheDir(env: NodeJS.ProcessEnv = process.env): string {
 export interface PinnedRepo {
   repo: string;
   commit: string;
+  /** Where to install, when the project is not at the repository root. */
+  directory?: string;
 }
 
 const SHA = /^[0-9a-f]{40}$/;
@@ -41,6 +43,8 @@ export function truthProblems(truth: GroundTruth, packageName: string): string[]
       if (!r.commit || !SHA.test(r.commit))
         problems.push(`${where}: commit must be a full 40-character SHA`);
     } else if (r.repo || r.commit) problems.push(`${where}: a fixture has no repo or commit`);
+    if (r.directory && (r.directory.startsWith('/') || /(^|\/)\.\.(\/|$)/.test(r.directory)))
+      problems.push(`${where}: directory is relative and inside the repository`);
     if (!r.from || !r.to) problems.push(`${where}: from and to are exact versions`);
     for (const f of r.findings ?? [])
       if (!f.file || !Number.isInteger(f.line) || f.line < 1 || !f.rule)
@@ -100,8 +104,8 @@ async function installDependencies(
 interface Marker {
   repo: string;
   commit: string;
-  installed: boolean;
-  manager?: string;
+  /** The directories installed so far (`.` for the root). */
+  installed: string[];
 }
 
 const MARKER = '.uptide-ground-truth.json';
@@ -135,7 +139,7 @@ export async function ensureRepo(entry: PinnedRepo, options: EnsureOptions = {})
   const dir = cachedRepoDir(entry, cacheDir);
   const install = options.install ?? true;
   const marker = readMarker(dir);
-  if (marker && (marker.installed || !install)) return dir;
+  if (marker && (!install || marker.installed.includes(entry.directory ?? '.'))) return dir;
   if (options.offline)
     throw new UptideError(
       'GROUND_TRUTH_NOT_CACHED',
@@ -165,18 +169,23 @@ export async function ensureRepo(entry: PinnedRepo, options: EnsureOptions = {})
       );
     }
   }
-  let installed = false;
-  let manager: string | undefined;
-  let frozen: boolean | undefined;
+  const installed = [...(marker?.installed ?? [])];
   if (install) {
-    const result = await installDependencies(dir, entry.repo, options);
-    manager = result.manager;
-    frozen = result.frozen;
-    installed = true;
+    const project = entry.directory ? join(dir, entry.directory) : dir;
+    if (entry.directory && (/(^|\/)\.\.(\/|$)/.test(entry.directory) || !existsSync(project)))
+      throw new UptideError(
+        'INVALID_GROUND_TRUTH',
+        `no directory ${entry.directory} in ${entry.repo}`,
+      );
+    const result = await installDependencies(project, entry.repo, options);
+    installed.push(entry.directory ?? '.');
+    options.log?.(
+      `installed with ${result.manager}${result.frozen ? '' : ', lockfile not frozen'}`,
+    );
   }
   writeFileSync(
     join(dir, MARKER),
-    `${JSON.stringify({ repo: entry.repo, commit: entry.commit, installed, ...(manager ? { manager, frozen } : {}) })}\n`,
+    `${JSON.stringify({ repo: entry.repo, commit: entry.commit, installed })}\n`,
   );
   return dir;
 }
