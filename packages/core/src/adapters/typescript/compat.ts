@@ -37,29 +37,68 @@ import { ambientModuleName, ownEntryOf } from './walk.js';
 const MODIFIERS = /^(readonly |protected |abstract |static |const |let |var )+/;
 const IDENTIFIER = /^[A-Za-z_$][\w$]*$/;
 
+/**
+ * Walks type text at bracket depth: calls `visit` with each character outside string and
+ * template literals and the depth before it. The `>` of an arrow (`=>`) closes nothing.
+ */
+function scanDepth(
+  text: string,
+  from: number,
+  visit: (ch: string, i: number, depth: number) => boolean | undefined,
+): void {
+  let depth = 0;
+  for (let i = from; i < text.length; i++) {
+    const ch = text[i] as string;
+    if (ch === '"' || ch === "'" || ch === '`') {
+      for (i++; i < text.length && text[i] !== ch; i++) if (text[i] === '\\') i++;
+      continue;
+    }
+    if (visit(ch, i, depth)) return;
+    if (ch === '<' || ch === '(' || ch === '[' || ch === '{') depth++;
+    else if ((ch === '>' && text[i - 1] !== '=') || ch === ')' || ch === ']' || ch === '}') depth--;
+  }
+}
+
+/** The index of the `>` that closes the type parameter list opened by the `<` at `open`. */
+function closingAngle(text: string, open: number): number | undefined {
+  let close: number | undefined;
+  scanDepth(text, open, (ch, i, depth) => {
+    if (depth === 1 && ch === '>' && text[i - 1] !== '=') close = i;
+    return close !== undefined;
+  });
+  return close;
+}
+
+const HEADER = /^(?:abstract )?(?:class|interface|type)</;
+
 function headerTypeParams(symbol: ApiSymbol | undefined): string | undefined {
   if (!symbol) return undefined;
-  const m = /^(?:abstract )?(?:class|interface|type)</.exec(symbol.signature);
+  const m = HEADER.exec(symbol.signature);
   if (!m) return undefined;
-  let depth = 0;
-  const start = m[0].length;
-  for (let i = start - 1; i < symbol.signature.length; i++) {
-    const ch = symbol.signature[i];
-    if (ch === '<') depth++;
-    else if (ch === '>' && --depth === 0) return symbol.signature.slice(start, i);
-  }
-  return undefined;
+  const close = closingAngle(symbol.signature, m[0].length - 1);
+  return close === undefined ? undefined : symbol.signature.slice(m[0].length, close);
 }
 
 function countParams(list: string): number {
-  let depth = 0;
   let n = 1;
-  for (const ch of list) {
-    if (ch === '<' || ch === '(' || ch === '[' || ch === '{') depth++;
-    else if (ch === '>' || ch === ')' || ch === ']' || ch === '}') depth--;
-    else if (ch === ',' && depth === 0) n++;
-  }
+  scanDepth(list, 0, (ch, _i, depth) => {
+    if (ch === ',' && depth === 0) n++;
+    return false;
+  });
   return n;
+}
+
+/**
+ * The right-hand side of a type alias signature (`type<T = never> = body`). The alias's
+ * own ` = ` follows its type parameter list; a default's (`Start extends number = never`)
+ * sits inside it.
+ */
+function aliasBody(sig: string): string | undefined {
+  const m = HEADER.exec(sig);
+  const close = m ? closingAngle(sig, m[0].length - 1) : undefined;
+  if (m && close === undefined) return undefined;
+  const eq = sig.indexOf(' = ', close ?? 0);
+  return eq === -1 ? undefined : sig.slice(eq + 3);
 }
 
 function overloadMembers(signature: string, prefix: string): string[] | undefined {
@@ -142,10 +181,8 @@ function bodyFor(
       const members = overloadMembers(sig, leafOf(path) === 'new()' ? 'new ' : '');
       return members ? `{ ${members.join('; ')} }` : undefined;
     }
-    case 'type': {
-      const eq = sig.indexOf(' = ');
-      return eq === -1 ? undefined : sig.slice(eq + 3);
-    }
+    case 'type':
+      return aliasBody(sig);
     default:
       return undefined;
   }
