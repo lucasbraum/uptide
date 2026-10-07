@@ -12,15 +12,17 @@
 <meta property="og:site_name" content="Uptide">
 <meta property="og:title" content="Uptide: migrations you can merge">
 <meta property="og:description" content="An open-source CLI that shows which dependency upgrades matter, what each one breaks in your code, and opens a verified migration branch or PR.">
-<meta property="og:url" content="https://github.com/uptide-dev/uptide">
-<meta property="og:image" content="https://raw.githubusercontent.com/uptide-dev/uptide/main/site/og.png">
+<!-- %SITE_URL% is replaced at deploy time with SITE_URL from .github/workflows/pages.yml. -->
+<link rel="canonical" href="%SITE_URL%">
+<meta property="og:url" content="%SITE_URL%">
+<meta property="og:image" content="%SITE_URL%og.png">
 <meta property="og:image:width" content="1280">
 <meta property="og:image:height" content="640">
 <meta property="og:image:alt" content="Uptide. Migrations you can merge. npx uptide list">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Uptide: migrations you can merge">
 <meta name="twitter:description" content="An open-source CLI that shows which dependency upgrades matter, what each one breaks in your code, and opens a verified migration branch or PR.">
-<meta name="twitter:image" content="https://raw.githubusercontent.com/uptide-dev/uptide/main/site/og.png">
+<meta name="twitter:image" content="%SITE_URL%og.png">
 <meta name="twitter:image:alt" content="Uptide. Migrations you can merge. npx uptide list">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="preload" href="fonts/space-grotesk-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
@@ -222,7 +224,7 @@ footer .brand svg{width:22px;height:22px}
     <h1>Migrations you can merge.</h1>
     <p class="lead">Uptide is an open-source CLI that shows which dependency upgrades matter in your repo, what each one breaks in your code, and opens a verified migration branch or PR. It runs locally on your repo. Nothing to sign up for.</p>
     <div class="command"><code>npx uptide list</code><button class="copy" type="button" data-copy="npx uptide list" aria-label="Copy npx uptide list"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="7" y="7" width="10" height="10" stroke="currentColor" stroke-width="1.5"/><path d="M13 7V3H3v10h4" stroke="currentColor" stroke-width="1.5"/></svg><span>Copy</span></button></div>
-    <p class="note">No API key. No account. About a second on a small repo, 24 seconds on the supabase monorepo. Node 20 or newer.</p>
+    <p class="note">No API key. No account. About a second on a small repo, 20 seconds on the supabase monorepo. Node 20 or newer.</p>
     <div class="actions">
       <a class="btn solid" href="https://github.com/uptide-dev/uptide">Star on GitHub</a>
       <a class="btn" href="https://github.com/uptide-dev/uptide/blob/main/CONTRIBUTING.md#how-packs-work">Write a pack</a>
@@ -231,17 +233,17 @@ footer .brand svg{width:22px;height:22px}
   <figure class="out" aria-label="Beginning of npx uptide list on supabase/supabase">
     <div class="out-head"><span>supabase/supabase @ 9d1661d</span><span>uptide list</span></div>
 <pre><span class="a">$</span> npx uptide list
-<strong>uptide list · supabase · pnpm · 24s</strong>
+<strong>uptide list · supabase · pnpm · 20s</strong>
 
 273 outdated   116 major   100 minor   57 patch   15 groups   53 tooling
 
 <strong>PRIORITIES</strong>  <span class="d">most urgent first · advisories checked for 377 packages</span>
-  <strong>Urgent</strong>  11 · advisories, deprecations
-    simple-git     <span class="b">dev · 3 advisories (1 critical), needs 4.0.1 (major)</span>
-    smol-toml      <span class="b">1 advisory (1 moderate), fixed in 1.9.0 (minor, same major)</span>
-    sharp          <span class="b">dev · 1 advisory (1 high), fixed in 0.35.5 (patch, same major)</span>
+  <strong>Urgent</strong>  12 · advisories, deprecations
+    @modelcontextprotocol/*   <span class="b">1 advisory (1 high), fixed in 1.31.0 (minor, same major)</span>
+    simple-git                <span class="b">dev · 3 advisories (1 critical), needs 4.0.1 (major)</span>
+    smol-toml                 <span class="b">1 advisory (1 moderate), fixed in 1.9.0 (minor, same major)</span>
     <span class="d">…</span></pre>
-    <div class="out-head" style="border-top:1px solid var(--line);border-bottom:0"><a href="#output">Full output below ↓</a><span>first 3 of 11 urgent rows</span></div>
+    <div class="out-head" style="border-top:1px solid var(--line);border-bottom:0"><a href="#output">Full output below ↓</a><span>first 3 of 12 urgent rows</span></div>
   </figure>
 </section>
 
@@ -304,29 +306,29 @@ footer .brand svg{width:22px;height:22px}
         <div class="stats">
           <div class="stat"><strong>273</strong><span class="label">outdated</span></div>
           <div class="stat"><strong>116</strong><span class="label">major</span></div>
-          <div class="stat warn"><strong>11</strong><span class="label">urgent</span></div>
+          <div class="stat warn"><strong>12</strong><span class="label">urgent</span></div>
           <div class="stat"><strong>15</strong><span class="label">groups</span></div>
         </div>
         <div class="out">
           <div class="out-head"><span>supabase/supabase @ 9d1661d</span><span>rows trimmed, values unedited</span></div>
 <pre><span class="a">$</span> npx uptide list
-<strong>uptide list · supabase · pnpm · 24s</strong>
+<strong>uptide list · supabase · pnpm · 20s</strong>
 
 273 outdated   116 major   100 minor   57 patch   15 groups   53 tooling
 
 <strong>PRIORITIES</strong>  <span class="d">most urgent first · advisories checked for 377 packages</span>
-  <strong>Urgent</strong>  11 · advisories, deprecations
-    simple-git     <span class="b">dev · 3 advisories (1 critical), needs 4.0.1 (major)</span>
+  <strong>Urgent</strong>  12 · advisories, deprecations
+    @modelcontextprotocol/*   <span class="b">1 advisory (1 high), fixed in 1.31.0 (minor, same major)</span>
+      <span class="d">npx uptide check --group modelcontextprotocol --target @modelcontextprotocol/sdk@1.31.0</span>
+    simple-git                <span class="b">dev · 3 advisories (1 critical), needs 4.0.1 (major)</span>
       <span class="d">npx uptide check simple-git --target simple-git@4.0.1</span>
-    smol-toml      <span class="b">1 advisory (1 moderate), fixed in 1.9.0 (minor, same major)</span>
+    smol-toml                 <span class="b">1 advisory (1 moderate), fixed in 1.9.0 (minor, same major)</span>
       <span class="d">npx uptide check smol-toml --target smol-toml@1.9.0</span>
-    sharp          <span class="b">dev · 1 advisory (1 high), fixed in 0.35.5 (patch, same major)</span>
+    sharp                     <span class="b">dev · 1 advisory (1 high), fixed in 0.35.5 (patch, same major)</span>
       <span class="d">npx uptide check sharp --target sharp@0.35.5</span>
-    katex          <span class="b">1 advisory (1 low), fixed in 0.18.2 (minor, same major)</span>
+    katex                     <span class="b">1 advisory (1 low), fixed in 0.18.2 (minor, same major)</span>
       <span class="d">npx uptide check katex --target katex@0.18.2</span>
-    jsrsasign      <span class="w">deprecated: This package is no longer maintained.</span>
-      <span class="d">npx uptide check jsrsasign</span>
-    + 6 more · --all
+    + 7 more · --all
   <strong>Worth planning</strong>  73 · unsupported, drift, blocking, majors behind · --all
 
 <strong>GROUPS</strong>  <span class="d">upgrade together</span>
@@ -336,9 +338,9 @@ footer .brand svg{width:22px;height:22px}
   @sentry/tanstackstart-react                      10.59.0 → 11.4.0    major             3 files      2 calls
 ai + @ai-sdk/*   5 packages   → ai 7 · @ai-sdk/amazon-bedrock 5 · @ai-sdk/* 4 · @ai-sdk/mcp 2
     <span class="d">npx uptide check --group ai</span>
-  @ai-sdk/openai                             2.0.2, 4.0.41 → 4.0.84    2 majors behind   2 files      1 call
+  @ai-sdk/openai                             2.0.2, 4.0.41 → 4.0.86    2 majors behind   2 files      1 call
     2 versions in 2 workspaces
-  ai                                        5.0.52, 7.0.59 → 7.0.128   2 majors behind   53 files     75 calls
+  ai                                        5.0.52, 7.0.59 → 7.0.130   2 majors behind   53 files     75 calls
     2 versions in 2 workspaces
 <span class="d">…</span></pre>
         </div>
@@ -415,7 +417,7 @@ stripe (packages/api)   14.25.0 → 23.0.0   9 majors behind · latest on npm   
       <figcaption>The one type error left in both runs is the fixture's own, there on purpose: errors a repository already had are subtracted, never blamed on the upgrade.</figcaption>
     </figure>
 
-    <p class="fn" id="fn1"><a href="#fnref1">1</a> supabase/supabase at commit <a href="https://github.com/supabase/supabase/tree/9d1661dec1548ec5bf3ffb4f551376a7650c213e">9d1661dec1548ec5bf3ffb4f551376a7650c213e</a>, run with uptide 0.4.0 on 2026-10-06. Rows are trimmed, values are as printed. Latest versions and advisories come from the npm registry at run time, so a later run prints different numbers.</p>
+    <p class="fn" id="fn1"><a href="#fnref1">1</a> supabase/supabase at commit <a href="https://github.com/supabase/supabase/tree/9d1661dec1548ec5bf3ffb4f551376a7650c213e">9d1661dec1548ec5bf3ffb4f551376a7650c213e</a>, run with uptide 0.4.0 from npm (<code>npx uptide@latest list</code>) on 2026-10-06. Rows are trimmed, values are as printed. Latest versions and advisories come from the npm registry at run time, so a later run prints different numbers.</p>
   </div>
 </section>
 
@@ -488,7 +490,7 @@ stripe (packages/api)   14.25.0 → 23.0.0   9 majors behind · latest on npm   
   <div class="rows">
     <div class="row"><div class="k">list, check</div><div class="v"><p>Never call an LLM.</p></div></div>
     <div class="row"><div class="k">fix</div><div class="v"><p>Rules first. Only sites no rule covers go to the agent, one at a time, and a patch is kept only if it removes its compiler error and introduces none.</p></div></div>
-    <div class="row"><div class="k">Providers</div><div class="v"><p>Anthropic by default (<code>claude-sonnet-5-5</code>), OpenAI (<code>gpt-6.1-sol</code>) or Gemini (<code>gemini-3.8-flash</code>), with your own key from <code>ANTHROPIC_API_KEY</code>, <code>OPENAI_API_KEY</code> or <code>GEMINI_API_KEY</code>. Keys are read only from the environment. Pick with <code>--provider</code> and <code>--model</code>.</p></div></div>
+    <div class="row"><div class="k">Providers</div><div class="v"><p>Anthropic by default (<code>claude-sonnet-5-5</code>), OpenAI (<code>gpt-6.1-sol</code>) or Gemini, experimental (<code>gemini-3.8-flash</code>), with your own key from <code>ANTHROPIC_API_KEY</code>, <code>OPENAI_API_KEY</code> or <code>GEMINI_API_KEY</code>. Keys are read only from the environment. Pick with <code>--provider</code> and <code>--model</code>.</p></div></div>
     <div class="row"><div class="k">Cost cap</div><div class="v"><p><code>--max-cost</code> defaults to $1 per package. Uptide reserves the worst-case cost before every call, and a call that would exceed the budget is never sent.</p></div></div>
     <div class="row"><div class="k">Fully local</div><div class="v"><p><code>--no-llm</code> turns the agent off. Rules still apply, and the remaining sites are listed for you.</p></div></div>
   </div>
