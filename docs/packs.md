@@ -134,8 +134,9 @@ Runtime never downloads instructions: they are checked in, with the date they we
       "repo": "owner/name",
       "commit": "<full SHA of the commit before the upgrade>",
       "migration": "https://github.com/owner/name/commit/<the upgrade commit>",
+      "directory": "web",
       "from": "3.25.76",
-      "to": "4.1.12",
+      "to": "4.6.5",
       "why": "what this repository exercises",
       "findings": [{ "file": "src/schema.ts", "line": 12, "rule": "error-params" }]
     }
@@ -148,16 +149,33 @@ findings the pack must report there: repository-relative file, 1-based line, and
 or note id. `from` is the version the lockfile has at that commit, and `to` the version the
 repository upgraded to.
 
-Where the expected findings come from:
+Where the expected findings come from: two sources that are not Uptide.
 
-1. the sites the repository's own upgrade commit changed for this dependency (`git diff
-   <commit> <upgrade> -U0`, the old side's line numbers), and
-2. the errors the compiler reports at the target that the upgrade commit fixed,
+1. **The compiler.** The repository's own TypeScript, run on every `tsconfig.json`, with the
+   target version linked where the package is installed and without it. Every diagnostic
+   new at the target is a site: errors, and deprecations (6385, 6387, what an editor strikes
+   through). A repository on TypeScript 7, which has no JavaScript API, is compiled with the
+   TypeScript of this checkout, and the draft says so.
+2. **The upgrade commit.** The lines it changed or removed (`git diff -U0 <commit> <upgrade>`,
+   the old side). One site per construct: a run of changed lines is one site, at its first
+   line of code, and a run that a diagnostic falls inside (or just after) is that
+   diagnostic's site. Comment-only lines, pure insertions (no line at `<commit>`), and
+   changes for another package are not sites.
 
-each read and kept only when it is about this dependency. A site that `check` reports and
-that nobody had to change is a false positive, and it stays one: the expected findings
-never come from Uptide's own output. A site the pack has no rule for is expected under
-`generic`, which is what `pack test` calls a site the plan groups under no rule of the pack.
+`pnpm packs:truth` drafts both for one repository:
+
+```sh
+pnpm packs:truth zod owner/name <commit> <upgrade-commit> --to 4.6.5 [--directory web]
+```
+
+It prints the compiler's new diagnostics with each line's text, and the changed and inserted
+lines. You read each one, drop what is not about the package, and give every kept site its
+rule, from its code and text. A site the pack has no rule for is expected under `generic`.
+The expected findings never come from Uptide's output: a site `check` reports that neither
+source has is a false positive, and it stays one.
+
+`directory` is the project inside the repository when it is not at the root; `from` is the
+version its lockfile has at `commit`, and `pack test` says so when it is not.
 
 `fixture` entries (`"fixture": "fixtures/repos/storefront"`) are repositories in this tree.
 They are scored like the others and never count toward `verified`.

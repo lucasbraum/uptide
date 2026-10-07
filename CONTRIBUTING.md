@@ -123,9 +123,13 @@ open a **Pack request** issue, and say you are writing it.
    (`// @uptide <rule>`, `keep` for one it must leave alone) and `after.ts`, what the rules
    must produce. `pnpm uptide pack test <package> --fixtures-only` runs them in seconds.
 5. **Find ground truth.** Two public repositories that made this upgrade in a commit you
-   can point at. Pin the commit before it; the expected findings are the sites the upgrade
-   commit changed for this package (`git diff <before> <upgrade> -U0`, old line numbers),
-   each with its rule (`generic` when no rule of the pack covers it). (15 minutes)
+   can point at. Pin the commit before it, and draft the expected findings from their own
+   compiler and their own upgrade commit:
+   ```sh
+   pnpm packs:truth <package> owner/name <commit-before> <upgrade-commit> --to <version>
+   ```
+   Read each site, drop what is not about the package, and give each its rule (`generic`
+   when no rule of the pack covers it). (15 minutes)
 6. **Score it.**
    ```sh
    pnpm uptide pack test <package>          # fetches the repositories once, scripts off

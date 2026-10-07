@@ -30,15 +30,6 @@
       "breakingMajors2y": 2
     },
     {
-      "package": "@vitejs/plugin-react",
-      "from": ">=5 <6",
-      "to": ">=6 <7",
-      "why": "2 breaking majors in two years (5, 6), 116,919,148 downloads a week",
-      "status": "todo",
-      "weeklyDownloads": 116919148,
-      "breakingMajors2y": 2
-    },
-    {
       "package": "react",
       "from": ">=18 <19",
       "to": ">=19 <20",
@@ -138,30 +129,12 @@
       "breakingMajors2y": 2
     },
     {
-      "package": "@angular-devkit/core",
-      "from": ">=21 <22",
-      "to": ">=22 <23",
-      "why": "4 breaking majors in two years (19, 20, 21, 22), 32,083,353 downloads a week",
-      "status": "todo",
-      "weeklyDownloads": 32083353,
-      "breakingMajors2y": 3
-    },
-    {
       "package": "motion",
       "from": ">=13 <14",
       "to": ">=14 <15",
       "why": "4 breaking majors in two years (11, 12, 13, 14), 28,260,335 downloads a week",
       "status": "todo",
       "weeklyDownloads": 28260335,
-      "breakingMajors2y": 3
-    },
-    {
-      "package": "@angular-devkit/schematics",
-      "from": ">=21 <22",
-      "to": ">=22 <23",
-      "why": "4 breaking majors in two years (19, 20, 21, 22), 27,747,217 downloads a week",
-      "status": "todo",
-      "weeklyDownloads": 27747217,
       "breakingMajors2y": 3
     },
     {
@@ -210,21 +183,48 @@
       "breakingMajors2y": 1
     },
     {
-      "package": "jest-cli",
-      "from": ">=29 <30",
-      "to": ">=30 <31",
-      "why": "1 breaking major in two years (30), 56,018,663 downloads a week",
-      "status": "todo",
-      "weeklyDownloads": 56018663,
-      "breakingMajors2y": 1
-    },
-    {
       "package": "emittery",
       "from": ">=1 <2",
       "to": ">=2 <3",
       "why": "1 breaking major in two years (2), 55,768,692 downloads a week",
       "status": "todo",
       "weeklyDownloads": 55768692,
+      "breakingMajors2y": 1
+    },
+    {
+      "package": "react-router-dom",
+      "from": ">=6 <7",
+      "to": ">=7 <8",
+      "why": "1 breaking major in two years (7), 55,140,358 downloads a week",
+      "status": "todo",
+      "weeklyDownloads": 55140358,
+      "breakingMajors2y": 1
+    },
+    {
+      "package": "@expo/config-plugins",
+      "from": ">=56 <57",
+      "to": ">=57 <58",
+      "why": "7 breaking majors in two years (9, 10, 11, 54, 55, 56, 57), 18,154,913 downloads a week",
+      "status": "todo",
+      "weeklyDownloads": 18154913,
+      "breakingMajors2y": 3
+    },
+    {
+      "package": "@ai-sdk/openai",
+      "from": ">=3 <4",
+      "to": ">=4 <5",
+      "why": "4 breaking majors in two years (1, 2, 3, 4), 17,549,891 downloads a week",
+      "status": "todo",
+      "weeklyDownloads": 17549891,
+      "breakingMajors2y": 3
+    },
+    {
+      "package": "@inquirer/prompts",
+      "from": ">=7 <8",
+      "to": ">=8 <9",
+      "why": "1 breaking major in two years (8), 51,544,600 downloads a week",
+      "status": "todo",
+      "weeklyDownloads": 51544600,
       "breakingMajors2y": 1
     }
   ]
