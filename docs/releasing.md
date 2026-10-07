@@ -40,18 +40,26 @@ request when you want to ship.
 Before anything is published, the publish job checks, in order, and stops at the first
 failure:
 
-1. the run is on `main` of the public repository;
-2. the committed version is the one planned, is a plain `x.y.z` for `latest`, and is not on
-   npm yet;
-3. `pnpm lint`, and no private material in the repository (`scripts/public-tree.mjs` with
-   the `UPTIDE_PRIVATE_DENYLIST` secret required);
-4. `pnpm build` (stamped clean), `pnpm typecheck`, `pnpm test`;
-5. `pnpm smoke 22`: the packed CLI, installed in a clean container, against npm, pnpm and
-   yarn fixtures; then the build stamp is checked clean;
-6. the tarball itself (`scripts/check-pack.mjs`): `LICENSE`, `NOTICE` and
+1. the run is on `main` of the public repository, and for `latest` the committed version is
+   the one planned;
+2. on the committed tree, at its committed version: `pnpm lint`, and no private material in
+   the repository (`scripts/public-tree.mjs` with the `UPTIDE_PRIVATE_DENYLIST` secret
+   required);
+3. `pnpm build`, `pnpm typecheck`, `pnpm test`;
+4. `pnpm smoke 22`: the packed CLI, installed in a clean container, against npm, pnpm and
+   yarn fixtures;
+5. only then the version to publish: the snapshot for `next` (below), the committed one for
+   `latest`, which must be a plain `x.y.z`; either must not be on npm yet. A prerelease
+   version makes the CLI suggest `npx uptide@next`, which is right for the snapshot and is
+   why the tests run before it: they assert what a release build prints;
+6. `pnpm build` again with that version (stamped clean), and the build stamp is checked clean;
+7. the tarball itself (`scripts/check-pack.mjs`): `LICENSE`, `NOTICE` and
    `THIRD-PARTY-NOTICES` are in it, `repository.url` is this repository (npm provenance
    refuses a mismatch), the version is the one being released, and no file in it holds a
-   private identifier.
+   private identifier;
+8. the tarball, installed, suggests commands that reach it
+   (`packages/cli/smoke/check-invocation.mjs`): `npx uptide@next` from a snapshot, `npx uptide`
+   from a release, and its `--version` is the package's.
 
 That same tarball is what is published, with `npm publish --provenance`. Only the
 `github-release` job can write to the repository, and only after a real `latest` publish.
@@ -61,7 +69,8 @@ That same tarball is what is published, with `npm publish --provenance`. Only th
 On every push to `main` with pending changesets, the publish job runs
 `changeset version --snapshot next` in its own checkout, which is thrown away: the version
 (`x.y.z-next.<datetime>`) is never committed or pushed, and no tag or GitHub Release is made.
-It goes through the same checks and is published under the `next` dist-tag. `latest` never
+It goes through the same checks (the tests on the committed version, the tarball checks on
+the snapshot) and is published under the `next` dist-tag. `latest` never
 moves from there.
 
 ```sh

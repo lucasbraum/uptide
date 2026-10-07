@@ -5,7 +5,7 @@
 // offline (`fix` in a bun repository stops before any network).
 // Usage: node packages/cli/smoke/check-invocation.mjs <tarball>
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { expectedInvocation, invocationFailures } from './check-output.mjs';
@@ -34,7 +34,12 @@ try {
   );
   const bin = join(prefix, 'node_modules/.bin/uptide');
   const env = { ...process.env, UPTIDE_TELEMETRY: '0', CI: '' };
-  const version = execFileSync(bin, ['--version'], { encoding: 'utf8', env }).trim();
+  // The version npm will publish it under, and the one the build says it is: a tarball
+  // packed without rebuilding after the snapshot version would disagree.
+  const version = JSON.parse(
+    readFileSync(join(prefix, 'node_modules/uptide/package.json'), 'utf8'),
+  ).version;
+  const built = execFileSync(bin, ['--version'], { encoding: 'utf8', env }).trim();
   const expected = expectedInvocation(version);
 
   const repo = join(scratch, 'repo');
@@ -47,6 +52,11 @@ try {
   const run = spawnSync(bin, ['fix', '--only', 'zod'], { cwd: repo, encoding: 'utf8', env });
   const output = `${run.stdout}${run.stderr}`;
   const failures = [
+    ...(built === version
+      ? []
+      : [
+          `uptide --version says ${built}, the package is ${version}: rebuild after setting the version`,
+        ]),
     ...(run.status === 2
       ? []
       : [`fix in a bun repository: exit ${run.status}, wanted 2\n${output}`]),
