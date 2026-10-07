@@ -103,7 +103,13 @@ export type ErrorCode =
   | 'ANALYSIS_STACK_OVERFLOW'
   | 'NO_FIXER'
   | 'RUN_STALE'
-  | 'INVALID_WORKSPACE';
+  | 'INVALID_WORKSPACE'
+  | 'GROUND_TRUTH_NOT_CACHED'
+  | 'GROUND_TRUTH_FETCH'
+  | 'GROUND_TRUTH_INSTALL'
+  | 'INVALID_GROUND_TRUTH'
+  | 'NOT_UPTIDE_CHECKOUT'
+  | 'PACK_EXISTS';
 /** Stable across rendering and worker serialization. Human wording is not an API. */
 export class UptideError extends Error {
   override readonly name = 'UptideError';
