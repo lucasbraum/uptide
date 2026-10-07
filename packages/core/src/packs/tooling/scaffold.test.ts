@@ -45,16 +45,17 @@ function miniCheckout(): string {
 
 it('pack new scaffolds a pack that lints, passes its own test and pack test; one added rule keeps it passing', async () => {
   const home = miniCheckout();
-  const result = scaffoldPack({ root, package: 'toy-lib', from: '>=1 <2', to: '>=2 <3' });
-  expect(result).toMatchObject({ dir: 'toy-lib', constant: 'toyLibPack', formatted: true });
+  const result = scaffoldPack({ root, package: 'alpha-lib', from: '>=1 <2', to: '>=2 <3' });
+  expect(result).toMatchObject({ dir: 'alpha-lib', constant: 'alphaLibPack', formatted: true });
   expect(parseRegistry(readFileSync(join(home, 'registry.ts'), 'utf8'))).toEqual([
-    { dir: 'toy-lib', name: 'toyLibPack' },
+    { dir: 'alpha-lib', name: 'alphaLibPack' },
   ]);
-  expect(() => scaffoldPack({ root, package: 'toy-lib', from: '>=1 <2', to: '>=2 <3' })).toThrow(
+  expect(() => scaffoldPack({ root, package: 'alpha-lib', from: '>=1 <2', to: '>=2 <3' })).toThrow(
     /already exists/,
   );
 
-  // Lint: the checkout's biome accepts every generated file as it is.
+  // Lint: the checkout's biome accepts every generated file as it is, the registry included
+  // (`alpha-lib` sorts before `contract.ts`, which the import order has to respect).
   const biome = spawnSync(
     join(repo, 'node_modules', '.bin', 'biome'),
     ['check', '--no-errors-on-unmatched', 'packages'],
@@ -64,7 +65,7 @@ it('pack new scaffolds a pack that lints, passes its own test and pack test; one
   expect(biome.status).toBe(0);
 
   // Add one rule: a note the compiler cannot see, detected in the source, with its fixture.
-  const index = join(home, 'toy-lib', 'index.ts');
+  const index = join(home, 'alpha-lib', 'index.ts');
   writeFileSync(
     index,
     readFileSync(index, 'utf8').replace(
@@ -85,11 +86,11 @@ it('pack new scaffolds a pack that lints, passes its own test and pack test; one
   ],`,
     ),
   );
-  mkdirSync(join(home, 'toy-lib', 'fixtures', 'retry-default'), { recursive: true });
+  mkdirSync(join(home, 'alpha-lib', 'fixtures', 'retry-default'), { recursive: true });
   writeFileSync(
-    join(home, 'toy-lib', 'fixtures', 'retry-default', 'before.ts'),
+    join(home, 'alpha-lib', 'fixtures', 'retry-default', 'before.ts'),
     [
-      "import { connect } from 'toy-lib';",
+      "import { connect } from 'alpha-lib';",
       '',
       "export const a = connect('db'); // @uptide retry-default",
       "export const b = connect('db', { retries: 0 }); // @uptide retry-default keep",
@@ -97,11 +98,11 @@ it('pack new scaffolds a pack that lints, passes its own test and pack test; one
     ].join('\n'),
   );
 
-  const pack = ((await import(index)) as { toyLibPack: Pack }).toyLibPack;
+  const pack = ((await import(index)) as { alphaLibPack: Pack }).alphaLibPack;
   const verification = JSON.parse(
-    readFileSync(join(home, 'toy-lib', 'verification.json'), 'utf8'),
+    readFileSync(join(home, 'alpha-lib', 'verification.json'), 'utf8'),
   ) as PackVerification;
-  const report = await testPack({ dir: 'toy-lib', pack, verification }, { root });
+  const report = await testPack({ dir: 'alpha-lib', pack, verification }, { root });
   expect(report.problems).toEqual([]);
   expect(report.fixtures.cases).toEqual(['example-rename', 'retry-default']);
   expect(report.fixtures.rules['retry-default']).toEqual({
@@ -115,7 +116,7 @@ it('pack new scaffolds a pack that lints, passes its own test and pack test; one
   // The generated test, run by the checkout's vitest as `pnpm test` would.
   const vitest = spawnSync(
     join(repo, 'node_modules', '.bin', 'vitest'),
-    ['run', '--root', join(root, 'packages', 'core'), 'src/packs/toy-lib'],
+    ['run', '--root', join(root, 'packages', 'core'), 'src/packs/alpha-lib'],
     { cwd: root, encoding: 'utf8' },
   );
   expect(vitest.stdout).toMatch(/1 passed/);

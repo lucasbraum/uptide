@@ -17,6 +17,7 @@ import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { workspacePackagesOf } from '../adapters/typescript/repo.js';
 import { UptideError } from '../errors.js';
 import { ACCEPTED_KEYS, selectLlm } from '../llm/config.js';
+import { activePack } from '../packs/index.js';
 import { uptideVersionInfo } from '../version.js';
 import { git, projectRoot } from './process.js';
 import { prBody } from './report.js';
@@ -456,7 +457,7 @@ export async function isolatedFix(
     throw new Error('--max-cost must be a positive finite amount in USD');
   if (
     !options.fixer &&
-    !['zod', 'stripe'].includes(options.only) &&
+    !activePack(options.only) &&
     !options.pack?.rules.length &&
     (options.fixer === null || !selected.available)
   )

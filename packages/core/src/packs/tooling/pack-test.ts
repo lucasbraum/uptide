@@ -63,6 +63,8 @@ export interface PackTestReport {
   recorded: PackStatus;
   /** The recorded verification no longer matches this run (`--write` updates it). */
   stale: boolean;
+  /** Ground truth was not scored (`--fixtures-only`). */
+  fixturesOnly: boolean;
   verification: PackVerification;
   problems: string[];
   fixtures: FixtureResult;
@@ -198,6 +200,8 @@ export interface PackTestOptions extends EnsureOptions {
   fixturesOnly?: boolean;
   /** Record this run's verification in the pack's `verification.json`. */
   write?: boolean;
+  /** Write each fixture case's `after.ts` from what the rules produce. */
+  updateFixtures?: boolean;
 }
 
 export function packsDir(root: string): string {
@@ -221,7 +225,7 @@ export async function testPack(
   const problems: string[] = [];
   if (!pack.meta.sources.length) problems.push('meta.sources lists no changelog or guide');
   if (!pack.meta.maintainer) problems.push('meta.maintainer is empty');
-  const fixtures = runFixtures(pack, dir);
+  const fixtures = runFixtures(pack, dir, { update: options.updateFixtures === true });
   if (fixtures.cases.length === 0 && pack.rules.some((r) => r.rewrite || r.detect))
     problems.push('rules that rewrite or detect need fixtures (fixtures/<case>/before.ts)');
   const read = readTruth(dir);
@@ -242,10 +246,14 @@ export async function testPack(
   const overall = tally(predicted.length - fp.length, fp.length, fn.length);
   const breakingPredicted = predicted.filter((p) => p.severity === 'breaking');
   const breakingFp = fp.filter((p) => p.severity === 'breaking');
+  // A miss is a breaking one unless the rule it was expected under is deprecated.
+  const deprecatedRules = new Set(
+    pack.rules.filter((r) => r.severity === 'deprecated').map((r) => r.id),
+  );
   const breaking = tally(
     breakingPredicted.length - breakingFp.length,
     breakingFp.length,
-    fn.length,
+    fn.filter((f) => !deprecatedRules.has(f.rule)).length,
   );
   const rules: Record<string, Tally> = {};
   const ids = new Set([
@@ -297,6 +305,7 @@ export async function testPack(
     status,
     recorded,
     stale,
+    fixturesOnly: options.fixturesOnly === true,
     verification,
     problems,
     fixtures,

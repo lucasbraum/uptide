@@ -44,6 +44,9 @@ jobs:
           cache: pnpm
       - if: steps.scope.outputs.run == 'true'
         run: pnpm install --frozen-lockfile --ignore-scripts
+      # Some ground-truth repositories install with bun (scripts off, as every install here).
+      - uses: oven-sh/setup-bun@v2
+        if: steps.scope.outputs.run == 'true'
       # Ground-truth repositories (shallow, installed with scripts off) and the registry
       # tarballs `check` extracts. Keyed on the ground truth: a new repository is fetched once.
       - uses: actions/cache@v4

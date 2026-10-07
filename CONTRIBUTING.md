@@ -121,13 +121,16 @@ open a **Pack request** issue, and say you are writing it.
    `detect` when its sites can be found in the source. (15 minutes)
 4. **Write fixtures**: `fixtures/<case>/before.ts` with each site marked
    (`// @uptide <rule>`, `keep` for one it must leave alone) and `after.ts`, what the rules
-   must produce. `pnpm uptide pack test <package> --fixtures-only` runs them in seconds.
+   must produce. `pnpm uptide pack test <package> --fixtures-only` runs them in seconds;
+   `--update-fixtures` writes each `after.ts` from what the rules do, for you to read.
 5. **Find ground truth.** Two public repositories that made this upgrade in a commit you
    can point at. Pin the commit before it, and draft the expected findings from their own
    compiler and their own upgrade commit:
    ```sh
    pnpm packs:truth <package> owner/name <commit-before> <upgrade-commit> --to <version>
    ```
+   Add `--also <package>@<version>` for each package the upgrade commit moved together with
+   it (its lockfile has the versions).
    Read each site, drop what is not about the package, and give each its rule (`generic`
    when no rule of the pack covers it). (15 minutes)
 6. **Score it.**

@@ -13,3 +13,8 @@ export function maxSatisfying(versions: readonly string[], range: string): strin
 export function minVersion(range: string): string | undefined {
   return semver.validRange(range) ? (semver.minVersion(range)?.version ?? undefined) : undefined;
 }
+
+/** Whether `range` is a semver range at all (`npm:`, `workspace:` and URLs are not). */
+export function validRange(range: string): boolean {
+  return semver.validRange(range) !== null;
+}

@@ -82,7 +82,8 @@ export function formatPackTest(report: PackTestReport, color = false): string {
   for (const s of f.falseNegatives)
     out.push(`  ${c.red('✗')} ${s.file}:${s.line} ${s.rule} marked, not detected`);
 
-  if (report.repos.length === 0)
+  if (report.fixturesOnly) out.push('ground truth  skipped (--fixtures-only)');
+  else if (report.repos.length === 0)
     out.push('ground truth  no repository yet: the pack ships as a candidate');
   else {
     out.push('ground truth');

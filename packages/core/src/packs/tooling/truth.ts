@@ -70,7 +70,27 @@ const UNFROZEN: Record<string, string[]> = {
   pnpm: ['install', '--ignore-scripts', '--no-frozen-lockfile'],
   'yarn-classic': ['install', '--ignore-scripts', '--non-interactive'],
   'yarn-berry': ['install'],
+  bun: ['install', '--ignore-scripts'],
 };
+
+/**
+ * The package manager to install a ground-truth repository with: `fix`'s (npm, pnpm, Yarn),
+ * and bun, which `check` reads (its text lockfile) and some public repositories use.
+ */
+function installerOf(dir: string): {
+  kind: string;
+  bin: string;
+  args: string[];
+  env?: Record<string, string>;
+} {
+  const others = ['pnpm-lock.yaml', 'package-lock.json', 'npm-shrinkwrap.json', 'yarn.lock'];
+  if (
+    (existsSync(join(dir, 'bun.lock')) || existsSync(join(dir, 'bun.lockb'))) &&
+    !others.some((file) => existsSync(join(dir, file)))
+  )
+    return { kind: 'bun', bin: 'bun', args: ['install', '--frozen-lockfile', '--ignore-scripts'] };
+  return packageManager(dir);
+}
 
 /**
  * The repository's own lockfile, frozen, with lifecycle scripts off. A repository whose
@@ -83,7 +103,7 @@ async function installDependencies(
   name: string,
   options: EnsureOptions,
 ): Promise<{ manager: string; frozen: boolean }> {
-  const pm = packageManager(dir);
+  const pm = installerOf(dir);
   const env = { ...pm.env, npm_config_manage_package_manager_versions: 'true' };
   const timeout = options.timeoutMs ?? 900_000;
   options.log?.(`installing ${name} with ${pm.kind}, scripts off`);

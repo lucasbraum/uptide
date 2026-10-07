@@ -56,7 +56,9 @@ installed).
 
 - **Detect.** `check` already diffs the two versions' declarations and compiles the
   repository against the target. A rule claims the findings whose change kind and symbol
-  path it matches (`kinds`, `symbols`). For sites no type diff reports, a rule can add
+  path it matches (`kinds`, `symbols`), and, with `message`, what the compiler said there: a
+  compiler-only finding's path is just its code (`TS2353`), the message names the property.
+  The plan files every claimed site under the rule, whether or not it rewrites (`ruleOf`). For sites no type diff reports, a rule can add
   `detect(text, file)`, which returns sites found in the source of a file that uses the
   package; `check` lists them as the pack's own findings.
 - **Rewrite.** `rewrite(text, finding, context)` edits the reported site and nothing else,
@@ -87,11 +89,14 @@ export const contact = z.string().email(); // @uptide string-format at:.email( p
   first non-blank column).
 - `kind:<kind>`, `path:<path>`: the change `check` reports there, when the rule matches on
   them (default: the rule's first kind, and the `at:` text).
+- `message:"..."`: the compiler's message there, for a rule that matches on `message`.
 
 Each marked site of a rule with `rewrite` is rewritten, bottom-up, and the result must equal
 `after.ts` byte for byte (the markers are comments, so they stay). A rule or note with
 `detect` must find exactly the marked lines in `before.ts`, and nothing on any other line.
 Fixtures are test data: biome and `tsc` skip them, and they are never reformatted.
+`uptide pack test <package> --fixtures-only --update-fixtures` writes each `after.ts` from
+what the rules produce, like a snapshot update: read the diff before committing it.
 
 ### Behavior notes: what the compiler cannot see
 
@@ -155,17 +160,24 @@ Where the expected findings come from: two sources that are not Uptide.
    target version linked where the package is installed and without it. Every diagnostic
    new at the target is a site: errors, and deprecations (6385, 6387, what an editor strikes
    through). A repository on TypeScript 7, which has no JavaScript API, is compiled with the
-   TypeScript of this checkout, and the draft says so.
+   TypeScript of this checkout, and the draft says so. The target is linked with its own
+   dependencies at the versions it declares, as an install would leave it, and
+   `--also <package>@<version>` links the companions the upgrade commit moved with it (the
+   versions in its lockfile): `ai` 7 next to `@ai-sdk/react` 3 is a mix no repository ships,
+   and its errors are not the upgrade's.
 2. **The upgrade commit.** The lines it changed or removed (`git diff -U0 <commit> <upgrade>`,
-   the old side). One site per construct: a run of changed lines is one site, at its first
-   line of code, and a run that a diagnostic falls inside (or just after) is that
-   diagnostic's site. Comment-only lines, pure insertions (no line at `<commit>`), and
+   the old side). One site per change: consecutive changed lines of the same change are one
+   site, at the first line of code (a line that is plainly another rule's starts a new
+   one); a run with a diagnostic inside it, or right after a diagnostic of the same rule, is
+   that diagnostic's site. Comment-only lines, pure insertions (no line at `<commit>`), and
    changes for another package are not sites.
 
 `pnpm packs:truth` drafts both for one repository:
 
 ```sh
 pnpm packs:truth zod owner/name <commit> <upgrade-commit> --to 4.6.5 [--directory web]
+pnpm packs:truth ai vercel/chatbot <commit> <upgrade-commit> --to 7.0.9 \
+  --also @ai-sdk/react@4.0.10 --also @ai-sdk/provider@4.0.1
 ```
 
 It prints the compiler's new diagnostics with each line's text, and the changed and inserted
@@ -181,7 +193,8 @@ version its lockfile has at `commit`, and `pack test` says so when it is not.
 They are scored like the others and never count toward `verified`.
 
 `uptide pack test` fetches each repository once: a shallow fetch of the pinned commit only,
-dependencies installed with lifecycle scripts off, and nothing from the repository is ever
+dependencies installed from its lockfile (npm, pnpm, Yarn or bun) with lifecycle scripts
+off, and nothing from the repository is ever
 executed. They are kept in `~/.cache/uptide/ground-truth` (`UPTIDE_GROUND_TRUTH_CACHE`), so
 `pack test --offline` runs without network after the first time. `pnpm packs:fetch` fills
 the cache for every pack (and `--corpus` for the repositories in `fixtures/corpus.json`).

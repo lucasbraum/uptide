@@ -327,6 +327,7 @@ pnpm uptide pack test --json             # every pack, for CI
 pnpm uptide pack test ai --offline       # cached repositories only
 pnpm uptide pack test ai --fixtures-only
 pnpm uptide pack test ai --write         # record the measured status in verification.json
+pnpm uptide pack test ai --fixtures-only --update-fixtures  # write after.ts from the rules
 ```
 
 `pack test` prints precision and recall per rule, overall and for breaking findings, and

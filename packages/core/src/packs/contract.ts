@@ -39,6 +39,8 @@ export interface SourceSite {
   column: number;
   /** The code at the site, trimmed: what the report shows. */
   snippet: string;
+  /** The name as the code writes it (`system`, `stepCountIs`): what a summary of sites lists. */
+  name?: string;
 }
 
 /**
@@ -59,6 +61,12 @@ export interface PackRule extends MigrationRule {
   rewrite?(text: string, finding: Finding, context: PackContext): TransformResult;
   /** Sites in a file that uses the package which the type diff cannot report. */
   detect?(text: string, file: string): SourceSite[];
+  /**
+   * With `kinds` and `symbols`: what the compiler said at the site must match too. A
+   * compiler-only finding's path is its code (`TS2353`), which says nothing about which
+   * property was rejected; the message does.
+   */
+  message?: RegExp;
 }
 
 /**
@@ -184,14 +192,22 @@ export interface RegisteredPack {
   verification: PackVerification;
 }
 
-/** The rule a finding belongs to: the one that set it, else the first whose kinds and symbols match. */
-export function ruleFor<R extends MigrationRule>(
+/**
+ * The rule a finding belongs to: the one that set it, else the first whose kinds, symbols and
+ * (when it has one) message match.
+ */
+export function ruleFor<R extends MigrationRule & { message?: RegExp }>(
   rules: readonly R[],
   finding: Finding,
 ): R | undefined {
   return (
     rules.find((r) => r.id === finding.rule) ??
-    rules.find((r) => r.kinds.includes(finding.change.kind) && r.symbols.test(finding.change.path))
+    rules.find(
+      (r) =>
+        r.kinds.includes(finding.change.kind) &&
+        r.symbols.test(finding.change.path) &&
+        (!r.message || r.message.test(finding.usage.compileError ?? '')),
+    )
   );
 }
 
@@ -223,7 +239,7 @@ function detected(
   const findings: Finding[] = [];
   for (const source of sources)
     for (const site of source.detect?.(input.text, input.file) ?? []) {
-      const path = `${pack.meta.package}:${source.id}`;
+      const path = site.name ?? `${pack.meta.package}:${source.id}`;
       findings.push({
         change: {
           package: pack.meta.package,
@@ -295,6 +311,7 @@ export function definePack(spec: PackSpec): Pack {
       const result = rule.rewrite(text, finding, context);
       return result.applied ? { ...result, rule: rule.id } : result;
     },
+    ruleOf: (finding) => ruleFor([...spec.rules, ...detectingNotes(behavior)], finding)?.id,
     guide(finding) {
       const rule = ruleFor(spec.rules, finding);
       return [rule?.guide, spec.instructions].filter(Boolean).join('\n');
@@ -312,6 +329,13 @@ export function definePack(spec: PackSpec): Pack {
     },
   };
   return pack;
+}
+
+/** Notes found by `detect`: their findings carry the note's id, as rules' do. */
+function detectingNotes(behavior: readonly BehaviorNote[]): MigrationRule[] {
+  return behavior
+    .filter((b) => b.detect && b.reported.includes('finding'))
+    .map((b) => ({ id: b.id, kinds: [], symbols: /$^/, guide: b.summary }));
 }
 
 /** Sites detected in one file, for fixtures and ground truth: what `check` would add. */
