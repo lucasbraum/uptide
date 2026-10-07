@@ -5,8 +5,8 @@
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 Uptide finds what a dependency upgrade breaks in your code, migrates it, and proves it with
-your compiler and tests. TypeScript repositories; verified migrations for **zod 3 → 4** and
-**stripe** today.
+your compiler and tests. TypeScript repositories; verified migrations for **zod 3 → 4**,
+**stripe** and the **AI SDK (`ai`) 6 → 7** today.
 
 ## Quickstart (30 seconds)
 
@@ -205,7 +205,7 @@ Every direct dependency can be discovered and selected for analysis. What differ
 
 | Tier | Dependencies | What you get |
 | --- | --- | --- |
-| **Verified** | zod 3 → 4, stripe 14 and newer | A migration pack: rules written for that dependency, a guide for the agent, behavior checks (zod schemas compared on generated inputs; Stripe changelog filtered to what you call), and ground truth the pack is scored against. `fix` migrates by rule first, by agent for the rest. |
+| **Verified** | zod 3 → 4, stripe 14 and newer, ai 6 → 7 | A migration pack: rules written for that dependency, a guide for the agent, behavior checks (zod schemas compared on generated inputs; Stripe changelog filtered to what you call), and ground truth from public repositories the pack is scored against ([docs/packs.md](docs/packs.md)). `fix` migrates by rule first, by agent for the rest. |
 | **Generic** | any other dependency | The same analysis without a pack. A finding is called breaking only when your compiler or the runtime probe confirms it, or when it is a `require()` of an ESM-only package or an import of a removed export; everything else is in `--details`. `fix` migrates with the agent alone, under the same verification, and says so in the pull request. |
 
 The tier is on every row of `check`, in the HTML report and in the pull request. A generic

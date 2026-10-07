@@ -52,7 +52,7 @@ describe('README', () => {
   });
 
   it('explains the support tiers, verification, privacy and exit codes', () => {
-    expect(readme).toMatch(/\| \*\*Verified\*\* \| zod 3 → 4, stripe 14 and newer \|/);
+    expect(readme).toMatch(/\| \*\*Verified\*\* \| zod 3 → 4, stripe 14 and newer, ai 6 → 7 \|/);
     expect(readme).toMatch(/\| \*\*Generic\*\* \| any other dependency/);
     for (const heading of ['## How verification works', '## Privacy', '## Documentation'])
       expect(readme).toContain(heading);
