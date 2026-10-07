@@ -183,6 +183,8 @@ footer .brand svg{width:22px;height:22px}
 @media (max-width:560px){
   .bar .btn span{display:none}
   .hero .command{width:100%}
+  .hero .copy span{display:none}
+  .hero .command code{font-size:14px;padding:14px}
   .actions .btn{flex:1}
   .out pre{font-size:11.5px;padding:14px}
   .diff pre{padding:12px 0}.diff .l{padding:0 14px}
@@ -223,7 +225,7 @@ footer .brand svg{width:22px;height:22px}
     <div class="label">Open source · Apache-2.0</div>
     <h1>Migrations you can merge.</h1>
     <p class="lead">Uptide is an open-source CLI that shows which dependency upgrades matter in your repo, what each one breaks in your code, and opens a verified migration branch or PR. It runs locally on your repo. Nothing to sign up for.</p>
-    <div class="command"><code>npx uptide list</code><button class="copy" type="button" data-copy="npx uptide list" aria-label="Copy npx uptide list"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="7" y="7" width="10" height="10" stroke="currentColor" stroke-width="1.5"/><path d="M13 7V3H3v10h4" stroke="currentColor" stroke-width="1.5"/></svg><span>Copy</span></button></div>
+    <div class="command"><code>npx uptide list --html --open</code><button class="copy" type="button" data-copy="npx uptide list --html --open" aria-label="Copy npx uptide list --html --open"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="7" y="7" width="10" height="10" stroke="currentColor" stroke-width="1.5"/><path d="M13 7V3H3v10h4" stroke="currentColor" stroke-width="1.5"/></svg><span>Copy</span></button></div>
     <p class="note">No API key. No account. About a second on a small repo, 20 seconds on the supabase monorepo. Node 20 or newer.</p>
     <div class="actions">
       <a class="btn solid" href="https://github.com/uptide-dev/uptide">Star on GitHub</a>
@@ -275,18 +277,18 @@ footer .brand svg{width:22px;height:22px}
   <div class="rows">
     <div class="row"><div class="k">list</div><div class="v">
       <p>Every outdated dependency in seconds, grouped into packages that move together and ranked by priority with a reason: known advisories with the smallest fixing version, deprecated versions, unsupported major lines, version drift across workspaces, runtime before dev. In the terminal, or as an HTML report with filters. No LLM.</p>
-      <div class="command"><code>npx uptide list</code><button class="copy" type="button" data-copy="npx uptide list" aria-label="Copy npx uptide list"><span>Copy</span></button></div>
+      <div class="command"><code>npx uptide list --html --open</code><button class="copy" type="button" data-copy="npx uptide list --html --open" aria-label="Copy npx uptide list --html --open"><span>Copy</span></button></div>
     </div></div>
     <div class="row"><div class="k">check &lt;pkg&gt;</div><div class="v">
       <p>Compiles your code against the new version and states the verdict, <code class="wrap">28 breaking · compiled against 4.6.5: 28 new type errors</code>, with every call site.</p>
-      <div class="command"><code>npx uptide check zod</code><button class="copy" type="button" data-copy="npx uptide check zod" aria-label="Copy npx uptide check zod"><span>Copy</span></button></div>
+      <div class="command"><code>npx uptide check zod --html --open</code><button class="copy" type="button" data-copy="npx uptide check zod --html --open" aria-label="Copy npx uptide check zod --html --open"><span>Copy</span></button></div>
     </div></div>
     <div class="row"><div class="k">fix &lt;pkg&gt;</div><div class="v">
-      <p>Migrates on a new branch in an isolated clone of your local HEAD. Rules first, the agent only for what rules can't do. Then it verifies with your compiler, the related tests, and your linter and formatter. Never pushes on its own.</p>
-      <div class="command"><code>npx uptide fix zod</code><button class="copy" type="button" data-copy="npx uptide fix zod" aria-label="Copy npx uptide fix zod"><span>Copy</span></button></div>
+      <p>Migrates on a new branch in an isolated clone of your local HEAD. Rules first, the agent only for what rules can't do. Then it verifies with your compiler, the related tests, and your linter and formatter. With <code>--pr --yes</code> it pushes the branch and opens a draft PR once verification passes; without them it never pushes.</p>
+      <div class="command"><code>npx uptide fix zod --pr --yes</code><button class="copy" type="button" data-copy="npx uptide fix zod --pr --yes" aria-label="Copy npx uptide fix zod --pr --yes"><span>Copy</span></button></div>
     </div></div>
     <div class="row"><div class="k">pr</div><div class="v">
-      <p>Opens the pull request with the evidence, summary first. It prints the plan and pushes only when you add <code>--yes</code>.</p>
+      <p>For a branch <code>fix</code> left local: opens the pull request with the evidence, summary first. It prints the plan and pushes only when you add <code>--yes</code>.</p>
       <div class="command"><code>npx uptide pr --branch uptide/zod-4.6.5</code><button class="copy" type="button" data-copy="npx uptide pr --branch uptide/zod-4.6.5" aria-label="Copy npx uptide pr --branch uptide/zod-4.6.5"><span>Copy</span></button></div>
     </div></div>
   </div>
