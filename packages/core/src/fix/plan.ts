@@ -62,6 +62,7 @@ export function planPackage(
     const rule =
       finding.rule ??
       dry?.rule ??
+      (usable ? pack.ruleOf?.(finding) : undefined) ??
       changeRule({ package: p.name }, { finding, outcome, reason: dry?.reason ?? finding.reason });
     return { finding, outcome, rule };
   });

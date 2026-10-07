@@ -1,5 +1,11 @@
 import { UptideError } from '../../errors.js';
-import { type LockGraph, type LockRecord, withoutTarget } from './lock-guard.js';
+import {
+  type LockGraph,
+  type LockRecord,
+  type Targets,
+  targetNames,
+  withoutTarget,
+} from './lock-guard.js';
 
 interface Block {
   key: string;
@@ -42,7 +48,7 @@ function dependencyPairs(lines: string[], indent: number): [string, string][] {
   return pairs;
 }
 /** Discard only the target dependency block, never text merely mentioning its name. */
-function omitTarget(lines: string[], target: string): string[] {
+function omitTarget(lines: string[], target: Targets): string[] {
   const out: string[] = [];
   let dependencyIndent = -1,
     skippedIndent = -1;
@@ -55,7 +61,7 @@ function omitTarget(lines: string[], target: string): string[] {
     else if (indent <= dependencyIndent) dependencyIndent = -1;
     if (dependencyIndent >= 0 && indent === dependencyIndent + 2) {
       const key = /^(?:"([^"]+)"|'([^']+)'|([^\s:]+))(?::|\s)/.exec(line.trim());
-      if ((key?.[1] ?? key?.[2] ?? key?.[3]) === target) {
+      if (targetNames(target).includes(key?.[1] ?? key?.[2] ?? key?.[3] ?? '')) {
         skippedIndent = indent;
         continue;
       }
@@ -137,7 +143,7 @@ export function parsedEntry(lines: string[], indent: number): Record<string, unk
  * carrying its block's parsed values: the same resolution grouped differently is no change.
  * Unknown constructs fail closed.
  */
-export function yarnGraph(text: string, target: string): LockGraph {
+export function yarnGraph(text: string, target: Targets): LockGraph {
   const records = new Map<string, LockRecord>();
   const metadata: Record<string, unknown> = {};
   const entries = blocks(text.split('\n'), 0);
@@ -167,12 +173,16 @@ export function yarnGraph(text: string, target: string): LockGraph {
  * packages changed: the suffix is the target's version as its dependents see it. It is
  * compared without the version, so a renamed dependent is the same entry.
  */
-function withoutTargetPeerVersion(text: string, target: string): string {
-  const name = target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return text.replace(new RegExp(`\\(${name}@[^()]+\\)`, 'g'), `(${target}@*)`);
+function withoutTargetPeerVersion(text: string, target: Targets): string {
+  let out = text;
+  for (const each of targetNames(target)) {
+    const name = each.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    out = out.replace(new RegExp(`\\(${name}@[^()]+\\)`, 'g'), `(${each}@*)`);
+  }
+  return out;
 }
 
-export function pnpmGraph(raw: string, target: string): LockGraph {
+export function pnpmGraph(raw: string, target: Targets): LockGraph {
   const text = withoutTargetPeerVersion(raw, target);
   const records = new Map<string, LockRecord>();
   const metadata: string[] = [];
@@ -186,7 +196,9 @@ export function pnpmGraph(raw: string, target: string): LockGraph {
           ...meaningful(lines).filter((line) => {
             const indent = line.length - line.trimStart().length;
             if (indent <= 4)
-              skip = indent === 4 && unquote(line.trim().replace(/:$/, '')) === target;
+              skip =
+                indent === 4 &&
+                targetNames(target).includes(unquote(line.trim().replace(/:$/, '')));
             return !skip;
           }),
         );
@@ -201,7 +213,7 @@ export function pnpmGraph(raw: string, target: string): LockGraph {
         name,
         dependencies: [],
         // A dependent's pointer at the target moves with the target; the rest of it may not.
-        data: name === target ? data : withoutTarget(data, target),
+        data: targetNames(target).includes(name) ? data : withoutTarget(data, target),
       });
       if (section === 'snapshots') {
         const r = records.get(`${section}:${key}`) as LockRecord;

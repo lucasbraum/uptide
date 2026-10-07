@@ -19,6 +19,15 @@ export interface PackageFetcher {
     bin?: string | Record<string, string>;
   }>;
   versions?(name: string): Promise<string[]>;
+  /** Every published version's dependencies and peers. Optional: without it no companion moves with a package. */
+  manifests?(
+    name: string,
+  ): Promise<
+    Record<
+      string,
+      { dependencies?: Record<string, string>; peerDependencies?: Record<string, string> }
+    >
+  >;
   /**
    * Done with a fetched directory. A fetcher that extracts into a persistent cache keeps it;
    * without this method the caller removes the directory itself.

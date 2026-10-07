@@ -99,6 +99,12 @@ export interface MigrationPack {
   supports(from: string, to: string): boolean;
   transform(text: string, finding: Finding, context: PackContext): TransformResult;
   guide(finding: Finding, context?: PackContext): string;
+  /**
+   * The rule a reported site belongs to, when the pack can say so itself: the plan files the
+   * site under it whether or not the rule rewrites. Packs built with `definePack` answer from
+   * their rules; without it the plan classifies by the change (`changeRule`).
+   */
+  ruleOf?(finding: Finding): string | undefined;
   reviewNotes(context: PackContext): string[];
   validateAssisted?(
     text: string,

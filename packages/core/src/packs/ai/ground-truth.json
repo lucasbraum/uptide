@@ -1,0 +1,405 @@
+{
+  "$comment": "Ground truth for the ai pack (docs/packs.md, \"Ground truth\"). Each public repository is pinned at the commit before its own AI SDK 6 to 7 upgrade. Expected findings come from two sources that are not Uptide, drafted by pnpm packs:truth and read by hand: the diagnostics the repository's TypeScript reports with the target and the companions its upgrade moved with it linked in (@ai-sdk/react, @ai-sdk/provider, the providers; their versions from the upgrade's lockfile) and not without them, errors and deprecations, and the lines the upgrade commit changed for ai (one site per construct; comments, insertions and other packages' changes such as @ai-sdk/react's experimental_throttle left out). Rules are assigned from each site's code and text. Each entry's `with` lists the packages that upgrade moved with ai (from its package.json); pack test fails when check would not move each of them.",
+  "package": "ai",
+  "repos": [
+    {
+      "repo": "vercel/chatbot",
+      "commit": "77d362e596e2c624638cad5a35199c0c8785c9fd",
+      "migration": "https://github.com/vercel/chatbot/commit/2397c783b505997a09968c4619ec42dc450cc705",
+      "from": "6.0.116",
+      "to": "7.0.9",
+      "with": {
+        "@ai-sdk/provider": "4.0.1",
+        "@ai-sdk/react": "4.0.10"
+      },
+      "why": "Next.js chat app: streamText with tools, artifact streams over fullStream, UI message streams, telemetry",
+      "findings": [
+        {
+          "file": "app/(chat)/actions.ts",
+          "line": 30,
+          "rule": "instructions",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "app/(chat)/api/chat/route.ts",
+          "line": 7,
+          "rule": "is-step-count",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "app/(chat)/api/chat/route.ts",
+          "line": 196,
+          "rule": "instructions",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "app/(chat)/api/chat/route.ts",
+          "line": 198,
+          "rule": "is-step-count",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "app/(chat)/api/chat/route.ts",
+          "line": 199,
+          "rule": "removed-experimental-option",
+          "note": "compiler TS2353"
+        },
+        {
+          "file": "app/(chat)/api/chat/route.ts",
+          "line": 236,
+          "rule": "telemetry",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "app/(chat)/api/chat/route.ts",
+          "line": 243,
+          "rule": "ui-message-stream",
+          "note": "compiler TS6387"
+        },
+        {
+          "file": "app/(chat)/api/chat/route.ts",
+          "line": 257,
+          "rule": "on-end",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "artifacts/code/server.ts",
+          "line": 18,
+          "rule": "full-stream",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "artifacts/code/server.ts",
+          "line": 20,
+          "rule": "instructions",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "artifacts/code/server.ts",
+          "line": 24,
+          "rule": "full-stream",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "artifacts/code/server.ts",
+          "line": 40,
+          "rule": "full-stream",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "artifacts/code/server.ts",
+          "line": 42,
+          "rule": "instructions",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "artifacts/code/server.ts",
+          "line": 46,
+          "rule": "full-stream",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "artifacts/sheet/server.ts",
+          "line": 11,
+          "rule": "full-stream",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "artifacts/sheet/server.ts",
+          "line": 13,
+          "rule": "instructions",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "artifacts/sheet/server.ts",
+          "line": 17,
+          "rule": "full-stream",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "artifacts/sheet/server.ts",
+          "line": 33,
+          "rule": "full-stream",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "artifacts/sheet/server.ts",
+          "line": 35,
+          "rule": "instructions",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "artifacts/sheet/server.ts",
+          "line": 39,
+          "rule": "full-stream",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "artifacts/text/server.ts",
+          "line": 11,
+          "rule": "full-stream",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "artifacts/text/server.ts",
+          "line": 13,
+          "rule": "instructions",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "artifacts/text/server.ts",
+          "line": 19,
+          "rule": "full-stream",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "artifacts/text/server.ts",
+          "line": 35,
+          "rule": "full-stream",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "artifacts/text/server.ts",
+          "line": 37,
+          "rule": "instructions",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "artifacts/text/server.ts",
+          "line": 42,
+          "rule": "full-stream",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "lib/ai/tools/request-suggestions.ts",
+          "line": 51,
+          "rule": "instructions",
+          "note": "changed by the upgrade"
+        }
+      ]
+    },
+    {
+      "repo": "miurla/morphic",
+      "commit": "989a05697d973030f2fbb4b805326bb24e68fd0d",
+      "migration": "https://github.com/miurla/morphic/commit/0ec2ca733c8cadb589d741097a2766f67e1766a3",
+      "from": "6.0.180",
+      "to": "7.0.66",
+      "with": {
+        "@ai-sdk/anthropic": "4.0.39",
+        "@ai-sdk/gateway": "4.0.52",
+        "@ai-sdk/google": "4.0.44",
+        "@ai-sdk/openai": "4.0.42",
+        "@ai-sdk/openai-compatible": "3.0.31",
+        "@ai-sdk/react": "4.0.69",
+        "ai-sdk-ollama": "4.1.0"
+      },
+      "why": "Next.js research agent on bun: ToolLoopAgent, telemetry metadata moved to runtimeContext, tool execute options, UI message streams, tests that mock ai",
+      "findings": [
+        {
+          "file": "lib/agents/__tests__/researcher.test.ts",
+          "line": 10,
+          "rule": "is-step-count",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "lib/agents/researcher.ts",
+          "line": 1,
+          "rule": "is-step-count",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "lib/agents/researcher.ts",
+          "line": 3,
+          "rule": "generic",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "lib/agents/researcher.ts",
+          "line": 145,
+          "rule": "is-step-count",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "lib/agents/researcher.ts",
+          "line": 148,
+          "rule": "telemetry",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "lib/agents/researcher.ts",
+          "line": 151,
+          "rule": "telemetry-metadata",
+          "note": "compiler TS2353"
+        },
+        {
+          "file": "lib/agents/researcher.ts",
+          "line": 168,
+          "rule": "generic",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "lib/agents/title-generator.ts",
+          "line": 43,
+          "rule": "instructions",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "lib/agents/title-generator.ts",
+          "line": 48,
+          "rule": "telemetry",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "lib/agents/title-generator.ts",
+          "line": 51,
+          "rule": "telemetry-metadata",
+          "note": "compiler TS2353"
+        },
+        {
+          "file": "lib/render/__tests__/llm-image-output.e2e.test.ts",
+          "line": 12,
+          "rule": "is-step-count",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "lib/render/__tests__/llm-image-output.e2e.test.ts",
+          "line": 89,
+          "rule": "instructions",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "lib/render/__tests__/llm-image-output.e2e.test.ts",
+          "line": 93,
+          "rule": "is-step-count",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "lib/render/__tests__/llm-related-questions.e2e.test.ts",
+          "line": 11,
+          "rule": "is-step-count",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "lib/render/__tests__/llm-related-questions.e2e.test.ts",
+          "line": 103,
+          "rule": "instructions",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "lib/render/__tests__/llm-related-questions.e2e.test.ts",
+          "line": 107,
+          "rule": "is-step-count",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "lib/streaming/__tests__/create-chat-stream-response.test.ts",
+          "line": 79,
+          "rule": "on-end",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "lib/streaming/__tests__/create-chat-stream-response.test.ts",
+          "line": 94,
+          "rule": "on-end",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "lib/streaming/__tests__/create-ephemeral-chat-stream-response.test.ts",
+          "line": 62,
+          "rule": "on-end",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "lib/streaming/__tests__/create-ephemeral-chat-stream-response.test.ts",
+          "line": 88,
+          "rule": "on-end",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "lib/streaming/create-chat-stream-response.ts",
+          "line": 222,
+          "rule": "on-step-end",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "lib/streaming/create-chat-stream-response.ts",
+          "line": 238,
+          "rule": "total-usage",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "lib/streaming/create-chat-stream-response.ts",
+          "line": 245,
+          "rule": "ui-message-stream",
+          "note": "compiler TS6387"
+        },
+        {
+          "file": "lib/streaming/create-chat-stream-response.ts",
+          "line": 255,
+          "rule": "on-end",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "lib/streaming/create-ephemeral-chat-stream-response.ts",
+          "line": 134,
+          "rule": "on-step-end",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "lib/streaming/create-ephemeral-chat-stream-response.ts",
+          "line": 148,
+          "rule": "total-usage",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "lib/streaming/create-ephemeral-chat-stream-response.ts",
+          "line": 153,
+          "rule": "ui-message-stream",
+          "note": "compiler TS6387"
+        },
+        {
+          "file": "lib/streaming/create-ephemeral-chat-stream-response.ts",
+          "line": 163,
+          "rule": "on-end",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "lib/tools/__tests__/fetch-error.test.ts",
+          "line": 23,
+          "rule": "tool-context",
+          "note": "compiler TS2345"
+        },
+        {
+          "file": "lib/tools/__tests__/fetch-error.test.ts",
+          "line": 55,
+          "rule": "tool-context",
+          "note": "compiler TS2345"
+        },
+        {
+          "file": "lib/tools/__tests__/fetch-error.test.ts",
+          "line": 91,
+          "rule": "tool-context",
+          "note": "compiler TS2345"
+        },
+        {
+          "file": "lib/tools/search.ts",
+          "line": 212,
+          "rule": "tool-context",
+          "note": "compiler TS2345"
+        },
+        {
+          "file": "lib/tools/search.ts",
+          "line": 214,
+          "rule": "generic",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "lib/types/agent.ts",
+          "line": 23,
+          "rule": "generic",
+          "note": "changed by the upgrade"
+        }
+      ]
+    }
+  ]
+}

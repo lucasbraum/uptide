@@ -41,6 +41,11 @@ export function formatFixSummary(report: FixReport, opts: FormatFixOptions = {})
         ['Tests', cells.tests],
       ] as const
     ).map(([label, text]) => `  ${pad(label, 9)} ${plain(text)}`),
+    ...(report.companions?.length
+      ? [
+          `  ${pad('With', 9)} ${report.companions.map((c) => `${c.name} ${c.from} → ${c.to}`).join(', ')}`,
+        ]
+      : []),
     // Without a pack the reader is told once, here, what stands behind the edits.
     ...(report.tier === 'generic' && report.sites.some((s) => s.outcome === 'agent')
       ? [

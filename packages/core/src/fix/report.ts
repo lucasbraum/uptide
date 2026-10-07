@@ -640,6 +640,14 @@ export function renderMigration(
       '',
     );
   }
+  // What moved with the package: one install at versions that agree, never the package alone.
+  if (report.companions?.length)
+    lines.push(
+      `Upgraded with ${report.package}, so the install stays consistent:`,
+      '',
+      ...report.companions.map((c) => `- \`${c.name}\` ${c.from} → ${c.to} (${c.reason})`),
+      '',
+    );
   // The note vouches for agent edits; with none, it has nothing to say.
   if (report.tier === 'generic' && report.sites.some((s) => s.outcome === 'agent'))
     lines.push(`> ${GENERIC_NOTE(report.package)}`, '');

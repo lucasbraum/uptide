@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ChangeKind } from '../../domain/change.js';
 import type { Finding } from '../../domain/report.js';
@@ -14,7 +14,8 @@ import { detectIn, type Pack, ruleFor } from '../contract.js';
  *
  * `keep` marks a site the rule must leave alone. `at:<text>` is where on the line the site
  * starts (default: the first non-blank column), `kind:` and `path:` the change `check` would
- * report there (default: the rule's first kind, and the rule id). Every marked site of a rule
+ * report there (default: the rule's first kind, and the `at:` text), `message:"..."` the compiler's
+ * message for a compiler-only finding (a rule with `message` matches on it). Every marked site of a rule
  * with `rewrite` is rewritten, bottom-up, and the result must equal `after.ts` byte for byte
  * (markers included: they are comments). A rule or note with `detect` must find exactly its
  * marked lines in `before.ts`, and nothing on any other line.
@@ -28,6 +29,7 @@ export interface FixtureSite {
   at?: string;
   kind?: ChangeKind;
   path?: string;
+  message?: string;
 }
 
 export interface FixtureResult {
@@ -42,7 +44,7 @@ export interface FixtureResult {
   unknown: { file: string; line: number; rule: string }[];
 }
 
-const MARKER = /\/\/\s*@uptide\s+([\w-]+)((?:\s+[^\s]+)*)\s*$/;
+const MARKER = /\/\/\s*@uptide\s+([\w-]+)((?:\s+(?:message:"[^"]*"|[^\s]+))*)\s*$/;
 
 export function parseMarkers(text: string, caseName: string, file: string): FixtureSite[] {
   const sites: FixtureSite[] = [];
@@ -56,7 +58,11 @@ export function parseMarkers(text: string, caseName: string, file: string): Fixt
       rule: match[1] as string,
       keep: false,
     };
-    for (const word of (match[2] ?? '').trim().split(/\s+/).filter(Boolean)) {
+    const rest = (match[2] ?? '').replace(/message:"([^"]*)"/, (_all, message: string) => {
+      site.message = message;
+      return '';
+    });
+    for (const word of rest.trim().split(/\s+/).filter(Boolean)) {
       if (word === 'keep') site.keep = true;
       else if (word.startsWith('at:')) site.at = word.slice(3);
       else if (word.startsWith('kind:')) site.kind = word.slice(5) as ChangeKind;
@@ -109,6 +115,12 @@ export function fixtureFinding(
       access: 'call',
       snippet: lineText.trim(),
       via: 'direct',
+      ...(site.message !== undefined
+        ? {
+            compileError: site.message,
+            ...(/^TS\d+$/.test(path) ? { compileCode: Number(path.slice(2)) } : {}),
+          }
+        : {}),
     },
     severity,
     confidence: 1,
@@ -128,7 +140,12 @@ export function fixtureCases(dir: string): string[] {
 }
 
 /** Every fixture case of the pack in `dir`, scored the way ground truth is. */
-export function runFixtures(pack: Pack, dir: string): FixtureResult {
+export function runFixtures(
+  pack: Pack,
+  dir: string,
+  /** Write each case's `after.ts` from what the rules produce (review the diff before committing). */
+  options: { update?: boolean } = {},
+): FixtureResult {
   const result: FixtureResult = {
     cases: [],
     rules: {},
@@ -213,7 +230,8 @@ export function runFixtures(pack: Pack, dir: string): FixtureResult {
       if (!rule.detect) tally(rule.id).truePositives++;
       text = out.text;
     }
-    if (text !== after)
+    if (options.update && text !== after) writeFileSync(afterPath, text);
+    else if (text !== after)
       result.rewriteFailures.push({
         case: name,
         file: `fixtures/${name}/after.ts`,

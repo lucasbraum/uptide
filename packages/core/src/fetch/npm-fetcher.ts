@@ -11,6 +11,7 @@ import { authHeaders, loadRegistryConfig, type RegistryConfig, registryFor } fro
 import {
   downloadTarball,
   type FetchFn,
+  listManifests,
   listVersions,
   manifestUrl,
   packumentUrl,
@@ -174,6 +175,11 @@ export function createNpmFetcher(opts: NpmFetcherOptions = {}): PackageFetcher {
     async versions(name) {
       return remembered([...packagePathSegments(name), 'versions'], false, () =>
         listVersions(name, config, fetchFn),
+      );
+    },
+    async manifests(name) {
+      return remembered([...packagePathSegments(name), 'manifests'], false, () =>
+        listManifests(name, config, fetchFn),
       );
     },
     async fetch(name, version): Promise<PackageDir> {

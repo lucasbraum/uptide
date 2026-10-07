@@ -2,7 +2,8 @@
  * A draft of the expected findings for one ground-truth repository, from two sources that are
  * not Uptide: the repository's own upgrade commit, and its own TypeScript compiler.
  *
- *   pnpm packs:truth <package> <owner/name> <commit> <upgrade-commit> --to <version> [--directory <dir>]
+ *   pnpm packs:truth <package> <owner/name> <commit> <upgrade-commit> --to <version>
+ *     [--directory <dir>] [--also <companion>@<version> ...]
  *
  * - changed: every line of `<commit>` the upgrade commit changed or removed (`git diff -U0`,
  *   the old side), in source files. Pure insertions have no line in `<commit>` and are listed
@@ -17,16 +18,21 @@
  */
 import { execFileSync } from 'node:child_process';
 import {
+  cpSync,
   existsSync,
   lstatSync,
+  mkdirSync,
+  mkdtempSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   renameSync,
   rmSync,
   symlinkSync,
 } from 'node:fs';
-import { join, relative } from 'node:path';
-import { createNpmFetcher, ensureRepo } from '@uptide/core';
+import { tmpdir } from 'node:os';
+import { basename, dirname, join, relative } from 'node:path';
+import { createNpmFetcher, ensureRepo, maxSatisfying, satisfies, validRange } from '@uptide/core';
 import { compilerDiagnostics, type Diagnostic } from './packs-truth-compiler.ts';
 
 const args = process.argv.slice(2);
@@ -87,14 +93,14 @@ for (const line of git('diff', '-U0', '--no-color', '--no-ext-diff', commit, upg
 }
 
 // Where the repository has the package: the root's node_modules and each workspace's.
-function installs(dir: string, depth = 0): string[] {
+function installs(name: string, dir: string, depth = 0): string[] {
   const found: string[] = [];
-  const own = join(dir, 'node_modules', ...pkg.split('/'));
+  const own = join(dir, 'node_modules', ...name.split('/'));
   if (existsSync(own)) found.push(relative(project, own));
   if (depth >= 3) return found;
   for (const entry of readdirSync(dir, { withFileTypes: true }))
     if (entry.isDirectory() && !['node_modules', '.git', 'dist', 'build'].includes(entry.name))
-      found.push(...installs(join(dir, entry.name), depth + 1));
+      found.push(...installs(name, join(dir, entry.name), depth + 1));
   return found;
 }
 function tsconfigs(dir: string, depth = 0): string[] {
@@ -107,23 +113,90 @@ function tsconfigs(dir: string, depth = 0): string[] {
       found.push(...tsconfigs(join(dir, entry.name), depth + 1));
   return found;
 }
-const links = installs(project);
 const configs = tsconfigs(project);
 const fetcher = createNpmFetcher();
-const target = await fetcher.fetch(pkg, to);
+const work = mkdtempSync(join(tmpdir(), 'uptide-truth-'));
+
+// The target, and the companions the upgrade moved with it (`--also @ai-sdk/react@4.0.10`).
+const swaps: { name: string; version: string }[] = [
+  { name: pkg, version: to },
+  ...args
+    .filter((_a, i) => args[i - 1] === '--also')
+    .map((spec) => {
+      const at = spec.lastIndexOf('@');
+      return { name: spec.slice(0, at), version: spec.slice(at + 1) };
+    }),
+];
+/** The version of `name` the repository resolves from `from` upward, with its real directory. */
+function consumerCopy(name: string, from: string): { version: string; dir: string } | undefined {
+  for (let dir = from; ; dir = dirname(dir)) {
+    const manifest = join(dir, 'node_modules', ...name.split('/'), 'package.json');
+    if (existsSync(manifest))
+      return {
+        version: JSON.parse(readFileSync(manifest, 'utf8')).version,
+        dir: realpathSync(dirname(manifest)),
+      };
+    if (dirname(dir) === dir || !dir.startsWith(root)) return undefined;
+  }
+}
+
+/**
+ * A package at a version, as an install of it would leave it: a copy with its own
+ * `node_modules`, each dependency the repository's copy when that satisfies the declared
+ * range (peers always the repository's), else the highest version inside the range, fetched
+ * and assembled the same way. What check does for the target (target-deps.ts).
+ */
+async function assemble(name: string, version: string, depth = 0): Promise<string> {
+  const dir = join(work, `${name.replace('/', '__')}@${version}`);
+  if (existsSync(dir)) return dir;
+  cpSync((await fetcher.fetch(name, version)).dir, dir, { recursive: true });
+  const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as {
+    dependencies?: Record<string, string>;
+    peerDependencies?: Record<string, string>;
+  };
+  const link = (dep: string, at: string) => {
+    const into = join(dir, 'node_modules', ...dep.split('/'));
+    mkdirSync(dirname(into), { recursive: true });
+    if (!existsSync(into)) symlinkSync(at, into);
+  };
+  for (const dep of Object.keys(manifest.peerDependencies ?? {})) {
+    const own = consumerCopy(dep, project);
+    if (own) link(dep, own.dir);
+  }
+  for (const [dep, range] of Object.entries(manifest.dependencies ?? {})) {
+    if (!validRange(range)) continue;
+    // A version the upgrade pinned (`--also`) wins, as one deduplicated copy in its lockfile does.
+    const pinned = swaps.find((swap) => swap.name === dep && satisfies(swap.version, range));
+    const own = consumerCopy(dep, project);
+    if (pinned) link(dep, await assemble(pinned.name, pinned.version, depth + 1));
+    else if (own && satisfies(own.version, range)) link(dep, own.dir);
+    else if (depth < 4) {
+      const best = maxSatisfying((await fetcher.versions?.(dep)) ?? [], range);
+      if (best) link(dep, await assemble(dep, best, depth + 1));
+    }
+  }
+  return dir;
+}
+
+const links: { at: string; dir: string }[] = [];
+for (const swap of swaps) {
+  const dir = await assemble(swap.name, swap.version);
+  for (const at of installs(swap.name, project)) links.push({ at, dir });
+}
 
 const { compiler: compilerName, diagnostics: baseline } = compilerDiagnostics(project, configs);
 for (const link of links) {
-  const at = join(project, link);
+  const at = join(project, link.at);
   renameSync(at, `${at}.uptide-orig`);
-  symlinkSync(target.dir, at);
+  symlinkSync(link.dir, at);
 }
 let after: Diagnostic[];
 try {
   after = compilerDiagnostics(project, configs).diagnostics;
 } finally {
+  rmSync(work, { recursive: true, force: true, maxRetries: 2 });
   for (const link of links) {
-    const at = join(project, link);
+    const at = join(project, link.at);
     if (lstatSync(at).isSymbolicLink()) rmSync(at);
     renameSync(`${at}.uptide-orig`, at);
   }
@@ -148,7 +221,7 @@ console.log(
       upgrade,
       ...(directory ? { directory } : {}),
       to,
-      links,
+      links: links.map((l) => `${l.at} → ${basename(l.dir)}`),
       compiledWith: compilerName,
       tsconfigs: configs,
       compiler: compiler.map((d) => ({

@@ -103,6 +103,7 @@ export {
   removePackageDir,
 } from './fetch/npm-fetcher.js';
 export { loadRegistryConfig, type RegistryConfig } from './fetch/npmrc.js';
+export { maxSatisfying, satisfies, validRange } from './fetch/range.js';
 export {
   cleanRuns,
   fixPreflight,

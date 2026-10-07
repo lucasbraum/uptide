@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 import type { CheckReport, CheckResult, FixReport } from '@uptide/core';
 import {
+  activePacks,
   formatFix,
   isFailure,
   PRICE_DATE,
@@ -42,13 +43,7 @@ import { type Io, type Ui, type UiFlags, uiOf } from './io.js';
 import { formatPackTest, packRoot, packsToTest } from './pack.js';
 import { PRIVACY } from './privacy.js';
 import { createProgress, elapsed, type Progress } from './progress.js';
-import {
-  collectStatus,
-  declaredDependencies,
-  formatStatus,
-  locateDependencies,
-  SUPPORTED as PACKED,
-} from './status.js';
+import { collectStatus, declaredDependencies, formatStatus, locateDependencies } from './status.js';
 import { createTelemetry, type Telemetry } from './telemetry/client.js';
 import { checkMetrics, fixMetrics, listMetrics } from './telemetry/metrics.js';
 import { VERSION } from './version.js';
@@ -712,7 +707,9 @@ ${EXIT_CODES('a plan was made', 'not used', ';\n     or a dependency failed to a
       .description('Upgrade one dependency on a new branch and migrate your code, verified')
       .option(
         '--only <package>',
-        'the dependency to upgrade: zod or stripe (verified), or any other (generic, agent only)',
+        `the dependency to upgrade: ${activePacks()
+          .map((pack) => pack.name)
+          .join(', ')} (verified), or any other (generic, agent only)`,
       )
       .option(
         '--target <spec>',
@@ -830,7 +827,7 @@ ${PRIVACY}`,
               });
             // No pack, so no rule: without the agent there is nothing this command can do,
             // and it says so before it touches anything.
-            const hasPack = (PACKED as readonly string[]).includes(only);
+            const hasPack = activePacks().some((pack) => pack.name === only);
             if (!hasPack && (flags.llm === false || !selection.available))
               throw noAgentForGeneric(only, flags.llm === false);
             if (flags.pinCurrentApi && only !== 'stripe')
@@ -1229,6 +1226,10 @@ ${EXIT_CODES('scaffolded', 'not used')}`,
     .option('--offline', 'never fetch: use only ground-truth repositories already cached')
     .option('--fixtures-only', 'run the fixtures, skip the ground-truth repositories')
     .option('--write', "record this run's result in the pack's verification.json")
+    .option(
+      '--update-fixtures',
+      "write each fixture's after.ts from what the rules produce; review the diff before committing",
+    )
     .option('--cwd <dir>', 'a directory inside the uptide checkout')
     .option('--json', 'machine-readable output for CI')
     .option('--no-color', 'no color (NO_COLOR is respected too)')
@@ -1247,7 +1248,12 @@ ${EXIT_CODES('every pack passed', 'a false positive among breaking findings, a f
     .action(
       (
         name: string | undefined,
-        flags: Shared & { offline?: boolean; fixturesOnly?: boolean; write?: boolean },
+        flags: Shared & {
+          offline?: boolean;
+          fixturesOnly?: boolean;
+          write?: boolean;
+          updateFixtures?: boolean;
+        },
       ) =>
         act(flags, async ({ ui, cwd }) => {
           const root = packRoot(cwd);
@@ -1258,6 +1264,7 @@ ${EXIT_CODES('every pack passed', 'a false positive among breaking findings, a f
               ...(flags.offline ? { offline: true } : {}),
               ...(flags.fixturesOnly ? { fixturesOnly: true } : {}),
               ...(flags.write ? { write: true } : {}),
+              ...(flags.updateFixtures ? { updateFixtures: true } : {}),
               log: (line) => io.err(`${line}\n`),
             });
             reports.push(report);

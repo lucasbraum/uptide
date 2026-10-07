@@ -82,7 +82,8 @@ export function formatPackTest(report: PackTestReport, color = false): string {
   for (const s of f.falseNegatives)
     out.push(`  ${c.red('✗')} ${s.file}:${s.line} ${s.rule} marked, not detected`);
 
-  if (report.repos.length === 0)
+  if (report.fixturesOnly) out.push('ground truth  skipped (--fixtures-only)');
+  else if (report.repos.length === 0)
     out.push('ground truth  no repository yet: the pack ships as a candidate');
   else {
     out.push('ground truth');
@@ -96,6 +97,9 @@ export function formatPackTest(report: PackTestReport, color = false): string {
         `${head}  predicted ${r.predicted.length}, expected ${r.expected.length}, false positives ${r.falsePositives.length}, false negatives ${r.falseNegatives.length}`,
       );
       if (r.installedMismatch) out.push(`    ${c.yellow('!')} ${r.installedMismatch}`);
+      if (r.companions?.length)
+        out.push(`    with ${r.companions.map((m) => `${m.name} ${m.from} → ${m.to}`).join(', ')}`);
+      for (const left of r.leftBehind ?? []) out.push(`    ${c.red('✗')} ${left}`);
     }
     out.push('');
     out.push(

@@ -266,6 +266,11 @@ Everything happens in a temporary clone of your repository, never in your checko
    with the stored description.
 2. **Upgrades.** Bumps the version in every workspace that declares it (and in pnpm
    catalogs), preserving `^`, `~`, or exact ranges. Installs run in a temporary git worktree with lifecycle scripts disabled. The real package manager produces the lockfile; Uptide rejects changes outside the target dependency subtree before copying it back unchanged. One commit.
+   Packages that must move with it move in the same install and commit, each at the version
+   that agrees with the target (see "Companions" in [architecture](./architecture.md)):
+   `fix ai` also bumps `@ai-sdk/react`, `@ai-sdk/provider` and every installed `@ai-sdk/*`
+   provider, and `check`'s plan, the summary (`With`) and the PR description say which and
+   why. When one of them has no release that agrees, `fix` stops before changing anything.
 3. **Rule-based fixes.** Deterministic rewrites for the changes it has rules for, such as
    zod's `required_error` / `invalid_type_error` (add `--include-deprecated` for
    `z.string().email()`-style chains). One commit.
@@ -327,6 +332,7 @@ pnpm uptide pack test --json             # every pack, for CI
 pnpm uptide pack test ai --offline       # cached repositories only
 pnpm uptide pack test ai --fixtures-only
 pnpm uptide pack test ai --write         # record the measured status in verification.json
+pnpm uptide pack test ai --fixtures-only --update-fixtures  # write after.ts from the rules
 ```
 
 `pack test` prints precision and recall per rule, overall and for breaking findings, and

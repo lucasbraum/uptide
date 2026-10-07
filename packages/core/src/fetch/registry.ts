@@ -210,3 +210,36 @@ export async function listVersions(
     .filter((v) => parseVersion(v) !== undefined)
     .sort(compareVersions);
 }
+
+/** What one version declares, as the abbreviated packument carries it. */
+export interface VersionDependencies {
+  dependencies?: Record<string, string>;
+  peerDependencies?: Record<string, string>;
+}
+
+/**
+ * Every published version's dependencies and peer dependencies, from the same abbreviated
+ * packument `listVersions` reads: one request answers which release of a package pins what.
+ */
+export async function listManifests(
+  name: string,
+  config: RegistryConfig,
+  fetchFn: FetchFn,
+): Promise<Record<string, VersionDependencies>> {
+  const registry = registryFor(name, config);
+  const packument = await getJson<AbbreviatedPackument>(
+    packumentUrl(name, registry),
+    config,
+    fetchFn,
+  );
+  if (!packument) throw new PackageNotFoundError(name, registry);
+  const out: Record<string, VersionDependencies> = {};
+  for (const [version, manifest] of Object.entries(packument.versions ?? {})) {
+    if (parseVersion(version) === undefined) continue;
+    out[version] = {
+      ...(manifest.dependencies ? { dependencies: manifest.dependencies } : {}),
+      ...(manifest.peerDependencies ? { peerDependencies: manifest.peerDependencies } : {}),
+    };
+  }
+  return out;
+}

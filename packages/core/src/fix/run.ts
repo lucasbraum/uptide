@@ -222,6 +222,16 @@ async function fixPackage(options: FixOptions, services: FixServices): Promise<F
         `cannot fix an incomplete check: ${p.name} ${p.notes.join('; ')}`,
       );
   }
+  // What moves with it (check/companions.ts): one install at versions that agree, or none.
+  const conflicts = [...new Set(packages.flatMap((p) => p.companionConflicts ?? []))];
+  if (conflicts.length > 0)
+    throw new UptideError(
+      'INCONSISTENT_UPGRADE',
+      `${pack.name} ${target} cannot be installed consistently: ${conflicts.join('; ')}. Nothing was changed.`,
+    );
+  const companions = [
+    ...new Map(packages.flatMap((p) => p.companions ?? []).map((c) => [c.name, c])).values(),
+  ].sort((a, b) => a.name.localeCompare(b.name));
   const initialContext = {
     from:
       [...packages].sort((a, b) => compareVersions(a.installed, b.installed))[0]?.installed ?? '',
@@ -285,19 +295,34 @@ async function fixPackage(options: FixOptions, services: FixServices): Promise<F
   // Lint of the same files before anything changes: a failure that is already there is not ours.
   const baselineLint = await (services.lint ?? lintFiles)(root, affected);
   git(root, 'switch', '-c', branch);
-  const bump = bumpVersions(root, pack.name, target);
+  const bumps = [
+    bumpVersions(root, pack.name, target),
+    ...companions.map((c) => bumpVersions(root, c.name, c.to)),
+  ];
+  const bump = {
+    files: [...new Set(bumps.flatMap((b) => b.files))],
+    workspaces: [...new Set(bumps.flatMap((b) => b.workspaces))],
+  };
+  const moved = companions.map((c) => `${c.name} ${c.to}`).join(', ');
   const lockfile = await progress(
     options.onProgress,
-    { phase: 'install', package: pack.name, detail: `${pack.name} ${target}` },
+    {
+      phase: 'install',
+      package: pack.name,
+      detail: `${pack.name} ${target}${moved ? ` with ${moved}` : ''}`,
+    },
     () =>
       services.install(root, {
         name: pack.name,
         version: target,
         workspaces: bump.workspaces,
         files: bump.files.map((f) => relative(root, f)),
+        ...(companions.length
+          ? { also: companions.map((c) => ({ name: c.name, version: c.to })) }
+          : {}),
       }),
   );
-  commit(root, `chore: upgrade ${pack.name} to ${target}`, [
+  commit(root, `chore: upgrade ${pack.name} to ${target}${moved ? ` with ${moved}` : ''}`, [
     ...bump.files,
     join(root, packageManager(root).lockfile),
   ]);
@@ -454,6 +479,7 @@ async function fixPackage(options: FixOptions, services: FixServices): Promise<F
     from: initialContext.from,
     target,
     targetSource: resolved.source,
+    ...(companions.length ? { companions } : {}),
     ...tool,
     verifiedAt: new Date().toISOString(),
     head: git(root, 'rev-parse', 'HEAD'),

@@ -281,6 +281,14 @@ function sectionLines(row: Row, colors: Colors): string[] {
       `  ${colors.yellow('!')} ${plural(sites, 'deprecated call')} (${deprecatedNames(deprecated)})   ${colors.dim(who)}`,
     );
   }
+  // What moves with it: one install, at versions that agree, the way `fix` upgrades it.
+  const companions = row.p.companions ?? [];
+  if (companions.length > 0)
+    lines.push(
+      `  ${colors.cyan('↑')} upgrades with ${companions.map((c) => `${c.name} ${c.from} → ${c.to}`).join(', ')}   ${colors.dim(companions.map((c) => c.reason).join('; '))}`,
+    );
+  for (const conflict of row.p.companionConflicts ?? [])
+    lines.push(`  ${colors.red('✗')} ${conflict}: no consistent upgrade`);
   // An importer the manifest does not show, or one the analysis could not reach: the reader
   // decides whether the sites above are all of them.
   for (const note of importers) lines.push(`  ${colors.yellow('⚠')} ${note}`);
@@ -345,8 +353,9 @@ export function nextCommands(rows: Row[], opts: FormatCheckOptions): [string, st
     opts.fixable === true || (Array.isArray(opts.fixable) && opts.fixable.includes(name));
   for (const row of rows) {
     const name = row.p.name;
-    // A release group is several packages: fix takes one.
-    if (!fixable(name) || row.p.members) continue;
+    // A release group is several packages: fix takes one, unless the group is the package
+    // and what moves with it, which `fix` upgrades together.
+    if (!fixable(name) || (row.p.members && !row.p.companions)) continue;
     if (commands.length >= FIX_SUGGESTIONS) break;
     const target = opts.repeat?.targets?.[name];
     const pinned = target ? ` --target ${quote(target)}` : '';

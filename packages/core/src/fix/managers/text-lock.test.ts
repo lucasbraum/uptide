@@ -28,6 +28,58 @@ snapshots:
   ).toThrow('outside target');
 });
 
+it('lets a package and its companions move together, and nothing else', () => {
+  const lock = (
+    ai: string,
+    react: string,
+    provider: string,
+    other = '1.0.0',
+  ) => `lockfileVersion: '9.0'
+importers:
+  .:
+    dependencies:
+      ai:
+        specifier: ${ai}
+        version: ${ai}
+      '@ai-sdk/react':
+        specifier: ${react}
+        version: ${react}(ai@${ai})
+      other:
+        specifier: ${other}
+        version: ${other}
+packages:
+  ai@${ai}: {}
+  '@ai-sdk/react@${react}': {}
+  '@ai-sdk/provider@${provider}': {}
+  other@${other}: {}
+snapshots:
+  ai@${ai}:
+    dependencies:
+      '@ai-sdk/provider': ${provider}
+  '@ai-sdk/react@${react}(ai@${ai})':
+    dependencies:
+      ai: ${ai}
+  '@ai-sdk/provider@${provider}': {}
+  other@${other}: {}
+`;
+  const names = ['ai', '@ai-sdk/react'];
+  const before = pnpmGraph(lock('6.0.116', '3.0.118', '3.0.3'), names);
+  expect(() =>
+    assertLockScope(before, pnpmGraph(lock('7.0.9', '4.0.10', '4.0.1'), names), names),
+  ).not.toThrow();
+  // ai alone may not drag @ai-sdk/react to its next major: that is what the group is for.
+  expect(() =>
+    assertLockScope(
+      pnpmGraph(lock('6.0.116', '3.0.118', '3.0.3'), 'ai'),
+      pnpmGraph(lock('7.0.9', '4.0.10', '4.0.1'), 'ai'),
+      'ai',
+    ),
+  ).toThrow('outside ai');
+  expect(() =>
+    assertLockScope(before, pnpmGraph(lock('7.0.9', '4.0.10', '4.0.1', '2.0.0'), names), names),
+  ).toThrow('outside ai, @ai-sdk/react');
+});
+
 describe('alias entries (@isaacs/cliui style) survive a manager re-quoting them', () => {
   const dir = resolve(import.meta.dirname, '../../../../../fixtures/lockfiles/aliases');
   const bump = (text: string): string =>

@@ -314,6 +314,12 @@
           "note": "compiler TS6385"
         },
         {
+          "file": "packages/designer/src/open-workflow.ts",
+          "line": 149,
+          "rule": "generic",
+          "note": "changed by the upgrade"
+        },
+        {
           "file": "packages/engine/src/run-workflow.ts",
           "line": 1208,
           "rule": "generic",
@@ -435,6 +441,12 @@
         },
         {
           "file": "packages/schema/src/nodes.ts",
+          "line": 291,
+          "rule": "types",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "packages/schema/src/nodes.ts",
           "line": 292,
           "rule": "error-params",
           "note": "compiler TS2353"
@@ -477,6 +489,12 @@
         },
         {
           "file": "packages/schema/src/wire-step-plugins.ts",
+          "line": 86,
+          "rule": "generic",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "packages/schema/src/wire-step-plugins.ts",
           "line": 87,
           "rule": "types",
           "note": "compiler TS6385"
@@ -489,9 +507,21 @@
         },
         {
           "file": "packages/schema/src/wire-step-plugins.ts",
+          "line": 93,
+          "rule": "generic",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "packages/schema/src/wire-step-plugins.ts",
           "line": 94,
           "rule": "types",
           "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/schema/src/wire-step-plugins.ts",
+          "line": 97,
+          "rule": "generic",
+          "note": "changed by the upgrade"
         },
         {
           "file": "packages/schema/src/wire-step-plugins.ts",

@@ -130,6 +130,8 @@ export interface FixReport {
   /** Where the target came from: asked for, the npm `latest` dist-tag, or the pack's tested target offline. */
   targetSource?: 'requested' | 'latest on npm' | "the pack's tested target";
   from?: string;
+  /** What moved with it, at the versions that agree with the target, and why (`check/companions.ts`). */
+  companions?: { name: string; from: string; to: string; reason: string }[];
   /** `pin`: no upgrade; the SDK's default API version was written on every client (`--pin-current-api`). */
   mode?: 'pin';
   /** The API version the pin run wrote. */
