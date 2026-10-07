@@ -1,5 +1,53 @@
 # uptide
 
+## 0.5.0
+
+### Minor Changes
+
+- [#39](https://github.com/uptide-dev/uptide/pull/39) [`b9f9974`](https://github.com/uptide-dev/uptide/commit/b9f9974dba7237e8e411ead80f793453ab5ebc43) Thanks [@lucasbraum](https://github.com/lucasbraum)! - A verified migration pack for the AI SDK (`ai`) 6 → 7: the renamed options (`system` →
+  `instructions`, `onFinish` → `onEnd`, `onStepFinish` → `onStepEnd`, `experimental_telemetry`
+  → `telemetry`), `stepCountIs` → `isStepCount`, `fullStream` → `stream`, `totalUsage` → `usage`
+  and the removed `experimental_*` options are rewritten by rule; telemetry `metadata`, tool
+  `context` and the stream result helpers go to the agent with the guide; what the compiler
+  cannot see (telemetry registration, results that now cover every step, rejected system
+  messages) is listed for review. Scored against vercel/chatbot and miurla/morphic at the
+  commit before their own upgrade: no false positive. `uptide pack test` gains
+  `--update-fixtures`, fixture markers take the compiler's `message`, and ground-truth
+  repositories can use bun.
+
+- [#39](https://github.com/uptide-dev/uptide/pull/39) [`b9f9974`](https://github.com/uptide-dev/uptide/commit/b9f9974dba7237e8e411ead80f793453ab5ebc43) Thanks [@lucasbraum](https://github.com/lucasbraum)! - `check` and `fix` upgrade a package together with the packages that must move with it,
+  using the groups `list` already draws (family, peer link, shared pin), each at the version
+  that agrees with the target. `fix ai` also bumps `@ai-sdk/react`, `@ai-sdk/provider` and the
+  installed `@ai-sdk/*` providers in one install and one commit; check's plan, the fix summary
+  and the PR description say which and why, and `fix` stops before changing anything when a
+  member has no release that agrees. npm and pnpm installs resolve the exact version first,
+  so a `^` range keeps the version the target pins. Ground-truth entries take `with`, the
+  packages the real upgrade moved, and `pack test` fails when check would leave one behind.
+
+- [#38](https://github.com/uptide-dev/uptide/pull/38) [`adaf8f9`](https://github.com/uptide-dev/uptide/commit/adaf8f915e746cc01f24cd60ed959989069db138) Thanks [@lucasbraum](https://github.com/lucasbraum)! - Migration packs are a public, testable contract (docs/packs.md). `uptide pack new` scaffolds
+  a pack (an example rule, a fixture pair, a test, empty ground truth) and registers it;
+  `uptide pack test` scores packs against their fixtures and against public repositories at the
+  commit before their upgrade, with precision and recall per rule, every false positive and
+  false negative, and `--json` for CI. A pack is labeled verified only with ground truth from at
+  least two public repositories and no false positive among its breaking findings; otherwise it
+  ships as a candidate and `check`, `list` and `fix` treat the dependency as generic.
+
+### Patch Changes
+
+- [#44](https://github.com/uptide-dev/uptide/pull/44) [`b4cc21f`](https://github.com/uptide-dev/uptide/commit/b4cc21f8a38b8336f55413b57177e4911f23d77b) Thanks [@lucasbraum](https://github.com/lucasbraum)! - `check` no longer dies with "Manipulation error: A syntax error was inserted." on packages
+  whose type aliases give their type parameters defaults (`type-fest` 4 → 5, `i18next` 23 → 26):
+  the alias body is read after the parameter list, not at the first default's ` = `, so these
+  aliases are compared by the checker instead of breaking the comparison program.
+
+- [#40](https://github.com/uptide-dev/uptide/pull/40) [`3e3a5fa`](https://github.com/uptide-dev/uptide/commit/3e3a5fa9f0774719421d3e8a75f2c0ed4d731ea1) Thanks [@lucasbraum](https://github.com/lucasbraum)! - `fix` verifies with the repository's own TypeScript (its `node_modules/typescript`, or an
+  ancestor's) or the bundled one, and never with a TypeScript that `NODE_PATH` or Node's global
+  folders happen to provide. A machine with a global TypeScript 6 made verification report
+  TS5107 deprecations the repository never sees.
+
+- [#37](https://github.com/uptide-dev/uptide/pull/37) [`3e7f744`](https://github.com/uptide-dev/uptide/commit/3e7f744bc5f154ac1d3562928451df481970a926) Thanks [@lucasbraum](https://github.com/lucasbraum)! - Gemini is labelled experimental: in `fix --help`, in the `LLM:` line `fix` prints, and in the
+  docs. Its evaluation runs on the storefront fixture failed on service errors (HTTP 503/429),
+  so its migration quality is not established yet.
+
 ## 0.4.0
 
 ### Minor Changes
