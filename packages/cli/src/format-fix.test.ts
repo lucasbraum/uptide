@@ -57,6 +57,7 @@ describe('formatFixSummary', () => {
       { ...fixReport(true), prUrl: 'https://github.com/o/r/pull/9' },
       { color: false },
     );
-    expect(published).toContain('https://github.com/o/r/pull/9    the pull request');
+    // Aligned with the other next steps, whose longest entry sets the padding.
+    expect(published).toMatch(/https:\/\/github\.com\/o\/r\/pull\/9 +the pull request/);
   });
 });
