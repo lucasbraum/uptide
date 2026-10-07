@@ -248,7 +248,12 @@ record no longer matches the evidence, so the label cannot outlive what supports
 
 - `packages/core/src/packs/registry.ts` is generated: `pack new` renders it again with the
   new entry. Every pack in it is scored by CI; only verified ones are used by the CLI.
-- `packs/queue.json` ranks the next packages worth a pack from public npm data
-  (`pnpm packs:queue`): weekly downloads times breaking majors in the last two years.
+- `packs/queue.json` ranks the next packages worth a pack by direct use (`pnpm packs:queue`):
+  how many sample repositories (`fixtures/corpus.json` and the pinned public applications in
+  `scripts/packs-queue-sample.ts`) declare the package in a package.json, weekly downloads
+  breaking ties. Packages that upgrade together are one entry named after their hub. Out:
+  fewer than three sample repositories using it or behind on it, no breaking change in its
+  type surface, an official codemod that covers the whole upgrade, and the packs that exist.
+  A codemod that covers part of it is named and counts half.
 - The **Packs** workflow (`.github/workflows/packs.yml`) runs `uptide pack test --json` for
   every pack with the ground-truth cache restored, on pull requests that touch packs.
