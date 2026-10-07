@@ -5,7 +5,8 @@ import type { Finding } from '../../domain/report.js';
 import { createNpmFetcher, releasePackage } from '../../fetch/npm-fetcher.js';
 import { satisfies } from '../../fetch/range.js';
 import { UPTIDE_COMMAND } from '../../version.js';
-import type { MigrationPack, PackContext, SharedHelper } from '../types.js';
+import type { Pack, PackMeta } from '../contract.js';
+import type { PackContext, SharedHelper } from '../types.js';
 import { between, type StripeCatalog } from './changelog.js';
 import catalog from './changelog.v1.json' with { type: 'json' };
 import {
@@ -158,13 +159,33 @@ export function stripeConcerns(findings: Finding[], context: PackContext) {
     },
   };
 }
-export const stripePack: MigrationPack = {
+const SDK_GUIDE =
+  'Migrate the reported Stripe SDK usage while preserving payment, subscription and webhook semantics. Use the target diagnostic and checked-in API changelog. Never remove signature verification, change monetary amounts/currency, or introduce a cast to hide incompatible data.';
+const meta: PackMeta = {
+  package: 'stripe',
+  from: '>=14',
+  // Any later version: `supports` also requires the target to be newer than what is installed.
+  to: '>=14',
+  sources: [
+    {
+      title: 'stripe-node changelog',
+      url: 'https://github.com/stripe/stripe-node/blob/master/CHANGELOG.md',
+    },
+    { title: 'Stripe API changelog', url: 'https://docs.stripe.com/changelog' },
+    { title: 'Stripe API upgrades', url: 'https://docs.stripe.com/upgrades' },
+  ],
+  maintainer: 'uptide-dev',
+};
+export const stripePack: Pack = {
   name: 'stripe',
+  meta,
   defaultTarget: '22.6.2',
-  supports: (from, to) => satisfies(from, '>=14') && satisfies(to, `>${from}`),
+  supports: (from, to) => satisfies(from, meta.from) && satisfies(to, `>${from}`),
   rules: [
     {
       id: 'api-version',
+      summary: 'an apiVersion literal or LatestApiVersion the target SDK no longer accepts',
+      severity: 'breaking',
       kinds: ['type', 'signature', 'narrowed', 'widened', 'required'],
       symbols: pin,
       guide:
@@ -172,6 +193,8 @@ export const stripePack: MigrationPack = {
     },
     {
       id: 'api-version-unpinned',
+      summary: 'a client without apiVersion, whose API version the SDK bump changes at runtime',
+      severity: 'breaking',
       kinds: ['type'],
       symbols: /^Stripe\.StripeConfig#apiVersion$/,
       guide:
@@ -179,6 +202,8 @@ export const stripePack: MigrationPack = {
     },
     {
       id: 'sdk-surface',
+      summary: 'any other SDK type or method the target changed; migrated by the agent',
+      severity: 'breaking',
       kinds: [
         'removed',
         'moved',
@@ -190,10 +215,45 @@ export const stripePack: MigrationPack = {
         'widened',
       ],
       symbols: /./,
-      guide:
-        'Migrate the reported Stripe SDK usage while preserving payment, subscription and webhook semantics. Use the target diagnostic and checked-in API changelog. Never remove signature verification, change monetary amounts/currency, or introduce a cast to hide incompatible data.',
+      guide: SDK_GUIDE,
+    },
+    // Classified from the site's evidence after the rules above matched (`changeRule` in
+    // fix/report.ts), never by kind and symbol: listed so the contract names every rule a
+    // plan or a pull request can show.
+    {
+      id: 'subscription-period',
+      summary:
+        'current_period_start/end moved to subscription items (2025-03-31.basil); migrated by the agent through one shared helper, the multi-item case is a decision',
+      severity: 'breaking',
+      kinds: [],
+      symbols: /current_period_(?:end|start)/,
+      guide: 'See the subscription period guide above.',
+    },
+    {
+      id: 'fixture-cast',
+      summary:
+        'a test that cast a partial fixture to an SDK type goes through unknown once the types stop overlapping (TS2352)',
+      severity: 'breaking',
+      kinds: [],
+      symbols: /^TS2352$/,
+      guide: 'Rewritten by rule: the same cast through unknown, in test files only.',
     },
   ],
+  behavior: [
+    {
+      id: 'api-changelog',
+      summary:
+        'API changelog entries between the two pinned API versions, filtered to the methods, fields, parameters and events the code uses',
+      reported: ['decision'],
+    },
+    {
+      id: 'webhook-payload-versions',
+      summary:
+        'api_version literals in webhook payload fixtures mirror the endpoint configuration and stay as they are',
+      reported: ['decision'],
+    },
+  ],
+  instructions: SDK_GUIDE,
   transform: (text, finding, context) => {
     // A client without apiVersion says the version the target SDK's types describe: with the
     // bump that is the only honest pin. Staying on the old version is `--pin-current-api`.

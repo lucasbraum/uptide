@@ -143,7 +143,43 @@ export { ACCEPTED_KEYS, KEY_ENV, selectLlm } from './llm/config.js';
 export { DEFAULT_MAX_COST_USD, providerFixer } from './llm/fixer.js';
 export { DEFAULT_MODELS, PRICE_DATE, PRICE_SOURCES, PRICES, priceFor } from './llm/pricing.js';
 export type { Provider } from './llm/types.js';
+export {
+  type BehaviorNote,
+  definePack,
+  type GroundTruth,
+  type GroundTruthFinding,
+  type GroundTruthRepo,
+  type Pack,
+  type PackMeta,
+  type PackRule,
+  type PackStatus,
+  type PackVerification,
+  type RegisteredPack,
+  replaceAtSite,
+  VERIFIED_MIN_REPOS,
+} from './packs/contract.js';
+export { activePacks, packStatus, registeredPacks } from './packs/index.js';
 export { sdkApiVersion, stripeConcerns, stripePack } from './packs/stripe/index.js';
+export { type FixtureResult, runFixtures } from './packs/tooling/fixtures.js';
+export {
+  GENERIC_RULE,
+  type PackTestOptions,
+  type PackTestReport,
+  type RepoScore,
+  type Tally,
+  testPack,
+} from './packs/tooling/pack-test.js';
+export {
+  type ScaffoldOptions,
+  type ScaffoldResult,
+  scaffoldPack,
+} from './packs/tooling/scaffold.js';
+export {
+  cachedRepoDir,
+  ensureRepo,
+  type PinnedRepo,
+  truthCacheDir,
+} from './packs/tooling/truth.js';
 export type { MigrationPack, MigrationRule } from './packs/types.js';
 export { zodPack } from './packs/zod/index.js';
 export { type PlanOptions, type PlanServices, upgradePlan } from './plan/gather.js';

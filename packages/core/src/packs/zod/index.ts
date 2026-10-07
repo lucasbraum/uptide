@@ -12,7 +12,8 @@ import {
 import type { Finding } from '../../domain/report.js';
 import { satisfies } from '../../fetch/range.js';
 import { onReset } from '../../shared-state.js';
-import type { MigrationPack, PackContext, TransformResult } from '../types.js';
+import type { Pack, PackMeta } from '../contract.js';
+import type { PackContext, TransformResult } from '../types.js';
 import { zodGuide } from './guide.js';
 import { defaultMessageSites } from './messages.js';
 
@@ -240,14 +241,12 @@ function parse(text: string): SourceFile {
   }
   return source;
 }
-function transform(text: string, finding: Finding, context: PackContext): TransformResult {
-  if (!zodPack.supports(context.from, context.to))
-    return { text, applied: false, reason: 'pack supports zod 3 to 4 only' };
-  const rule = zodPack.rules.find(
-    (r) => r.kinds.includes(finding.change.kind) && r.symbols.test(finding.change.path),
-  );
-  if (!rule || !['error-params', 'string-format'].includes(rule.id))
-    return { text, applied: false, reason: 'no mechanical rule for this change kind and symbol' };
+/** Runs `each` on the calls around the reported site, innermost first, until one answers. */
+function atSite(
+  text: string,
+  finding: Finding,
+  each: (call: CallExpression) => TransformResult | undefined,
+): TransformResult {
   const source = parse(text);
   const lines = text.split('\n');
   const offset =
@@ -259,43 +258,86 @@ function transform(text: string, finding: Finding, context: PackContext): Transf
     .filter((c) => c.getStart() <= offset && c.getEnd() >= offset)
     .sort((a, b) => a.getWidth() - b.getWidth());
   for (const call of calls) {
-    const result =
-      finding.change.kind === 'deprecated'
-        ? context.includeDeprecated
-          ? formatTransform(text, call)
-          : undefined
-        : errorTransform(text, call);
+    const result = each(call);
     if (result) return result;
   }
   return { text, applied: false, reason: 'no safe mechanical transform for this reported site' };
 }
-export const zodPack: MigrationPack = {
+function transform(text: string, finding: Finding, context: PackContext): TransformResult {
+  if (!zodPack.supports(context.from, context.to))
+    return { text, applied: false, reason: 'pack supports zod 3 to 4 only' };
+  const rule = zodPack.rules.find(
+    (r) => r.kinds.includes(finding.change.kind) && r.symbols.test(finding.change.path),
+  );
+  if (!rule?.rewrite)
+    return { text, applied: false, reason: 'no mechanical rule for this change kind and symbol' };
+  return rule.rewrite(text, finding, context);
+}
+const meta: PackMeta = {
+  package: 'zod',
+  from: '>=3 <4',
+  to: '>=4 <5',
+  sources: [
+    { title: 'Zod 4 migration guide', url: 'https://zod.dev/v4/changelog' },
+    { title: 'Zod 4 release notes', url: 'https://zod.dev/v4' },
+  ],
+  maintainer: 'uptide-dev',
+};
+export const zodPack: Pack = {
   name: 'zod',
+  meta,
   defaultTarget: '4.6.5',
-  supports: (from, to) => satisfies(from, '>=3 <4') && satisfies(to, '>=4 <5'),
+  supports: (from, to) => satisfies(from, meta.from) && satisfies(to, meta.to),
   rules: [
     {
       id: 'error-params',
+      summary: 'required_error and invalid_type_error become one error callback',
+      severity: 'breaking',
       kinds: ['signature', 'type', 'required'],
       symbols:
         /string|number|boolean|bigint|date|symbol|undefined|null|void|any|unknown|never|enum|object|literal|array|tuple|union|record|map|set|TS(?:2353|2769|2345)/,
       guide: zodGuide.errors,
+      rewrite: (text, finding) => atSite(text, finding, (call) => errorTransform(text, call)),
     },
     {
       id: 'string-format',
+      summary: 'z.string().email() and the other formats move to top-level factories',
+      severity: 'deprecated',
       kinds: ['deprecated'],
       symbols: /#(email|uuid|url|base64|datetime)$/,
       guide: zodGuide.formats,
+      rewrite: (text, finding, context) =>
+        atSite(text, finding, (call) =>
+          context.includeDeprecated ? formatTransform(text, call) : undefined,
+        ),
     },
-    { id: 'ip', kinds: ['removed'], symbols: /#ip$/, guide: zodGuide.ip },
+    {
+      id: 'ip',
+      summary: 'z.string().ip() was removed: z.ipv4(), z.ipv6() or their union',
+      severity: 'breaking',
+      kinds: ['removed'],
+      symbols: /#ip$/,
+      guide: zodGuide.ip,
+    },
     {
       id: 'types',
+      summary: 'ZodType generics and ZodTypeDef changed; type-level code is migrated by the agent',
+      severity: 'breaking',
       kinds: ['type', 'signature', 'removed', 'narrowed', 'cause'],
       symbols: /./,
       guide: zodGuide.generics,
       perFile: true,
     },
   ],
+  behavior: [
+    {
+      id: 'default-messages',
+      summary:
+        'Zod 4 words its default error messages differently; code and tests matching the old text keep compiling',
+      reported: ['decision', 'test-follow-up'],
+    },
+  ],
+  instructions: zodGuide.generics,
   transform,
   guide: (f) =>
     zodPack.rules.find((r) => r.kinds.includes(f.change.kind) && r.symbols.test(f.change.path))

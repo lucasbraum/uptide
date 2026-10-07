@@ -35,6 +35,7 @@ Other suites, when your change touches them:
 | `UPTIDE_NETWORK=1 pnpm test` | real package digests, the Stripe `tsc` fixture | npm registry |
 | `pnpm smoke 20` / `pnpm smoke 22` | the packed CLI on npm, pnpm and Yarn fixtures | Docker |
 | `pnpm eval:check fixtures/repos/storefront --truth=fixtures/truth/storefront.json` | check against the errors a real upgrade produced | the fixture's dependencies (`pnpm install --ignore-scripts` in it) |
+| `pnpm uptide pack test` | every pack against its fixtures and its public ground truth | network the first time (`pnpm packs:fetch`), then `--offline` |
 
 ## Layout
 
@@ -69,25 +70,77 @@ from this repository, so it is scanned in full. Which scan runs when:
 ## How packs work
 
 A migration pack (`packages/core/src/packs/<dependency>/`) owns the knowledge of one
-dependency; the runner owns everything else (install, verification, commits, publishing).
-The contract is `MigrationPack` in `packages/core/src/packs/types.ts`. A pack provides:
+dependency upgrade; the runner owns everything else (install, verification, commits,
+publishing). The public contract, with zod as the reference, is [docs/packs.md](docs/packs.md)
+and `packages/core/src/packs/contract.ts`. A pack provides:
 
-- **rules**: deterministic rewrites, applied only at sites `check` reported;
-- **a guide** for assisted fixes, and a validator that can reject a patch the compiler
-  would accept (a fallback like `?? 0` that hides a missing value, for example);
-- **findings the compiler cannot see** (a Stripe client without `apiVersion`);
-- **review material**: decisions that are the user's to make, changelog entries filtered to
-  what the code uses, test follow-ups.
+- **metadata**: the package, the `from` and `to` version ranges, its sources (changelog,
+  migration guide) and its maintainer;
+- **rules**: what `check` reports that the rule claims, and a deterministic rewrite applied
+  only at reported sites, or a guide for the agent;
+- **behavior notes**: changes the compiler cannot see (a Stripe client without
+  `apiVersion`, zod's reworded default messages), and how each is reported;
+- **agent instructions** for what no rule can do;
+- **fixtures** and **ground truth**: public repositories at the commit before their upgrade,
+  with the findings expected there.
 
 Rules for a pack change:
 
 1. A rule never edits a site that was not reported, and never changes behavior silently.
    When behavior can differ, the report says so and asks.
-2. Every rule has a test with the code before and after, and a case it must leave alone.
-3. A claim about what a pack finds is backed by ground truth in `fixtures/truth/`: the
-   compiler errors a real upgrade produced on a fixture in this repository. No private
-   code, paths or names anywhere in the tree: fixtures are synthetic.
-4. Server API changes (Stripe API versions) are never rewritten by rule.
+2. Every rule that rewrites or detects has a fixture with the code before and after, and a
+   site it must leave alone.
+3. A claim about what a pack finds is backed by ground truth from public repositories, scored
+   by `uptide pack test`. Expected findings come from the repository's own upgrade and the
+   compiler, never from Uptide's output. No private code, paths or names anywhere: fixtures
+   are synthetic, ground truth is public.
+4. A pack is verified only with ground truth from two public repositories and no false
+   positive among its breaking findings; until then it ships as a candidate, and the CLI
+   treats the dependency as generic.
+5. Server API changes (Stripe API versions) are never rewritten by rule.
+
+## Write a pack
+
+About an hour for a focused upgrade. Pick one from [`packs/queue.json`](packs/queue.json), or
+open a **Pack request** issue, and say you are writing it.
+
+1. **Read the sources.** The official migration guide and the changelog of the target major.
+   List the breaking changes, and for each: does the compiler see it, and is a rewrite safe
+   whatever the surrounding code is? (15 minutes)
+2. **Scaffold.**
+   ```sh
+   pnpm uptide pack new <package> --from ">=6 <7" --to ">=7 <8" --maintainer @you
+   ```
+   This writes `packages/core/src/packs/<name>/` (the pack with one example rule, a fixture
+   pair, a test, an empty `ground-truth.json`, `verification.json`) and registers it. It
+   passes `pnpm lint` and `pnpm test` as written.
+3. **Write the rules** in `index.ts`, replacing the example: put the guide and changelog URLs
+   in `meta.sources`; one rule per compiler-visible change you can rewrite safely
+   (`kinds`, `symbols`, `rewrite`; `replaceAtSite` covers renames); a rule with only a `guide`
+   for one the agent must do; a behavior note for each change the compiler cannot see, with
+   `detect` when its sites can be found in the source. (15 minutes)
+4. **Write fixtures**: `fixtures/<case>/before.ts` with each site marked
+   (`// @uptide <rule>`, `keep` for one it must leave alone) and `after.ts`, what the rules
+   must produce. `pnpm uptide pack test <package> --fixtures-only` runs them in seconds.
+5. **Find ground truth.** Two public repositories that made this upgrade in a commit you
+   can point at. Pin the commit before it, and draft the expected findings from their own
+   compiler and their own upgrade commit:
+   ```sh
+   pnpm packs:truth <package> owner/name <commit-before> <upgrade-commit> --to <version>
+   ```
+   Read each site, drop what is not about the package, and give each its rule (`generic`
+   when no rule of the pack covers it). (15 minutes)
+6. **Score it.**
+   ```sh
+   pnpm uptide pack test <package>          # fetches the repositories once, scripts off
+   pnpm uptide pack test <package> --write  # records the status in verification.json
+   ```
+   Every false positive among breaking findings fails it. Fix the rule, not the ground truth.
+   A false negative is a site to cover or a known gap to say in the pull request.
+7. **Open the pull request** with the pack template (`?template=pack.md`), with the
+   `pack test` output pasted in, and a changeset.
+
+`pnpm uptide` runs the CLI from source, so nothing needs building while you work.
 
 ## Rules that do not bend
 

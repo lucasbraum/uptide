@@ -88,8 +88,10 @@ or incomplete analysis. A failing package/workspace does not erase successful re
 
 ### Tiers
 
-Every row says `verified` or `generic`. Verified: a migration pack covers the upgrade.
-Generic: no pack; a finding is breaking only with evidence, which `--details` names under
+Every row says `verified` or `generic`. Verified: a migration pack covers the upgrade, and
+its ground truth from at least two public repositories has no false positive among breaking
+findings ([docs/packs.md](packs.md)). A pack that has not met that bar yet is a candidate and
+the row says generic. Generic: no verified pack; a finding is breaking only with evidence, which `--details` names under
 each site:
 
 - your code does not compile against the target at that site;
@@ -311,6 +313,27 @@ Builds embed the Uptide commit and whether its source checkout had working-tree 
 and type verification on the recorded commit without installing or changing source.
 Diffs, file lists, verification and run details are collapsed; the Action comment and
 terminal share the compact migration renderer.
+
+## `uptide pack new|test` (contributors)
+
+Packs are written in an uptide checkout; the contract is [docs/packs.md](packs.md) and the
+steps are in [CONTRIBUTING.md](../CONTRIBUTING.md#write-a-pack). `pnpm uptide` runs the CLI
+from source.
+
+```sh
+pnpm uptide pack new ai --from ">=6 <7" --to ">=7 <8" --maintainer @you
+pnpm uptide pack test ai                 # fixtures, then check on each ground-truth repository
+pnpm uptide pack test --json             # every pack, for CI
+pnpm uptide pack test ai --offline       # cached repositories only
+pnpm uptide pack test ai --fixtures-only
+pnpm uptide pack test ai --write         # record the measured status in verification.json
+```
+
+`pack test` prints precision and recall per rule, overall and for breaking findings, and
+every false positive and false negative as `repository  file:line  rule`. Exit codes: **0**
+every pack passed, **1** a false positive among breaking findings, a failing fixture, or a
+`verification.json` the run does not support, **2** it could not run (not in a checkout,
+bad arguments).
 
 ## `uptide telemetry on|off|status|show`
 

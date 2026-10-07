@@ -1,7 +1,17 @@
 import { readFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 import type { CheckReport, CheckResult, FixReport } from '@uptide/core';
-import { formatFix, isFailure, PRICE_DATE, priceFor, selectLlm, TIER_LEGEND } from '@uptide/core';
+import {
+  formatFix,
+  isFailure,
+  PRICE_DATE,
+  priceFor,
+  registeredPacks,
+  scaffoldPack,
+  selectLlm,
+  TIER_LEGEND,
+  testPack,
+} from '@uptide/core';
 import { Command, CommanderError } from 'commander';
 import { describeRepo, detectRepo, type Repo } from './detect.js';
 import { defaultEngine, type Engine } from './engine.js';
@@ -29,6 +39,7 @@ import { writePlanHtml } from './html/plan.js';
 import { openHtml, writeHtml } from './html/write.js';
 import { INVOCATION } from './invocation.js';
 import { type Io, type Ui, type UiFlags, uiOf } from './io.js';
+import { formatPackTest, packRoot, packsToTest } from './pack.js';
 import { PRIVACY } from './privacy.js';
 import { createProgress, elapsed, type Progress } from './progress.js';
 import {
@@ -1164,6 +1175,98 @@ ${EXIT_CODES('description rendered (and updated unless --preview)', 'not used')}
         }
         return EXIT.ok;
       }),
+    );
+
+  const packs = program
+    .command('pack')
+    .description('Write and score migration packs (inside an uptide checkout; docs/packs.md)');
+  packs
+    .command('new')
+    .description('Scaffold a pack: one example rule, a fixture pair, a test, empty ground truth')
+    .argument('<package>', 'the npm package the pack migrates')
+    .requiredOption(
+      '--from <range>',
+      'installed versions it migrates from, a semver range (">=6 <7")',
+    )
+    .requiredOption('--to <range>', 'target versions, a semver range (">=7 <8")')
+    .option('--maintainer <handle>', 'who answers for the pack: a GitHub handle')
+    .option('--cwd <dir>', 'a directory inside the uptide checkout')
+    .option('--json', 'machine-readable output')
+    .addHelpText(
+      'after',
+      `
+Example:
+  $ uptide pack new ai --from ">=6 <7" --to ">=7 <8" --maintainer @octocat
+${EXIT_CODES('scaffolded', 'not used')}`,
+    )
+    .action((name: string, flags: Shared & { from: string; to: string; maintainer?: string }) =>
+      act(flags, async ({ cwd }) => {
+        const root = packRoot(cwd);
+        const result = scaffoldPack({
+          root,
+          package: name,
+          from: flags.from,
+          to: flags.to,
+          ...(flags.maintainer ? { maintainer: flags.maintainer } : {}),
+        });
+        if (flags.json) emit(result);
+        else {
+          io.out(`Scaffolded the ${name} pack (${result.constant}), registered as a candidate:\n`);
+          for (const file of result.files) io.out(`  ${file}\n`);
+          io.out(
+            `\nNext: replace the example rule, add fixtures and ground truth (docs/packs.md), then\n  pnpm uptide pack test ${name}\n`,
+          );
+        }
+        return EXIT.ok;
+      }),
+    );
+  packs
+    .command('test')
+    .description(
+      'Score packs against their fixtures and ground truth: precision and recall per rule',
+    )
+    .argument('[package]', 'one pack; every registered pack when omitted')
+    .option('--offline', 'never fetch: use only ground-truth repositories already cached')
+    .option('--fixtures-only', 'run the fixtures, skip the ground-truth repositories')
+    .option('--write', "record this run's result in the pack's verification.json")
+    .option('--cwd <dir>', 'a directory inside the uptide checkout')
+    .option('--json', 'machine-readable output for CI')
+    .option('--no-color', 'no color (NO_COLOR is respected too)')
+    .addHelpText(
+      'after',
+      `
+Ground-truth repositories are fetched once (shallow, the pinned commit only) and installed with
+lifecycle scripts off into ~/.cache/uptide/ground-truth (UPTIDE_GROUND_TRUTH_CACHE overrides it).
+
+Examples:
+  $ uptide pack test zod
+  $ uptide pack test --json > pack-test.json
+  $ uptide pack test ai --write          record the status verification.json claims
+${EXIT_CODES('every pack passed', 'a false positive among breaking findings, a failing fixture, or a stale verification.json')}`,
+    )
+    .action(
+      (
+        name: string | undefined,
+        flags: Shared & { offline?: boolean; fixturesOnly?: boolean; write?: boolean },
+      ) =>
+        act(flags, async ({ ui, cwd }) => {
+          const root = packRoot(cwd);
+          const reports = [];
+          for (const entry of packsToTest(root, registeredPacks(), name)) {
+            const report = await testPack(entry, {
+              root,
+              ...(flags.offline ? { offline: true } : {}),
+              ...(flags.fixturesOnly ? { fixturesOnly: true } : {}),
+              ...(flags.write ? { write: true } : {}),
+              log: (line) => io.err(`${line}\n`),
+            });
+            reports.push(report);
+            if (!flags.json) io.out(formatPackTest(report, ui.color));
+          }
+          const passed = reports.every((r) => r.passed);
+          if (flags.json) emit({ passed, packs: reports });
+          return passed ? EXIT.ok : EXIT.breaking;
+        }),
     );
 
   program

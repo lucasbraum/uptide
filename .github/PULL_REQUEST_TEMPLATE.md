@@ -1,3 +1,5 @@
+<!-- Adding or changing a migration pack? Use the pack template: add ?template=pack.md to this page's URL. -->
+
 ## What and why
 
 <!-- One change. What was wrong or missing, and what this does about it. -->

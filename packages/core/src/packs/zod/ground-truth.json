@@ -1,0 +1,822 @@
+{
+  "package": "zod",
+  "repos": [
+    {
+      "fixture": "fixtures/repos/storefront",
+      "from": "3.25.76",
+      "to": "4.6.5",
+      "why": "synthetic pnpm workspace of this repository (fixtures/truth/storefront.json): error params, string formats, ip, generics across two workspaces",
+      "findings": [
+        {
+          "file": "packages/api/src/queue/consumer.ts",
+          "line": 2,
+          "rule": "types"
+        },
+        {
+          "file": "packages/api/src/queue/consumer.ts",
+          "line": 12,
+          "rule": "types"
+        },
+        {
+          "file": "packages/api/src/queue/consumer.ts",
+          "line": 19,
+          "rule": "types"
+        },
+        {
+          "file": "packages/api/src/routes/customers.ts",
+          "line": 5,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/api/src/routes/customers.ts",
+          "line": 6,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/api/src/routes/customers.ts",
+          "line": 7,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/api/src/routes/customers.ts",
+          "line": 12,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/api/src/routes/customers.ts",
+          "line": 13,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/api/src/routes/orders.ts",
+          "line": 5,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/api/src/routes/orders.ts",
+          "line": 6,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/api/src/routes/orders.ts",
+          "line": 10,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/api/src/routes/orders.ts",
+          "line": 13,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/api/src/routes/orders.ts",
+          "line": 17,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/api/src/routes/orders.ts",
+          "line": 18,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/api/src/routes/webhooks.ts",
+          "line": 4,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/api/src/routes/webhooks.ts",
+          "line": 6,
+          "rule": "string-format"
+        },
+        {
+          "file": "packages/api/src/routes/webhooks.ts",
+          "line": 8,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/api/src/routes/webhooks.ts",
+          "line": 9,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/api/src/routes/webhooks.ts",
+          "line": 14,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/api/src/routes/webhooks.ts",
+          "line": 15,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/api/src/routes/webhooks.ts",
+          "line": 16,
+          "rule": "string-format"
+        },
+        {
+          "file": "packages/shared/src/address.ts",
+          "line": 4,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/shared/src/address.ts",
+          "line": 5,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/shared/src/address.ts",
+          "line": 7,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/shared/src/address.ts",
+          "line": 10,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/shared/src/errors.ts",
+          "line": 8,
+          "rule": "generic"
+        },
+        {
+          "file": "packages/shared/src/errors.ts",
+          "line": 25,
+          "rule": "generic"
+        },
+        {
+          "file": "packages/shared/src/monitoring.ts",
+          "line": 5,
+          "rule": "string-format"
+        },
+        {
+          "file": "packages/shared/src/monitoring.ts",
+          "line": 6,
+          "rule": "ip"
+        },
+        {
+          "file": "packages/shared/src/monitoring.ts",
+          "line": 9,
+          "rule": "string-format"
+        },
+        {
+          "file": "packages/shared/src/product.ts",
+          "line": 4,
+          "rule": "string-format"
+        },
+        {
+          "file": "packages/shared/src/product.ts",
+          "line": 5,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/shared/src/product.ts",
+          "line": 6,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/shared/src/product.ts",
+          "line": 8,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/shared/src/product.ts",
+          "line": 11,
+          "rule": "string-format"
+        },
+        {
+          "file": "packages/shared/src/product.ts",
+          "line": 12,
+          "rule": "string-format"
+        },
+        {
+          "file": "packages/shared/src/product.ts",
+          "line": 16,
+          "rule": "string-format"
+        },
+        {
+          "file": "packages/shared/src/product.ts",
+          "line": 17,
+          "rule": "error-params"
+        }
+      ]
+    },
+    {
+      "repo": "ugurkocde/AwesomeIntune",
+      "commit": "dcf38603fd55cea72737e17274d5de03cece341e",
+      "migration": "https://github.com/ugurkocde/AwesomeIntune/commit/c980a77e4863578f3a26281d9c20505bc43b1e01",
+      "from": "3.25.76",
+      "to": "4.6.5",
+      "why": "Next.js app (npm): ZodError.errors, errorMap on z.literal, string formats in schemas and env.js",
+      "findings": [
+        {
+          "file": "src/app/api/ideas/route.ts",
+          "line": 201,
+          "rule": "generic",
+          "note": "compiler TS6387"
+        },
+        {
+          "file": "src/app/api/submit-tool/route.ts",
+          "line": 17,
+          "rule": "generic",
+          "note": "compiler TS6387"
+        },
+        {
+          "file": "src/app/api/subscribe/route.ts",
+          "line": 10,
+          "rule": "string-format",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "src/app/api/subscribe/route.ts",
+          "line": 23,
+          "rule": "generic",
+          "note": "compiler TS2339"
+        },
+        {
+          "file": "src/app/api/v1/keys/route.ts",
+          "line": 30,
+          "rule": "generic",
+          "note": "compiler TS2339"
+        },
+        {
+          "file": "src/env.js",
+          "line": 12,
+          "rule": "string-format",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "src/env.js",
+          "line": 25,
+          "rule": "string-format",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "src/lib/schemas/api-key.ts",
+          "line": 8,
+          "rule": "string-format",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "src/lib/schemas/tool-submission.ts",
+          "line": 35,
+          "rule": "string-format",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "src/lib/schemas/tool-submission.ts",
+          "line": 44,
+          "rule": "string-format",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "src/lib/schemas/tool-submission.ts",
+          "line": 53,
+          "rule": "string-format",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "src/lib/schemas/tool-submission.ts",
+          "line": 80,
+          "rule": "string-format",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "src/lib/schemas/tool-submission.ts",
+          "line": 85,
+          "rule": "string-format",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "src/lib/schemas/tool-submission.ts",
+          "line": 86,
+          "rule": "string-format",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "src/lib/schemas/tool-submission.ts",
+          "line": 99,
+          "rule": "error-params",
+          "note": "compiler TS2769"
+        }
+      ]
+    },
+    {
+      "repo": "howardyang2009/PATH",
+      "commit": "bb171417d911f373c8df28ab7a1e0698b62e0906",
+      "migration": "https://github.com/howardyang2009/PATH/commit/bf66cc6c189d7e61f2c810680d3d956d581351fe",
+      "from": "3.25.76",
+      "to": "4.6.5",
+      "why": "pnpm workspace of four packages: single-argument z.record, ZodDiscriminatedUnionOption, a ZodErrorMap with ctx, recursive lazy schemas, _def.typeName reads",
+      "findings": [
+        {
+          "file": "packages/designer/src/open-workflow.ts",
+          "line": 148,
+          "rule": "types",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/engine/src/run-workflow.ts",
+          "line": 1208,
+          "rule": "generic",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/engine/step-plugins/person-activity/index.ts",
+          "line": 5,
+          "rule": "generic",
+          "note": "compiler TS2554"
+        },
+        {
+          "file": "packages/engine/step-plugins/prompt/index.ts",
+          "line": 41,
+          "rule": "generic",
+          "note": "compiler TS2554"
+        },
+        {
+          "file": "packages/schema/src/conditions.ts",
+          "line": 9,
+          "rule": "generic",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/schema/src/conditions.ts",
+          "line": 20,
+          "rule": "generic",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/schema/src/config.ts",
+          "line": 63,
+          "rule": "generic",
+          "note": "compiler TS2554"
+        },
+        {
+          "file": "packages/schema/src/config.ts",
+          "line": 73,
+          "rule": "generic",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/schema/src/config.ts",
+          "line": 83,
+          "rule": "types",
+          "note": "compiler TS2322"
+        },
+        {
+          "file": "packages/schema/src/config.ts",
+          "line": 102,
+          "rule": "generic",
+          "note": "compiler TS2554"
+        },
+        {
+          "file": "packages/schema/src/interpolation.ts",
+          "line": 111,
+          "rule": "generic",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/schema/src/interpolation.ts",
+          "line": 117,
+          "rule": "types",
+          "note": "compiler TS2322"
+        },
+        {
+          "file": "packages/schema/src/interpolation.ts",
+          "line": 124,
+          "rule": "generic",
+          "note": "compiler TS2554"
+        },
+        {
+          "file": "packages/schema/src/nodes.ts",
+          "line": 1,
+          "rule": "types",
+          "note": "compiler TS2724"
+        },
+        {
+          "file": "packages/schema/src/nodes.ts",
+          "line": 22,
+          "rule": "generic",
+          "note": "compiler TS2554"
+        },
+        {
+          "file": "packages/schema/src/nodes.ts",
+          "line": 59,
+          "rule": "types",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "packages/schema/src/nodes.ts",
+          "line": 206,
+          "rule": "types",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "packages/schema/src/nodes.ts",
+          "line": 229,
+          "rule": "generic",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/schema/src/nodes.ts",
+          "line": 255,
+          "rule": "error-params",
+          "note": "compiler TS2322"
+        },
+        {
+          "file": "packages/schema/src/nodes.ts",
+          "line": 256,
+          "rule": "generic",
+          "note": "compiler TS2339"
+        },
+        {
+          "file": "packages/schema/src/nodes.ts",
+          "line": 260,
+          "rule": "generic",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "packages/schema/src/nodes.ts",
+          "line": 292,
+          "rule": "error-params",
+          "note": "compiler TS2353"
+        },
+        {
+          "file": "packages/schema/src/wire-step-plugins.ts",
+          "line": 1,
+          "rule": "types",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/schema/src/wire-step-plugins.ts",
+          "line": 60,
+          "rule": "types",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/schema/src/wire-step-plugins.ts",
+          "line": 77,
+          "rule": "types",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/schema/src/wire-step-plugins.ts",
+          "line": 79,
+          "rule": "types",
+          "note": "compiler TS2352"
+        },
+        {
+          "file": "packages/schema/src/wire-step-plugins.ts",
+          "line": 83,
+          "rule": "generic",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "packages/schema/src/wire-step-plugins.ts",
+          "line": 84,
+          "rule": "types",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/schema/src/wire-step-plugins.ts",
+          "line": 87,
+          "rule": "types",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/schema/src/wire-step-plugins.ts",
+          "line": 91,
+          "rule": "types",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/schema/src/wire-step-plugins.ts",
+          "line": 94,
+          "rule": "types",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/schema/src/wire-step-plugins.ts",
+          "line": 104,
+          "rule": "types",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/schema/src/workflow-file.ts",
+          "line": 25,
+          "rule": "generic",
+          "note": "compiler TS2554"
+        },
+        {
+          "file": "packages/schema/src/workflow-file.ts",
+          "line": 176,
+          "rule": "generic",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/schema/src/workflow-file.ts",
+          "line": 185,
+          "rule": "generic",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/schema/src/workflow-file.ts",
+          "line": 193,
+          "rule": "generic",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/schema/src/workflow-file.ts",
+          "line": 210,
+          "rule": "types",
+          "note": "compiler TS2345"
+        },
+        {
+          "file": "packages/schema/test/builtin-registry.ts",
+          "line": 22,
+          "rule": "generic",
+          "note": "compiler TS2554"
+        },
+        {
+          "file": "packages/schema/test/wire-step-plugins.test.ts",
+          "line": 27,
+          "rule": "generic",
+          "note": "compiler TS2554"
+        },
+        {
+          "file": "packages/server/src/routes/post-runs.ts",
+          "line": 12,
+          "rule": "generic",
+          "note": "compiler TS2554"
+        },
+        {
+          "file": "packages/server/src/routes/post-runs.ts",
+          "line": 55,
+          "rule": "generic",
+          "note": "compiler TS2345"
+        },
+        {
+          "file": "packages/server/src/routes/post-runs.ts",
+          "line": 82,
+          "rule": "generic",
+          "note": "compiler TS2322"
+        },
+        {
+          "file": "packages/server/src/routes/put-workflow.ts",
+          "line": 22,
+          "rule": "generic",
+          "note": "compiler TS2554"
+        },
+        {
+          "file": "packages/server/src/routes/resume-run.ts",
+          "line": 52,
+          "rule": "generic",
+          "note": "compiler TS2345"
+        },
+        {
+          "file": "packages/server/src/routes/resume-run.ts",
+          "line": 127,
+          "rule": "generic",
+          "note": "compiler TS2322"
+        },
+        {
+          "file": "scripts/test/builtin-registry.ts",
+          "line": 23,
+          "rule": "generic",
+          "note": "compiler TS2554"
+        }
+      ]
+    },
+    {
+      "repo": "band-ai/band-sdk-typescript",
+      "commit": "5d9a66a1dde4989fbc0608200f291f0ca8194052",
+      "migration": "https://github.com/band-ai/band-sdk-typescript/commit/c5ef5dd0fabf836104a5b2c13a2e29abc6a97127",
+      "from": "3.25.76",
+      "to": "4.6.5",
+      "why": "pnpm workspace SDK: AnyZodObject, single-argument z.record, ZodTypeAny and ZodIssue, string formats",
+      "findings": [
+        {
+          "file": "packages/sdk/src/adapters/claude-sdk/ClaudeSDKAdapter.ts",
+          "line": 92,
+          "rule": "types",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/sdk/src/integrations/linear/tools.ts",
+          "line": 53,
+          "rule": "generic",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/sdk/src/integrations/linear/tools.ts",
+          "line": 175,
+          "rule": "string-format",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/sdk/src/integrations/linear/tools.ts",
+          "line": 289,
+          "rule": "types",
+          "note": "compiler TS2724"
+        },
+        {
+          "file": "packages/sdk/src/integrations/linear/tools.ts",
+          "line": 290,
+          "rule": "types",
+          "note": "compiler TS2724"
+        },
+        {
+          "file": "packages/sdk/src/integrations/linear/tools.ts",
+          "line": 612,
+          "rule": "string-format",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/sdk/src/integrations/linear/tools.ts",
+          "line": 617,
+          "rule": "string-format",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/sdk/src/integrations/linear/tools.ts",
+          "line": 676,
+          "rule": "string-format",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/sdk/src/integrations/linear/tools.ts",
+          "line": 700,
+          "rule": "string-format",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/sdk/src/integrations/linear/tools.ts",
+          "line": 704,
+          "rule": "string-format",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/sdk/src/integrations/linear/tools.ts",
+          "line": 705,
+          "rule": "string-format",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/sdk/src/integrations/linear/tools.ts",
+          "line": 706,
+          "rule": "string-format",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/sdk/src/mcp/sdk.ts",
+          "line": 359,
+          "rule": "types",
+          "note": "compiler TS2345"
+        },
+        {
+          "file": "packages/sdk/src/mcp/server.ts",
+          "line": 311,
+          "rule": "types",
+          "note": "compiler TS2322"
+        },
+        {
+          "file": "packages/sdk/src/mcp/sse.ts",
+          "line": 239,
+          "rule": "types",
+          "note": "compiler TS2322"
+        },
+        {
+          "file": "packages/sdk/src/mcp/stdio.ts",
+          "line": 93,
+          "rule": "types",
+          "note": "compiler TS2322"
+        },
+        {
+          "file": "packages/sdk/src/mcp/zod.ts",
+          "line": 5,
+          "rule": "types",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/sdk/src/mcp/zod.ts",
+          "line": 6,
+          "rule": "types",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/sdk/src/mcp/zod.ts",
+          "line": 19,
+          "rule": "types",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/sdk/src/platform/streaming/disconnectReason.ts",
+          "line": 109,
+          "rule": "generic",
+          "note": "compiler TS2554"
+        },
+        {
+          "file": "packages/sdk/src/platform/streaming/payloadSchemas.ts",
+          "line": 8,
+          "rule": "generic",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/sdk/src/platform/streaming/payloadSchemas.ts",
+          "line": 12,
+          "rule": "generic",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/sdk/src/platform/streaming/payloadSchemas.ts",
+          "line": 25,
+          "rule": "generic",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/sdk/src/platform/streaming/payloadSchemas.ts",
+          "line": 31,
+          "rule": "generic",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/sdk/src/platform/streaming/payloadSchemas.ts",
+          "line": 44,
+          "rule": "generic",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/sdk/src/platform/streaming/payloadSchemas.ts",
+          "line": 52,
+          "rule": "generic",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/sdk/src/platform/streaming/payloadSchemas.ts",
+          "line": 59,
+          "rule": "generic",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/sdk/src/platform/streaming/payloadSchemas.ts",
+          "line": 63,
+          "rule": "generic",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/sdk/src/platform/streaming/payloadSchemas.ts",
+          "line": 67,
+          "rule": "generic",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/sdk/src/platform/streaming/payloadSchemas.ts",
+          "line": 76,
+          "rule": "generic",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/sdk/src/platform/streaming/payloadSchemas.ts",
+          "line": 81,
+          "rule": "generic",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/sdk/src/platform/streaming/payloadSchemas.ts",
+          "line": 91,
+          "rule": "generic",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/sdk/src/platform/streaming/payloadSchemas.ts",
+          "line": 95,
+          "rule": "generic",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/sdk/src/runtime/tools/customTools.ts",
+          "line": 1,
+          "rule": "generic",
+          "note": "compiler TS6385"
+        },
+        {
+          "file": "packages/sdk/src/runtime/tools/customTools.ts",
+          "line": 5,
+          "rule": "types",
+          "note": "compiler TS2724"
+        },
+        {
+          "file": "packages/sdk/src/runtime/tools/customTools.ts",
+          "line": 78,
+          "rule": "types",
+          "note": "compiler TS2724"
+        },
+        {
+          "file": "packages/sdk/src/runtime/tools/customTools.ts",
+          "line": 146,
+          "rule": "generic",
+          "note": "compiler TS6385"
+        }
+      ]
+    }
+  ],
+  "$comment": "Ground truth for the zod pack (docs/packs.md, \"Ground truth\"). Each public repository is pinned at the commit before its own zod 3 to 4 upgrade. Expected findings come from two sources that are not Uptide, drafted by pnpm packs:truth and read by hand: the diagnostics the repository's TypeScript reports with zod 4.6.5 linked in and not without it (errors, and deprecations 6385/6387), and the lines the upgrade commit changed for zod (one site per construct; comments and other packages' changes left out). Rules are assigned from each site's code and text. The storefront fixture is synthetic: scored, never counted toward verified; its breaking sites are the tsc errors of fixtures/truth/storefront.json."
+}

@@ -1,0 +1,151 @@
+{
+  "package": "stripe",
+  "repos": [
+    {
+      "fixture": "fixtures/repos/storefront",
+      "from": "14.25.0",
+      "to": "23.0.0",
+      "why": "synthetic pnpm workspace of this repository (fixtures/truth/storefront.json): apiVersion literal, subscription period, a widened test fixture cast",
+      "findings": [
+        {
+          "file": "packages/api/src/billing/client.ts",
+          "line": 9,
+          "rule": "api-version"
+        },
+        {
+          "file": "packages/api/src/billing/renewal.test.ts",
+          "line": 7,
+          "rule": "fixture-cast"
+        },
+        {
+          "file": "packages/api/src/billing/renewal.ts",
+          "line": 12,
+          "rule": "subscription-period"
+        },
+        {
+          "file": "packages/api/src/billing/renewal.ts",
+          "line": 13,
+          "rule": "subscription-period"
+        }
+      ]
+    },
+    {
+      "repo": "unkeyed/unkey",
+      "commit": "37044fc57fe08c917e92b323933baf322d6df1c6",
+      "migration": "https://github.com/unkeyed/unkey/commit/234357b0226c2d2dc7881e096d1ff216ea02ccf8",
+      "directory": "web",
+      "from": "14.23.0",
+      "to": "22.2.0",
+      "why": "pnpm monorepo dashboard: two apiVersion pins, Invoice.subscription and payment_intent moved, the subscription period on items, Stripe.errors used as a type",
+      "findings": [
+        {
+          "file": "apps/dashboard/app/api/webhooks/stripe/route.ts",
+          "line": 88,
+          "rule": "api-version",
+          "note": "compiler TS2322"
+        },
+        {
+          "file": "apps/dashboard/lib/stripe.ts",
+          "line": 26,
+          "rule": "api-version",
+          "note": "compiler TS2322"
+        },
+        {
+          "file": "apps/dashboard/lib/stripe/paymentUtils.ts",
+          "line": 253,
+          "rule": "sdk-surface",
+          "note": "compiler TS2339"
+        },
+        {
+          "file": "apps/dashboard/lib/stripe/paymentUtils.ts",
+          "line": 258,
+          "rule": "sdk-surface",
+          "note": "compiler TS2339"
+        },
+        {
+          "file": "apps/dashboard/lib/stripe/paymentUtils.ts",
+          "line": 264,
+          "rule": "sdk-surface",
+          "note": "compiler TS2339"
+        },
+        {
+          "file": "apps/dashboard/lib/stripe/paymentUtils.ts",
+          "line": 281,
+          "rule": "subscription-period",
+          "note": "compiler TS2339"
+        },
+        {
+          "file": "apps/dashboard/lib/stripe/paymentUtils.ts",
+          "line": 287,
+          "rule": "subscription-period",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "apps/dashboard/lib/stripe/paymentUtils.ts",
+          "line": 363,
+          "rule": "sdk-surface",
+          "note": "compiler TS2339"
+        },
+        {
+          "file": "apps/dashboard/lib/stripe/paymentUtils.ts",
+          "line": 365,
+          "rule": "sdk-surface",
+          "note": "compiler TS2339"
+        },
+        {
+          "file": "apps/dashboard/lib/stripe/paymentUtils.ts",
+          "line": 366,
+          "rule": "sdk-surface",
+          "note": "compiler TS2339"
+        },
+        {
+          "file": "apps/dashboard/lib/stripe/paymentUtils.ts",
+          "line": 367,
+          "rule": "sdk-surface",
+          "note": "compiler TS2339"
+        },
+        {
+          "file": "apps/dashboard/lib/stripe/paymentUtils.ts",
+          "line": 450,
+          "rule": "sdk-surface",
+          "note": "compiler TS2339"
+        },
+        {
+          "file": "apps/dashboard/lib/stripe/subscriptionUtils.ts",
+          "line": 118,
+          "rule": "sdk-surface",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "apps/dashboard/lib/trpc/routers/utils/stripe.ts",
+          "line": 49,
+          "rule": "sdk-surface",
+          "note": "compiler TS2749"
+        },
+        {
+          "file": "tools/migrate/migrate_subscription.ts",
+          "line": 3,
+          "rule": "sdk-surface",
+          "note": "compiler TS2866"
+        }
+      ]
+    },
+    {
+      "repo": "nextjs/saas-starter",
+      "commit": "3e5fd2bf626c4ee73c06dcc9e1aa503b8904a37c",
+      "migration": "https://github.com/nextjs/saas-starter/commit/e88fb409e09a23628331f84bcd485baf68d693b5",
+      "from": "17.7.0",
+      "to": "18.0.0",
+      "why": "Next.js starter across the basil boundary (2025-03-31): the apiVersion pin; the rest of the upgrade commit is an unrelated UI refactor, left out",
+      "findings": [
+        {
+          "file": "lib/payments/stripe.ts",
+          "line": 11,
+          "rule": "api-version",
+          "note": "compiler TS2322"
+        }
+      ]
+    }
+  ],
+  "$comment": "Ground truth for the stripe pack (docs/packs.md, \"Ground truth\"). Each public repository is pinned at the commit before its own stripe-node major upgrade. Expected findings come from two sources that are not Uptide, drafted by pnpm packs:truth and read by hand: the errors the repository's TypeScript reports with the target SDK linked in and not without it, and the lines the upgrade commit changed for stripe (one site per construct; comments and unrelated changes left out). Rules are assigned from each site's code and text. The storefront fixture is synthetic: scored, never counted toward verified; its sites are the tsc errors of fixtures/truth/storefront.json."
+}

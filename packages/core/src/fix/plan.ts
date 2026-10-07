@@ -1,4 +1,5 @@
 import type { Finding, PackageReport, PlanGroup } from '../domain/report.js';
+import type { Pack } from '../packs/contract.js';
 import type { MigrationPack, PackContext } from '../packs/types.js';
 import { changeRule, diagnosticTitle, RULE_TITLES, ruleTitle } from './report.js';
 import { selectedFindings } from './select.js';
@@ -90,7 +91,7 @@ export function planPackage(
       const assisted = sites.filter((s) => s.outcome !== 'mechanical');
       const group: PlanGroup = {
         rule: first.rule,
-        title: titleOf(first.rule, sites),
+        title: titleOf(first.rule, sites, usable ? summaryOf(pack, first.rule) : undefined),
         severity,
         by: { rule: count('mechanical'), agent: count('agent'), manual: count('manual') },
         sites: sites.length,
@@ -141,7 +142,13 @@ function written(path: string): string {
 }
 
 /** The PR body's wording when the rule is known; plain English for everything else. */
-function titleOf(rule: string, sites: Planned[]): string {
+/** A contract pack's own words for one of its rules or notes (`summary`). */
+function summaryOf(pack: MigrationPack, rule: string): string | undefined {
+  const notes = 'behavior' in pack ? (pack as Pack).behavior : [];
+  const rules = pack.rules as readonly { id: string; summary?: string }[];
+  return [...rules, ...notes].find((r) => r.id === rule)?.summary;
+}
+function titleOf(rule: string, sites: Planned[], summary?: string): string {
   if (rule === 'typescript-no-js-api')
     return 'TypeScript 7 has no JavaScript compiler API in its main entry';
   const evidence = sites
@@ -150,7 +157,7 @@ function titleOf(rule: string, sites: Planned[]): string {
         `${s.finding.change.path} ${s.finding.usage.compileError ?? ''} ${s.finding.usage.snippet}`,
     )
     .join(' ');
-  const known = RULE_TITLES[rule]?.plain ?? ruleTitle(rule, /ZodTypeDef/.test(evidence));
+  const known = RULE_TITLES[rule]?.plain ?? ruleTitle(rule, /ZodTypeDef/.test(evidence)) ?? summary;
   if (known) return known.replaceAll('`', '');
   const first = (sites[0] as Planned).finding;
   const code = /^TS(\d+)$/.exec(rule);

@@ -1,23 +1,48 @@
-name: Dependency request
-description: Ask for a migration pack for another dependency
+name: Pack request
+description: Ask for a migration pack for one dependency upgrade, or say you are writing one
+title: 'pack: <package> <from> → <to>'
 labels: [pack]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        A pack is accepted with its sources, fixtures and ground truth from public repositories (docs/packs.md).
+        The ranked list of what is worth a pack next is packs/queue.json.
   - type: input
     id: dependency
     attributes:
-      label: Dependency and upgrade
-      placeholder: openai 4 → 5
+      label: Package and upgrade
+      description: The npm package and the two majors, as semver ranges
+      placeholder: ai >=6 <7 → >=7 <8
+    validations:
+      required: true
+  - type: input
+    id: guide
+    attributes:
+      label: Migration guide or changelog
+      description: The official source every rule will be taken from
+      placeholder: https://ai-sdk.dev/docs/migration-guides/migration-guide-7-0
     validations:
       required: true
   - type: textarea
     id: breaks
     attributes:
       label: What the upgrade breaks
-      description: The changes that cost you time, with the official migration guide if there is one
+      description: The changes that cost you time, and any that compile but behave differently
     validations:
       required: true
   - type: textarea
-    id: example
+    id: repos
     attributes:
-      label: A public repository that still needs it
-      description: A pack is accepted with ground truth from a public repository
+      label: Public repositories that made this upgrade
+      description: Links to the commits or pull requests where they upgraded. Two are needed for a verified pack; the commit before each one is its ground truth.
+      placeholder: https://github.com/owner/name/pull/123
+  - type: dropdown
+    id: writing
+    attributes:
+      label: Are you writing it?
+      options:
+        - No, asking for it
+        - Yes, I am writing it (the queue entry becomes in-progress)
+    validations:
+      required: true
