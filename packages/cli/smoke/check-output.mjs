@@ -27,3 +27,23 @@ export function listReportFailures(listed, manager) {
   }
   return failures;
 }
+
+// The command a build prints in its suggestions: `npx uptide@next` from a snapshot, plain
+// `npx uptide` from a release (packages/core/src/version.ts, uptideCommand).
+export function expectedInvocation(version) {
+  const tag = /^\d+\.\d+\.\d+-([a-z]+)/.exec(version)?.[1];
+  return tag ? `npx uptide@${tag}` : 'npx uptide';
+}
+
+// Every suggested command reaches the build that printed it, and there is at least one.
+export function invocationFailures(name, output, version) {
+  const expected = expectedInvocation(version);
+  const found = output.match(/npx uptide(?:@[\w.-]+)?(?=[\s`])/g) ?? [];
+  if (found.length === 0) return [`${name}: expected a suggestion with "${expected}"\n${output}`];
+  const wrong = [...new Set(found.filter((f) => f !== expected))];
+  return wrong.length
+    ? [
+        `${name}: uptide ${version} must suggest "${expected}", not ${wrong.map((w) => `"${w}"`).join(', ')}\n${output}`,
+      ]
+    : [];
+}

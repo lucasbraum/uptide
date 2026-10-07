@@ -129,19 +129,27 @@ describe('the Release workflow', () => {
     const publish = job('publish');
     const order = [
       runs(publish, 'node scripts/check-release-version.mjs'),
-      at(publish, (s) => s.id === 'version'),
+      // The committed tree, at its committed version: the tests assert `npx uptide`.
       runs(publish, 'pnpm lint'),
       runs(publish, 'node scripts/public-tree.mjs . --require-denylist'),
       runs(publish, 'pnpm build'),
       runs(publish, 'pnpm typecheck'),
       runs(publish, 'pnpm test'),
       runs(publish, 'pnpm smoke 22'),
+      // Then the version to publish, rebuilt with it, packed and checked as published.
+      runs(publish, 'pnpm changeset version --snapshot next'),
+      at(publish, (s) => s.id === 'version'),
+      at(publish, (s) => s.name === 'Build the version to publish'),
       runs(publish, 'node scripts/check-build-stamp.mjs'),
       runs(publish, 'pnpm --filter uptide pack'),
       runs(publish, 'node scripts/check-pack.mjs "$TARBALL"'),
+      runs(publish, 'node packages/cli/smoke/check-invocation.mjs "$TARBALL"'),
       runs(publish, 'npm publish'),
     ];
     expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(publish.steps[at(publish, (s) => s.name === 'Build the version to publish')]?.run).toBe(
+      'pnpm build',
+    );
     const version = publish.steps[at(publish, (s) => s.id === 'version')]?.run ?? '';
     expect(version).toContain("'^[0-9]+\\.[0-9]+\\.[0-9]+$'");
     expect(version).toContain('npm view "uptide@$version" version');
