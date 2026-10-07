@@ -679,7 +679,10 @@ it('selects each provider from its key, passes model and the universal budget, a
     const io = memoryIo({ cwd: pnpmGitRepo(), env: { [key]: 'test-key' } });
     expect(await run(['fix', 'zod'], io, engine)).toBe(0);
     expect(engine.calls[0]).toMatchObject({ provider, model, maxCostUsd: 1 });
-    expect(io.stderr()).toContain(`LLM: ${provider} / ${model}`);
+    // Gemini is experimental: its evaluation runs failed on service errors (docs/provider-evaluation.md).
+    expect(io.stderr()).toContain(
+      `LLM: ${provider}${provider === 'gemini' ? ' (experimental)' : ''} / ${model}`,
+    );
     expect(io.stderr()).toContain('LLM spend: no LLM calls.');
     expect(io.stderr()).not.toContain('test-key');
   }

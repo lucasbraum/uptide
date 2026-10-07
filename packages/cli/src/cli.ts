@@ -714,7 +714,7 @@ ${EXIT_CODES('a plan was made', 'not used', ';\n     or a dependency failed to a
       )
       .option(
         '--provider <name>',
-        'LLM provider: anthropic, openai or gemini (also UPTIDE_PROVIDER)',
+        'LLM provider: anthropic, openai or gemini (experimental) (also UPTIDE_PROVIDER)',
       )
       .option('--model <id>', 'LLM model ID (also UPTIDE_MODEL)')
       .option('--no-llm', 'rule-based fixes only: never send code to the LLM provider')
@@ -881,7 +881,7 @@ ${PRIVACY}`,
             else if (!llm) io.err('assisted fixes off (--no-llm): no code leaves this machine\n');
             else if (selection.available) {
               io.err(
-                `LLM: ${selection.provider} / ${selection.model} · budget $${maxCost.toFixed(2)}\n`,
+                `LLM: ${selection.provider}${selection.provider === 'gemini' ? ' (experimental)' : ''} / ${selection.model} · budget $${maxCost.toFixed(2)}\n`,
               );
               io.err(assistedNote(selection.provider));
               const price = priceFor(selection.provider, selection.model);
