@@ -1,0 +1,67 @@
+name: Packs
+
+# `uptide pack test` for every pack: fixtures, and `check` on each ground-truth repository
+# against the expected findings (docs/packs.md). It fails on a false positive among breaking
+# findings, a failing fixture, or a verification.json the evidence no longer supports.
+#
+# The job always reports, so it can be a required check: on a pull request that touches
+# neither a pack nor the engine that produces their findings it passes without running.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  pack-test:
+    name: Pack test
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Touches packs
+        id: scope
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then echo "run=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          changed=$(git diff --name-only "$BASE" HEAD)
+          echo "$changed"
+          if echo "$changed" | grep -Eq '^(packages/core/src/(packs|check|adapters|fix/plan\.ts|fix/report\.ts)|packages/core/package\.json|packs/|fixtures/repos/storefront/|scripts/pack-test-report\.ts|\.github/workflows/packs\.yml|pnpm-lock\.yaml)'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No pack, and nothing their findings come from, changed: nothing to score."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: pnpm/action-setup@v4
+        if: steps.scope.outputs.run == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.scope.outputs.run == 'true'
+        with:
+          node-version: 22
+          cache: pnpm
+      - if: steps.scope.outputs.run == 'true'
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      # Ground-truth repositories (shallow, installed with scripts off) and the registry
+      # tarballs `check` extracts. Keyed on the ground truth: a new repository is fetched once.
+      - uses: actions/cache@v4
+        if: steps.scope.outputs.run == 'true'
+        with:
+          path: ~/.cache/uptide
+          key: packs-${{ runner.os }}-${{ hashFiles('packages/core/src/packs/*/ground-truth.json') }}
+          restore-keys: packs-${{ runner.os }}-
+      - name: uptide pack test
+        if: steps.scope.outputs.run == 'true'
+        run: |
+          set +e
+          pnpm -s uptide pack test --json > pack-test.json
+          code=$?
+          node --conditions=source --import tsx scripts/pack-test-report.ts pack-test.json | tee -a "$GITHUB_STEP_SUMMARY"
+          exit $code
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.scope.outputs.run == 'true'
+        with:
+          name: pack-test
+          path: pack-test.json
