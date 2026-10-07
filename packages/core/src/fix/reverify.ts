@@ -3,9 +3,8 @@ import { dirname, join, resolve } from 'node:path';
 import { workspacePackagesOf } from '../adapters/typescript/repo.js';
 import type { ProgressListener } from '../domain/progress.js';
 import { UptideError } from '../errors.js';
-import { stripePack } from '../packs/stripe/index.js';
+import { activePack } from '../packs/index.js';
 import type { MigrationPack, PackContext } from '../packs/types.js';
-import { zodPack } from '../packs/zod/index.js';
 import { uptideVersionInfo } from '../version.js';
 import { git } from './process.js';
 import { prBody } from './report.js';
@@ -79,8 +78,7 @@ export async function reverify(
     .filter((line) => line.trim() !== '' && !line.slice(3).startsWith('.uptide/'));
   if (pending.length)
     throw new UptideError('DIRTY_WORKING_TREE', 'uptide verify requires a clean working tree');
-  const pack =
-    options.pack ?? [zodPack, stripePack].find((candidate) => candidate.name === report.package);
+  const pack = options.pack ?? activePack(report.package);
   if (!pack) throw new Error(`no migration pack for ${report.package}`);
   const workspaces = workspacePackagesOf(root).filter((w) => {
     const p = JSON.parse(readFileSync(join(root, w, 'package.json'), 'utf8'));

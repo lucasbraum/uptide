@@ -1,0 +1,34 @@
+{
+  "package": "stripe",
+  "repos": [
+    {
+      "fixture": "fixtures/repos/storefront",
+      "from": "14.25.0",
+      "to": "23.0.0",
+      "why": "synthetic pnpm workspace of this repository (fixtures/truth/storefront.json): apiVersion literal, subscription period, a widened test fixture cast",
+      "findings": [
+        {
+          "file": "packages/api/src/billing/client.ts",
+          "line": 9,
+          "rule": "api-version"
+        },
+        {
+          "file": "packages/api/src/billing/renewal.test.ts",
+          "line": 7,
+          "rule": "fixture-cast"
+        },
+        {
+          "file": "packages/api/src/billing/renewal.ts",
+          "line": 12,
+          "rule": "subscription-period"
+        },
+        {
+          "file": "packages/api/src/billing/renewal.ts",
+          "line": 13,
+          "rule": "subscription-period"
+        }
+      ]
+    }
+  ],
+  "$comment": "Ground truth for the stripe pack. Public repositories at the commit before a stripe-node major upgrade, each with every site the real upgrade changed for stripe or the compiler rejected (docs/packs.md, \"Ground truth\"). The storefront fixture is synthetic: scored, never counted toward verified; its sites are the tsc errors of fixtures/truth/storefront.json."
+}

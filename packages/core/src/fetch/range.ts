@@ -8,3 +8,8 @@ export function satisfies(version: string, range: string): boolean {
 export function maxSatisfying(versions: readonly string[], range: string): string | undefined {
   return semver.maxSatisfying([...versions], range) ?? undefined;
 }
+
+/** The lowest version a range admits (`>=4 <5` → `4.0.0`), or undefined for no valid range. */
+export function minVersion(range: string): string | undefined {
+  return semver.validRange(range) ? (semver.minVersion(range)?.version ?? undefined) : undefined;
+}

@@ -30,9 +30,8 @@ import { maxSatisfying } from '../fetch/range.js';
 import { planPackage } from '../fix/plan.js';
 import { scanImports } from '../list/scan.js';
 import { packFixability } from '../packs/fixability.js';
-import { stripePack } from '../packs/stripe/index.js';
+import { activePacks } from '../packs/index.js';
 import type { MigrationPack } from '../packs/types.js';
-import { zodPack } from '../packs/zod/index.js';
 import { diffRuntime, probeRuntime } from '../runtime/runtime.js';
 import { resetSharedState } from '../shared-state.js';
 import { requireFindUsages } from './capabilities.js';
@@ -59,8 +58,13 @@ import { unattributedFindings } from './unattributed.js';
 import { verdictOf } from './verdict.js';
 import { compareVersions, majorsBehind, parseVersion } from './version.js';
 
-/** Packs `check` can plan with; the same ones `fix` runs. */
-const PACKS: readonly MigrationPack[] = [zodPack, stripePack];
+/**
+ * Packs `check` can plan with; the same ones `fix` runs: the verified packs, unless the caller
+ * names its own (`uptide pack test` scores a candidate with it).
+ */
+function packsOf(opts: Pick<CheckOptions, 'packs'>): readonly MigrationPack[] {
+  return opts.packs ?? activePacks();
+}
 
 export interface CheckOptions {
   onProgress?: ProgressListener;
@@ -112,6 +116,12 @@ export interface CheckOptions {
   hardDeadline?: number;
   /** Set by `check` for its workspace jobs: the dependencies with something to analyze. */
   behind?: string[];
+  /**
+   * The packs to use instead of the verified ones (`uptide pack test` passes a candidate).
+   * Packs are code, which no worker receives: with this set, workspaces are checked in this
+   * thread.
+   */
+  packs?: readonly MigrationPack[];
 }
 
 /** What a worker needs to check one workspace; everything is plain data. */
@@ -123,7 +133,7 @@ export interface WorkspaceJob {
   installedByWorkspace: Record<string, Record<string, string>>;
   /** Packages each workspace's own sources import, declared or not (a text scan). */
   importedByWorkspace: Record<string, string[]>;
-  opts: Omit<CheckOptions, 'adapter' | 'fetcher' | 'cache' | 'onProgress'>;
+  opts: Omit<CheckOptions, 'adapter' | 'fetcher' | 'cache' | 'onProgress' | 'packs'>;
 }
 
 export interface CheckResult extends CheckReport {
@@ -208,7 +218,7 @@ export async function check(opts: CheckOptions): Promise<CheckResult> {
       };
     }),
   );
-  const { adapter: _a, fetcher: _f, cache: _c, onProgress: _p, ...givenOpts } = opts;
+  const { adapter: _a, fetcher: _f, cache: _c, onProgress: _p, packs: _k, ...givenOpts } = opts;
   const plainOpts: WorkspaceJob['opts'] = {
     ...givenOpts,
     // Compiler overlays share a workspace program; serialize them within its memory slot.
@@ -251,7 +261,10 @@ export async function check(opts: CheckOptions): Promise<CheckResult> {
       opts: plainOpts,
     }));
   const injected =
-    opts.adapter !== undefined || opts.fetcher !== undefined || opts.cache !== undefined;
+    opts.adapter !== undefined ||
+    opts.fetcher !== undefined ||
+    opts.cache !== undefined ||
+    opts.packs !== undefined;
   const estimates = new Map(
     jobs.map((job) => [
       job.workspace,
@@ -343,7 +356,10 @@ export async function check(opts: CheckOptions): Promise<CheckResult> {
   // Pack rules preview their actual edit; check and fix must promise the same work.
   if (adapter.id === 'typescript')
     for (const report of results.flat()) {
-      if (report.name !== 'zod') continue;
+      // Packs whose rules carry their own rewrite (zod, and every pack built on the contract).
+      const pack = packsOf(opts).find((p) => p.name === report.name);
+      if (!pack || !(pack.rules as readonly { rewrite?: unknown }[]).some((r) => r.rewrite))
+        continue;
       const sources = new Map<string, string>();
       report.findings = report.findings.map((finding) => {
         const file = resolve(opts.cwd, report.workspace, finding.usage.file);
@@ -356,7 +372,7 @@ export async function check(opts: CheckOptions): Promise<CheckResult> {
           }
           sources.set(file, source);
         }
-        return packFixability(finding, source, zodPack);
+        return packFixability(finding, source, pack);
       });
     }
   const order = new Map(workspaces.map((w, i) => [w, i]));
@@ -364,7 +380,7 @@ export async function check(opts: CheckOptions): Promise<CheckResult> {
     results.flat().sort((a, b) => (order.get(a.workspace) ?? 0) - (order.get(b.workspace) ?? 0)),
     catalogByWorkspace,
   );
-  for (const p of packages) p.tier ??= tierOf(PACKS, p.name, p.installed, p.target);
+  for (const p of packages) p.tier ??= tierOf(packsOf(opts), p.name, p.installed, p.target);
   for (const p of packages) groupRootCauses(p);
   if (adapter.id === 'typescript' && opts.plan !== false) planPackages(packages, opts);
   else for (const p of packages) delete p.planContext;
@@ -398,7 +414,7 @@ function planPackages(packages: PackageReport[], opts: CheckOptions): void {
   };
   for (const p of packages) {
     if (!['breaking', 'deprecated'].includes(p.status) && p.findings.length === 0) continue;
-    const pack = PACKS.find((candidate) => candidate.name === p.name);
+    const pack = packsOf(opts).find((candidate) => candidate.name === p.name);
     const plan = planPackage(p, pack, read, p.planContext ?? {});
     if (plan.length === 0) continue;
     p.plan = plan;
@@ -1774,7 +1790,7 @@ async function checkGroup(
     findings.length = 0;
     findings.push(...arbitrated);
     // A pack can see what no type diff shows: a client the SDK bump reconfigures at runtime.
-    const pack = PACKS.find((candidate) => candidate.name === name);
+    const pack = packsOf(ctx.opts).find((candidate) => candidate.name === name);
     const only = prepared.length === 1 ? prepared[0] : undefined;
     const packDirs = (p: Prepared) => {
       const target = fetched.find((f) => f.p === p);
@@ -1807,7 +1823,7 @@ async function checkGroup(
       }
     }
     // Without a pack, only what the compiler or the runtime probe confirms is called breaking.
-    const tier = tierOf(PACKS, name, installed[0] as string, targets.at(-1) as string);
+    const tier = tierOf(packsOf(ctx.opts), name, installed[0] as string, targets.at(-1) as string);
     const evidence = (f: Finding): Finding['evidence'] => {
       const p = runtimeOf(f);
       return evidenceOf(f, p?.runtime, p ? loadRootOf(p) : undefined);

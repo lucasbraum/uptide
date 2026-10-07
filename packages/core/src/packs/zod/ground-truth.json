@@ -1,0 +1,204 @@
+{
+  "package": "zod",
+  "repos": [
+    {
+      "fixture": "fixtures/repos/storefront",
+      "from": "3.25.76",
+      "to": "4.6.5",
+      "why": "synthetic pnpm workspace of this repository (fixtures/truth/storefront.json): error params, string formats, ip, generics across two workspaces",
+      "findings": [
+        {
+          "file": "packages/api/src/queue/consumer.ts",
+          "line": 2,
+          "rule": "types"
+        },
+        {
+          "file": "packages/api/src/queue/consumer.ts",
+          "line": 12,
+          "rule": "types"
+        },
+        {
+          "file": "packages/api/src/queue/consumer.ts",
+          "line": 19,
+          "rule": "types"
+        },
+        {
+          "file": "packages/api/src/routes/customers.ts",
+          "line": 5,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/api/src/routes/customers.ts",
+          "line": 6,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/api/src/routes/customers.ts",
+          "line": 7,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/api/src/routes/customers.ts",
+          "line": 12,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/api/src/routes/customers.ts",
+          "line": 13,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/api/src/routes/orders.ts",
+          "line": 5,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/api/src/routes/orders.ts",
+          "line": 6,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/api/src/routes/orders.ts",
+          "line": 10,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/api/src/routes/orders.ts",
+          "line": 13,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/api/src/routes/orders.ts",
+          "line": 17,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/api/src/routes/orders.ts",
+          "line": 18,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/api/src/routes/webhooks.ts",
+          "line": 4,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/api/src/routes/webhooks.ts",
+          "line": 6,
+          "rule": "string-format"
+        },
+        {
+          "file": "packages/api/src/routes/webhooks.ts",
+          "line": 8,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/api/src/routes/webhooks.ts",
+          "line": 9,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/api/src/routes/webhooks.ts",
+          "line": 14,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/api/src/routes/webhooks.ts",
+          "line": 15,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/api/src/routes/webhooks.ts",
+          "line": 16,
+          "rule": "string-format"
+        },
+        {
+          "file": "packages/shared/src/address.ts",
+          "line": 4,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/shared/src/address.ts",
+          "line": 5,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/shared/src/address.ts",
+          "line": 7,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/shared/src/address.ts",
+          "line": 10,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/shared/src/errors.ts",
+          "line": 8,
+          "rule": "generic"
+        },
+        {
+          "file": "packages/shared/src/errors.ts",
+          "line": 25,
+          "rule": "generic"
+        },
+        {
+          "file": "packages/shared/src/monitoring.ts",
+          "line": 5,
+          "rule": "string-format"
+        },
+        {
+          "file": "packages/shared/src/monitoring.ts",
+          "line": 6,
+          "rule": "ip"
+        },
+        {
+          "file": "packages/shared/src/monitoring.ts",
+          "line": 9,
+          "rule": "string-format"
+        },
+        {
+          "file": "packages/shared/src/product.ts",
+          "line": 4,
+          "rule": "string-format"
+        },
+        {
+          "file": "packages/shared/src/product.ts",
+          "line": 5,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/shared/src/product.ts",
+          "line": 6,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/shared/src/product.ts",
+          "line": 8,
+          "rule": "error-params"
+        },
+        {
+          "file": "packages/shared/src/product.ts",
+          "line": 11,
+          "rule": "string-format"
+        },
+        {
+          "file": "packages/shared/src/product.ts",
+          "line": 12,
+          "rule": "string-format"
+        },
+        {
+          "file": "packages/shared/src/product.ts",
+          "line": 16,
+          "rule": "string-format"
+        },
+        {
+          "file": "packages/shared/src/product.ts",
+          "line": 17,
+          "rule": "error-params"
+        }
+      ]
+    }
+  ],
+  "$comment": "Ground truth for the zod pack. Public repositories at the commit before they upgraded zod 3 to 4, each with every site the real upgrade changed for zod or the compiler rejected (docs/packs.md, \"Ground truth\"). The storefront fixture is synthetic: scored, never counted toward verified; its breaking sites are the tsc errors of fixtures/truth/storefront.json, its deprecated ones the zod 3 APIs zod 4 deprecates (string formats, ZodIssue, flatten)."
+}

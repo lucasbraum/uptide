@@ -14,7 +14,8 @@
       "!fixtures/**/*.d.ts",
       "!fixtures/**/expected-*.json",
       "!fixtures/snapshots",
-      "!**/__snapshots__"
+      "!**/__snapshots__",
+      "!packages/core/src/packs/*/fixtures"
     ]
   },
   "formatter": {

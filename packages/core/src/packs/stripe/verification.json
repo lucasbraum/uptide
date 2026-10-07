@@ -1,0 +1,6 @@
+{
+  "status": "verified",
+  "truth": "",
+  "repos": 2,
+  "breaking": { "precision": 1, "recall": 1, "falsePositives": 0 }
+}

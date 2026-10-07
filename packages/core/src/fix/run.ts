@@ -9,10 +9,9 @@ import { UptideError } from '../errors.js';
 import { ACCEPTED_KEYS, selectLlm } from '../llm/config.js';
 import { DEFAULT_MAX_COST_USD, providerFixer } from '../llm/fixer.js';
 import { genericPack } from '../packs/generic.js';
-import { stripePack } from '../packs/stripe/index.js';
+import { activePack } from '../packs/index.js';
 import { payloadApiVersions, stripeUsageContext } from '../packs/stripe/relevance.js';
 import type { MigrationPack, PackContext } from '../packs/types.js';
-import { zodPack } from '../packs/zod/index.js';
 import { resetSharedState } from '../shared-state.js';
 import { UPTIDE_COMMAND, uptideVersionInfo } from '../version.js';
 import { assist } from './assisted.js';
@@ -160,10 +159,7 @@ async function fixPackage(options: FixOptions, services: FixServices): Promise<F
   )
     throw new Error('--max-cost must be a positive finite amount in USD');
   const selection = selectLlm(root, options);
-  let pack =
-    options.pack ??
-    [zodPack, stripePack].find((p) => p.name === options.only) ??
-    genericPack(options.only);
+  let pack = options.pack ?? activePack(options.only) ?? genericPack(options.only);
   if (pack.name !== options.only) throw new Error(`no migration pack for ${options.only}`);
   const fixer = options.fixer === null ? undefined : (options.fixer ?? providerFixer(selection));
   // Without a pack every edit is the agent's: no agent, nothing this command can do.
@@ -579,7 +575,7 @@ export function confirmedEvidence(
  */
 export function refreshReview(
   result: FixReport,
-  pack: MigrationPack | undefined = [zodPack, stripePack].find((p) => p.name === result.package),
+  pack: MigrationPack | undefined = activePack(result.package),
 ): void {
   if (!pack || !result.packContext) return;
   const rules = [...new Set(result.sites.map((s) => s.rule).filter((r): r is string => !!r))];

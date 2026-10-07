@@ -10,8 +10,7 @@ import type { Tier } from '../domain/report.js';
 import { errorCode } from '../errors.js';
 import { loadRegistryConfig, registryFor } from '../fetch/npmrc.js';
 import { advisoriesEnabled } from '../llm/config.js';
-import { stripePack } from '../packs/stripe/index.js';
-import { zodPack } from '../packs/zod/index.js';
+import { activePacks } from '../packs/index.js';
 import type { TaskCommands } from './config.js';
 import {
   BUILD_TOOLS,
@@ -514,7 +513,7 @@ export async function listDependencies(opts: ListOptions): Promise<ListReport> {
                     : []),
                 ]
               : (reasons.get(name) ?? []),
-          tier: tierOf([zodPack, stripePack], localName(name), current, latest),
+          tier: tierOf(activePacks(), localName(name), current, latest),
           workspaces: [...new Set(outdated.flatMap(([, w]) => w))].sort(),
           usage: {
             files: scanned?.files.length ?? 0,
