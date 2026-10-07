@@ -147,6 +147,20 @@ jobs:
       # Trusted publishing (OIDC) needs npm 11.5.1 or later; Node 22 ships npm 10.
       - run: npm install --global npm@^11.5.1
       - run: pnpm install --frozen-lockfile --ignore-scripts
+      # Lint, build, typecheck, test and smoke the committed tree, at its committed version:
+      # the tests assert what a release build prints (`npx uptide`), which a snapshot version
+      # would change to `npx uptide@next`.
+      - run: pnpm lint
+      - name: No private material in the repository
+        env:
+          UPTIDE_PRIVATE_DENYLIST: ${{ secrets.UPTIDE_PRIVATE_DENYLIST }}
+        run: node scripts/public-tree.mjs . --require-denylist
+      - run: pnpm build
+      - run: pnpm typecheck
+      - run: pnpm test
+      - name: Smoke-test the CLI packed from this tree
+        run: pnpm smoke 22
+      # Only then the version to publish: the snapshot for next, the committed one for latest.
       - name: Snapshot version for next (never committed)
         if: ${{ needs.plan.outputs.channel == 'next' }}
         env:
@@ -169,16 +183,8 @@ jobs:
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
-      - run: pnpm lint
-      - name: No private material in the repository
-        env:
-          UPTIDE_PRIVATE_DENYLIST: ${{ secrets.UPTIDE_PRIVATE_DENYLIST }}
-        run: node scripts/public-tree.mjs . --require-denylist
-      - run: pnpm build
-      - run: pnpm typecheck
-      - run: pnpm test
-      - name: Smoke-test the CLI packed from this tree
-        run: pnpm smoke 22
+      - name: Build the version to publish
+        run: pnpm build
       - name: The published build must be stamped clean
         run: node scripts/check-build-stamp.mjs
       # Only the CLI is published: the engine is bundled into it. `changeset publish` is
@@ -196,6 +202,10 @@ jobs:
           UPTIDE_PRIVATE_DENYLIST: ${{ secrets.UPTIDE_PRIVATE_DENYLIST }}
           TARBALL: ${{ steps.pack.outputs.tarball }}
         run: node scripts/check-pack.mjs "$TARBALL"
+      - name: The tarball's suggestions reach it (npx uptide@next from a snapshot)
+        env:
+          TARBALL: ${{ steps.pack.outputs.tarball }}
+        run: node packages/cli/smoke/check-invocation.mjs "$TARBALL"
       - name: Publish that tarball under its dist-tag, with provenance
         env:
           TARBALL: ${{ steps.pack.outputs.tarball }}

@@ -135,3 +135,29 @@ it.each(['npm', 'npm-workspaces', 'pnpm', 'yarn', 'yarn-berry'])(
     ).toHaveLength(1);
   },
 );
+
+it('expects the command that reaches the build: npx uptide@next from a snapshot, npx uptide from a release', async () => {
+  const { expectedInvocation, invocationFailures } = (await import(
+    new URL('../smoke/check-output.mjs', import.meta.url).href
+  )) as {
+    expectedInvocation(version: string): string;
+    invocationFailures(name: string, output: string, version: string): string[];
+  };
+  expect(expectedInvocation('0.5.0')).toBe('npx uptide');
+  expect(expectedInvocation('0.5.0-next.20261007192842')).toBe('npx uptide@next');
+  const next = 'Next: npx uptide@next check zod --details\n';
+  expect(invocationFailures('fix', next, '0.5.0-next.20261007192842')).toEqual([]);
+  expect(invocationFailures('fix', next, '0.5.0')[0]).toContain(
+    'uptide 0.5.0 must suggest "npx uptide", not "npx uptide@next"',
+  );
+  expect(
+    invocationFailures(
+      'status',
+      'Run `npx uptide list`, then `npx uptide check <package>`.',
+      '0.5.0-next.1',
+    )[0],
+  ).toContain('must suggest "npx uptide@next", not "npx uptide"');
+  expect(invocationFailures('fix', 'error: nothing to suggest\n', '0.5.0')[0]).toContain(
+    'expected a suggestion with "npx uptide"',
+  );
+});

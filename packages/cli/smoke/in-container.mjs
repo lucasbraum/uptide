@@ -5,7 +5,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
-import { checkReportFailures, listReportFailures } from './check-output.mjs';
+import { checkReportFailures, invocationFailures, listReportFailures } from './check-output.mjs';
 
 // Never send smoke-test usage, even when the release build contains a capture key.
 process.env.UPTIDE_TELEMETRY = '0';
@@ -108,6 +108,8 @@ for (const fixture of ['npm', 'npm-workspaces', 'pnpm', 'yarn', 'yarn-berry']) {
     status.out,
     /Run `npx uptide\S* list`, then `npx uptide\S* check <package>` for impact\./,
   );
+  // `npx uptide` from a release, `npx uptide@next` from a snapshot: the commands reach this build.
+  failures.push(...invocationFailures(`${manager} status`, status.out, version));
 
   const inventory = uptide(repo, 'list', '--json');
   expect(`${manager} list exits 0`, inventory.code === 0, inventory.err);
