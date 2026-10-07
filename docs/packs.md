@@ -248,12 +248,16 @@ record no longer matches the evidence, so the label cannot outlive what supports
 
 - `packages/core/src/packs/registry.ts` is generated: `pack new` renders it again with the
   new entry. Every pack in it is scored by CI; only verified ones are used by the CLI.
-- `packs/queue.json` ranks the next packages worth a pack by direct use (`pnpm packs:queue`):
-  how many sample repositories (`fixtures/corpus.json` and the pinned public applications in
-  `scripts/packs-queue-sample.ts`) declare the package in a package.json, weekly downloads
-  breaking ties. Packages that upgrade together are one entry named after their hub. Out:
-  fewer than three sample repositories using it or behind on it, no breaking change in its
-  type surface, an official codemod that covers the whole upgrade, and the packs that exist.
-  A codemod that covers part of it is named and counts half.
+- `packs/queue.json` ranks the next packages worth a pack (`pnpm packs:queue`) by direct use
+  × log2(1 + breaking type changes). Direct use is how many sample repositories
+  (`fixtures/corpus.json` and the pinned public applications in
+  `scripts/packs-queue-sample.ts`) declare the package in a package.json; the breaking
+  changes are the diff `check` runs between the major most of them are behind on and the
+  latest. Weekly downloads break ties. Packages that upgrade together are one entry named
+  after their hub. Out: fewer than three sample repositories using it or behind on it, fewer
+  than 10 breaking changes, an official codemod that covers the whole upgrade, and the packs
+  that exist. A package without types enters only when its changelog lists API changes
+  (recorded in the script, marked "not measured", scored as 10). A partial codemod is named
+  and counts 0.9.
 - The **Packs** workflow (`.github/workflows/packs.yml`) runs `uptide pack test --json` for
   every pack with the ground-truth cache restored, on pull requests that touch packs.

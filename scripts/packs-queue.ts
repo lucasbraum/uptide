@@ -4,12 +4,14 @@
  *
  *   pnpm packs:queue [--size=25]
  *
+ * score = direct-use repositories × log2(1 + breaking type changes), × 0.9 with a partial
+ * official codemod. Weekly downloads only break ties.
+ *
  * 1. Direct use. A package counts once for each repository that declares it in a
  *    package.json (dependencies, devDependencies or optionalDependencies): the repositories
  *    of fixtures/corpus.json and the pinned public applications of packs-queue-sample.ts.
  *    Total npm downloads put what everything pulls in transitively on top (undici,
  *    google-auth-library); a declaration is someone choosing the package and upgrading it.
- *    Weekly downloads only break ties.
  * 2. One entry per upgrade. Packages that move together are merged and named after their
  *    hub: the links `list` draws (src/list/groups.ts: an exact pin both move together, a peer
  *    the latest version needs moved, a scope family), plus `@types/x` with `x` as `list`
@@ -20,13 +22,16 @@
  *    `@tanstack/react-table` upgrade on their own), and a peer link attaches only a plugin to
  *    its host (eslint-plugin-x to eslint; react-router keeps its own entry and says it needs
  *    react moved).
- * 3. Something to migrate. `to` is the hub's latest major, `from` the major most sample
+ * 3. How much to migrate. `to` is the hub's latest major, `from` the major most sample
  *    repositories behind it declare. Fewer than three repositories behind: left out, the
- *    migration has happened. No breaking change between the two type surfaces (the diff
- *    `check` runs): left out, the major changes nothing a pack would rewrite (clsx 2, nanoid
- *    6). The count of breaking changes is in `why`.
+ *    migration has happened. The breaking changes between the two type surfaces (the diff
+ *    `check` runs) are counted, up to MAX_BREAKING; fewer than MIN_BREAKING: left out, the
+ *    major changes too little for a pack (clsx 2, chalk 6). A package without types enters
+ *    only when CHANGELOGS records API changes from its changelog, marked "not measured" and
+ *    scored as MIN_BREAKING. date-fns counts its main entry only (MAIN_ENTRY_ONLY).
  * 4. Codemods. A package whose official codemod covers the breaking changes end to end is
- *    left out; one whose codemod covers part of them says so and counts half.
+ *    left out; one whose codemod covers part of them says so and counts 0.9: the codemod
+ *    leaves the manual work a pack does, and a pack can run it as one of its rules.
  * 5. Out: packages with a pack already (and what moves with them), anything declared in
  *    fewer than three sample repositories, and NOT_A_PACK below.
  *
@@ -57,7 +62,7 @@ const NOT_A_PACK: Record<string, string> = {
 /**
  * Official codemods for the upgrade `to` names, from each project's own migration guide.
  * `all`: the codemod covers every breaking change, so a pack adds nothing (left out).
- * `some`: it covers part of them, and the rest is migrated by hand (the entry counts half).
+ * `some`: it covers part of them, and the rest is migrated by hand (PARTIAL_CODEMOD).
  */
 const CODEMODS: Record<string, { to: number; url: string; covers: 'all' | 'some'; note: string }> =
   {
@@ -92,6 +97,72 @@ const CODEMODS: Record<string, { to: number; url: string; covers: 'all' | 'some'
       note: 'the `@expressjs/v5-migration-recipe` codemods cover removed method signatures; path syntax, promise handling and changed request properties are manual',
     },
   };
+
+/** What a partial codemod leaves: the manual work a pack does (and a pack can run it as a rule). */
+const PARTIAL_CODEMOD = 0.9;
+/** Fewer measured breaking type changes than this, a major is not worth a pack. */
+const MIN_BREAKING = 10;
+/**
+ * Counted up to this many breaking changes (log2 = 14): beyond it a major rewrites the whole
+ * surface either way, and the bound lets the ranking stop diffing once nothing left can place.
+ */
+const MAX_BREAKING = 16_383;
+
+/**
+ * Packages no diff measures: their `from` version ships no types, or the diff fails on them
+ * (i18next and type-fest, a diff bug). They enter only when their changelog lists API
+ * changes, scored as MIN_BREAKING: the least a measured entry can have, so an unmeasured one
+ * never outranks a measured one used as widely. An empty list records that the changelog was
+ * read and lists none (the major is a Node version, a CLI or configuration). A package
+ * without an entry here is left out.
+ */
+const CHANGELOGS: Record<string, { to: number; url: string; api: string[] }> = {
+  prettier: {
+    to: 3,
+    url: 'https://prettier.io/blog/2023/07/05/3.0.0.html',
+    api: [
+      'every public API is async (`format`, `resolveConfig`)',
+      '`resolveConfig.sync` removed',
+      '`doc.builders.concat` removed',
+    ],
+  },
+  eslint: {
+    to: 10,
+    url: 'https://eslint.org/docs/latest/use/migrate-to-10.0.0',
+    api: [
+      'eslintrc configuration removed',
+      '`Linter#defineParser`, `defineRule`, `defineRules`, `getRules` removed',
+      '`LintMessage#nodeType` removed',
+      'deprecated `SourceCode` methods removed',
+    ],
+  },
+  '@babel/core': {
+    to: 8,
+    url: 'https://babeljs.io/docs/v8-migration-api',
+    api: [
+      '`parse`, `loadOptions`, `loadPartialConfig`, `transformFromAst` and `createConfigItem` need a callback (or their sync versions)',
+      'module-specific options removed',
+    ],
+  },
+  nodemailer: {
+    to: 10,
+    url: 'https://github.com/nodemailer/nodemailer/blob/master/CHANGELOG.md',
+    api: [],
+  },
+  jsdom: { to: 30, url: 'https://github.com/jsdom/jsdom/releases', api: [] },
+  'cross-env': { to: 10, url: 'https://github.com/kentcdodds/cross-env#readme', api: [] },
+  turbo: { to: 2, url: 'https://turborepo.dev/blog/turbo-2-0', api: [] },
+};
+
+/**
+ * Packages whose diff cannot be read whole yet: date-fns 4 moved its subpath modules
+ * (`date-fns/add`) to a layout the diff does not match, which reports every one removed.
+ * Only changes to the main entry's exports count until it does.
+ */
+const MAIN_ENTRY_ONLY: Record<string, string> = {
+  'date-fns':
+    "counts only the main entry: the diff does not match v4's subpath modules (date-fns/add) yet",
+};
 
 interface Entry {
   package: string;
@@ -387,7 +458,12 @@ for (const name of names) {
 // 4. Entries: one per group, named after its hub, ranked by direct use.
 const components = new Map<string, string[]>();
 for (const n of names) components.set(find(n), [...(components.get(find(n)) ?? []), n]);
-const entries: (Entry & { score: number; versions: [string, string]; stand?: string })[] = [];
+const entries: (Entry & {
+  score: number;
+  weight: number;
+  versions: [string, string];
+  stand?: string;
+})[] = [];
 for (const members of components.values()) {
   if (members.some((m) => own.has(m))) continue;
   const runtime = members.filter((m) => !m.startsWith('@types/') && packuments.has(m));
@@ -440,12 +516,13 @@ for (const members of components.values()) {
     reposBehind: behindRepos.size,
     weeklyDownloads: 0,
     ...(codemod ? { codemod: `${codemod.url} (${codemod.note})` } : {}),
-    score: repoSet.size * (codemod ? 0.5 : 1),
+    score: 0,
+    weight: repoSet.size * (codemod ? PARTIAL_CODEMOD : 1),
     versions: [fromVersion, hubLatest],
     ...(members.includes(typesOf) ? { stand: typesOf } : {}),
   });
 }
-entries.sort((a, b) => b.score - a.score || a.package.localeCompare(b.package));
+entries.sort((a, b) => b.weight - a.weight || a.package.localeCompare(b.package));
 
 /**
  * What a pack would migrate: the breaking changes `check` finds between the two type
@@ -458,49 +535,81 @@ async function breakingChanges(
   name: string,
   from: string,
   to: string,
-): Promise<number | undefined> {
-  const file = join(diffCache, `${name.replace('/', '__')}@${from}..${to}.json`);
+  mainOnly = false,
+): Promise<number | string> {
+  const key = `${name.replace('/', '__')}@${from}..${to}${mainOnly ? '.main' : ''}`;
+  const file = join(diffCache, `${key}.json`);
   if (existsSync(file)) return JSON.parse(readFileSync(file, 'utf8')).breaking;
   try {
     const changes = await diffPackage({ name, from, to });
-    const breaking = changes.filter((c) => c.severity === 'breaking').length;
+    // A subpath's symbols are written `"./add":add`; the main entry's are bare.
+    const breaking = changes.filter(
+      (c) => c.severity === 'breaking' && !(mainOnly && c.path.startsWith('"')),
+    ).length;
     mkdirSync(diffCache, { recursive: true });
     writeFileSync(file, JSON.stringify({ breaking }));
     return breaking;
   } catch (err) {
-    console.error(`${name} ${from} → ${to}: ${(err as Error).message.split('\n')[0]}`);
-    return undefined;
+    // Why it could not be measured: no types to read, or the diff itself failed.
+    const why = (err as Error).message.split('\n')[0] ?? 'unknown error';
+    console.error(`${name} ${from} → ${to}: ${why}`);
+    return why.includes('no type declarations')
+      ? 'no type declarations'
+      : `the diff failed (${why})`;
   }
 }
+/** score = direct use × log2(1 + breaking type changes), a partial codemod counting 0.9. */
+const scoreOf = (weight: number, breaking: number): number =>
+  weight * Math.log2(1 + Math.min(breaking, MAX_BREAKING));
 const ranked: (typeof entries)[number][] = [];
 const api = new Map<string, string>();
 for (const e of entries) {
-  // Every entry tied with the last place is read, so ties are decided by downloads below.
-  if (ranked.length >= size && e.score < (ranked[size - 1]?.score ?? 0)) break;
+  // Entries are in order of direct use: once even the most breaking changes counted could
+  // not reach the last place, nothing after can.
+  const last = [...ranked].sort((a, b) => b.score - a.score)[size - 1]?.score ?? 0;
+  if (ranked.length >= size && scoreOf(e.weight, MAX_BREAKING) < last) break;
   console.error(`diffing ${e.package} ${e.versions[0]} → ${e.versions[1]}`);
-  let breaking = await breakingChanges(e.package, ...e.versions);
-  let via = '';
-  if (breaking === undefined && e.stand) {
-    const major = (v: string) => majorOfVersion(v);
-    const standFrom = newestOf(e.stand, major(e.versions[0]));
+  const mainOnly = e.package in MAIN_ENTRY_ONLY;
+  let breaking: number | string = await breakingChanges(e.package, ...e.versions, mainOnly);
+  let via = mainOnly ? `; ${MAIN_ENTRY_ONLY[e.package]}` : '';
+  if (typeof breaking === 'string' && e.stand) {
+    const standFrom = newestOf(e.stand, majorOfVersion(e.versions[0]));
     const standTo = latest.get(e.stand)?.version;
     if (standFrom && standTo) {
       breaking = await breakingChanges(e.stand, standFrom, standTo);
       via = ` (${e.stand} ${standFrom} → ${standTo})`;
     }
   }
-  if (breaking === 0) {
-    console.error(`left out ${e.package}: no breaking API change${via}`);
+  if (typeof breaking === 'string') {
+    const reason = breaking;
+    const log = CHANGELOGS[e.package];
+    const to = majorOfVersion(e.versions[1]);
+    if (!log || log.to !== to || log.api.length === 0) {
+      console.error(
+        `left out ${e.package}: ${reason}, and ${log?.to === to ? `its changelog lists no API change (${log.url})` : 'no changelog recorded in CHANGELOGS'}`,
+      );
+      continue;
+    }
+    e.score = scoreOf(e.weight, MIN_BREAKING);
+    api.set(
+      e.package,
+      `API change not measured (${reason}); the changelog lists ${log.api.join(', ')} (${log.url}), scored as ${MIN_BREAKING} breaking changes`,
+    );
+    ranked.push(e);
     continue;
   }
+  if (breaking < MIN_BREAKING) {
+    console.error(`left out ${e.package}: ${breaking} breaking API changes${via}`);
+    continue;
+  }
+  e.score = scoreOf(e.weight, breaking);
   api.set(
     e.package,
-    breaking === undefined
-      ? 'API change not measured (no type declarations)'
-      : `${breaking} breaking API change${breaking === 1 ? '' : 's'} from ${e.versions[0]} to ${e.versions[1]}${via}`,
+    `${breaking} breaking API changes from ${e.versions[0]} to ${e.versions[1]}${via}`,
   );
   ranked.push(e);
 }
+ranked.sort((a, b) => b.score - a.score || a.package.localeCompare(b.package));
 // Downloads break ties only, so they are read for tied entries that can still place. The
 // registry's search carries them (the weekly count api.npmjs.org gives), so the script needs
 // registry.npmjs.org alone; it rate-limits, hence two at a time.
@@ -524,7 +633,7 @@ const queue = ranked
       a.package.localeCompare(b.package),
   )
   .slice(0, size)
-  .map(({ score: _score, versions: _versions, stand: _stand, ...e }) => {
+  .map(({ score: _score, weight: _weight, versions: _versions, stand: _stand, ...e }) => {
     const together = e.members.length > 1 ? `; upgraded with ${e.members.slice(1).join(', ')}` : '';
     const reasons = [
       ...(why.get(e.package) ?? []),
