@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { builtinModules, createRequire } from 'node:module';
-import { basename, dirname, join, relative } from 'node:path';
+import { basename, dirname, join, relative, resolve } from 'node:path';
 import { Project, ts } from 'ts-morph';
 import { readInstalled } from '../adapters/typescript/repo.js';
 import { workspaceSourceMap } from '../adapters/typescript/workspace-source.js';
@@ -9,14 +9,32 @@ import { command } from './process.js';
 import { isServiceTest, serviceNeeds, unitConfig } from './services.js';
 import type { FixDiagnostic, TestResult } from './types.js';
 
+/**
+ * The repository's own TypeScript: `node_modules/typescript` in `dir` or the nearest ancestor
+ * that has one, as its own build would find it. Never `NODE_PATH` or Node's global folders:
+ * a compiler the repository did not install is not its compiler, and verifying with one
+ * reports errors (or deprecations) the repository never sees.
+ */
+export function consumerCompilerDir(dir: string): string | undefined {
+  for (let current = resolve(dir); ; current = dirname(current)) {
+    const manifest = join(current, 'node_modules', 'typescript', 'package.json');
+    if (existsSync(manifest)) return dirname(manifest);
+    if (dirname(current) === current) return undefined;
+  }
+}
+
 /** The consumer's compiler is authoritative; bundles carry ts-morph's compiler as fallback. */
 export function resolveCompiler(
   dir: string,
   bundled: typeof ts | undefined = ts,
-  load = (path: string) => createRequire(path)('typescript') as typeof ts,
+  load = (packageDir: string) =>
+    createRequire(join(packageDir, 'package.json'))(packageDir) as typeof ts,
+  find: (dir: string) => string | undefined = consumerCompilerDir,
 ): typeof ts {
   try {
-    return load(join(dir, 'package.json'));
+    const own = find(dir);
+    if (own === undefined) throw new Error('the repository installs no TypeScript');
+    return load(own);
   } catch {
     if (bundled) return bundled;
     throw new UptideError(
