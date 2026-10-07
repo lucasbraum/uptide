@@ -175,7 +175,7 @@ gate are the same as for a verified dependency.
 
 ## Choosing a model
 
-Assisted fixes support Anthropic, OpenAI and Gemini, with the same prompts, tool,
+Assisted fixes support Anthropic, OpenAI and Gemini (experimental), with the same prompts, tool,
 verification and publish gate. Set the chosen provider's key in your environment:
 `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` or `GEMINI_API_KEY`. Never put keys in repository
 config or command arguments.
