@@ -27,8 +27,11 @@
  *    migration has happened. The breaking changes between the two type surfaces (the diff
  *    `check` runs) are counted, up to MAX_BREAKING; fewer than MIN_BREAKING: left out, the
  *    major changes too little for a pack (clsx 2, chalk 6). A package without types enters
- *    only when CHANGELOGS records API changes from its changelog, marked "not measured" and
- *    scored as MIN_BREAKING. date-fns counts its main entry only (MAIN_ENTRY_ONLY).
+ *    only when GUIDES records API changes from its migration guide or changelog, marked "not
+ *    measured". A guide listing breaks the types cannot show (CSS, configuration, runtime)
+ *    scores on max(distinct type changes, items listed), marked "type diff understates".
+ *    A change repeated across many exports counts once (distinctBreaking). date-fns counts
+ *    its main entry only (MAIN_ENTRY_ONLY).
  * 4. Codemods. A package whose official codemod covers the breaking changes end to end is
  *    left out; one whose codemod covers part of them says so and counts 0.9: the codemod
  *    leaves the manual work a pack does, and a pack can run it as one of its rules.
@@ -42,7 +45,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { diffPackage, packStatus, registeredPacks } from '@uptide/core';
+import { type Change, diffPackage, packStatus, registeredPacks } from '@uptide/core';
 import type { Manifest } from '../packages/core/src/list/evidence.js';
 import { dependencyGroups } from '../packages/core/src/list/groups.js';
 import type { ListedDependency } from '../packages/core/src/list/list.js';
@@ -109,49 +112,592 @@ const MIN_BREAKING = 10;
 const MAX_BREAKING = 16_383;
 
 /**
- * Packages no diff measures: their `from` version ships no types, or the diff fails on them
- * (i18next and type-fest, a diff bug). They enter only when their changelog lists API
- * changes, scored as MIN_BREAKING: the least a measured entry can have, so an unmeasured one
- * never outranks a measured one used as widely. An empty list records that the changelog was
- * read and lists none (the major is a Node version, a CLI or configuration). A package
- * without an entry here is left out.
+ * Official migration guides (or changelogs, where a package has none), and the breaking
+ * changes each lists for the upgrade to `to`, one entry per item the guide names. They
+ * count where the type diff cannot:
+ * - a break the types do not show (CSS, configuration, runtime behavior): the entry is
+ *   scored on max(distinct type changes, items listed) and marked "type diff understates";
+ * - a package no diff measures (no types at `from`, or a diff failure: i18next and
+ *   type-fest, a diff bug): it enters only when its guide lists API changes, scored on
+ *   max(MIN_BREAKING, items listed), and marked "not measured".
+ * `counted` says which of the guide's sections were counted (scripts' count: every heading in
+ * them with no heading under it, instructions like "How to update" aside). An empty list
+ * records that the guide or changelog was read and lists no API change (the major is a Node
+ * version, a CLI or configuration). Not measured and not here: left out.
  */
-const CHANGELOGS: Record<string, { to: number; url: string; api: string[] }> = {
-  prettier: {
-    to: 3,
-    url: 'https://prettier.io/blog/2023/07/05/3.0.0.html',
-    api: [
-      'every public API is async (`format`, `resolveConfig`)',
-      '`resolveConfig.sync` removed',
-      '`doc.builders.concat` removed',
+const GUIDES: Record<string, { to: number; url: string; counted?: string; breaking: string[] }> = {
+  tailwindcss: {
+    to: 4,
+    url: 'https://tailwindcss.com/docs/upgrade-guide',
+    counted: '"Changes from v3", every item but browser requirements',
+    breaking: [
+      'Removed @tailwind directives',
+      'Removed deprecated utilities',
+      'Updated shadow, radius, and blur scales',
+      'Renamed outline utility',
+      'Default ring width change',
+      'Space-between selector',
+      'Divide selector',
+      'Using variants with gradients',
+      'Container configuration',
+      'Default border color',
+      'Default ring width and color',
+      'New default placeholder color',
+      'Buttons use the default cursor',
+      'Dialog margins removed',
+      'Hidden attribute takes priority',
+      'Using a prefix',
+      'The important modifier',
+      'Adding custom utilities',
+      'Variant stacking order',
+      'Variables in arbitrary values',
+      'Arbitrary values in grid and object-position utilities',
+      'Hover styles on mobile',
+      'Transitioning outline-color',
+      'Resetting Transforms',
+      'Transitions',
+      'Disabling core plugins',
+      'Using the theme() function',
+      'Using a JavaScript config file',
+      'Theme values in JavaScript',
+      'Using @apply with Vue, Svelte, or CSS modules',
+      'Using Sass, Less, and Stylus',
+    ],
+  },
+  express: {
+    to: 5,
+    url: 'https://expressjs.com/en/guide/migrating-5',
+    counted: '"Removed methods and properties" and "Changed"',
+    breaking: [
+      'app.del()',
+      'app.param(fn)',
+      'Pluralized method names',
+      'Leading colon (:) in the name for app.param(name, fn)',
+      'req.param(name)',
+      'res.json(obj, status)',
+      'res.jsonp(obj, status)',
+      'res.redirect(url, status)',
+      "res.redirect('back') and res.location('back')",
+      'res.send(body, status)',
+      'res.send(status)',
+      'res.sendfile()',
+      'res.sendFile() options',
+      'express.static() options',
+      'router.param(fn)',
+      'express.static.mime',
+      'MIME type changes',
+      'express:router debug logs',
+      'Path route matching syntax',
+      'Rejected promises handled from middleware and handlers',
+      'express.urlencoded',
+      'express.static dotfiles',
+      'router.param() with an array of names',
+      'app.listen',
+      'app.router',
+      'req.body',
+      'req.host',
+      'req.params',
+      'req.query',
+      'res.clearCookie',
+      'res.status',
+      'res.vary',
+    ],
+  },
+  next: {
+    to: 16,
+    url: 'https://nextjs.org/docs/app/guides/upgrading/version-16',
+    counted: 'the sections marked "(Breaking change)" and "Removals"',
+    breaking: [
+      'Async Request APIs',
+      'Async parameters for icon, and open-graph Image',
+      'Async `id` parameter for `sitemap`',
+      'Local Images with Query Strings',
+      '`minimumCacheTTL` Default',
+      '`imageSizes` Default',
+      '`qualities` Default',
+      'Local IP Restriction',
+      'Maximum Redirects',
+      'AMP Support',
+      '`next lint` Command',
+      'Runtime Configuration',
+      '`devIndicators` Options',
+      '`experimental.dynamicIO` and `experimental.useCache`',
+      '`unstable_rootParams`',
+    ],
+  },
+  react: {
+    to: 19,
+    url: 'https://react.dev/blog/2024/04/25/react-19-upgrade-guide',
+    counted: '"Breaking changes" and "TypeScript changes"',
+    breaking: [
+      'Errors in render are not re-thrown',
+      'Removed: `propTypes` and `defaultProps` for functions',
+      'Removed: Legacy Context using `contextTypes` and `getChildContext`',
+      'Removed: string refs',
+      'Removed: Module pattern factories',
+      'Removed: `React.createFactory`',
+      'Removed: `react-test-renderer/shallow`',
+      'Removed: `react-dom/test-utils`',
+      'Removed: `ReactDOM.render`',
+      'Removed: `ReactDOM.hydrate`',
+      'Removed: `unmountComponentAtNode`',
+      'Removed: `ReactDOM.findDOMNode`',
+      'Removed deprecated TypeScript types',
+      '`ref` cleanups required',
+      '`useRef` requires an argument',
+      'Changes to the `ReactElement` TypeScript type',
+      'The JSX namespace in TypeScript',
+      'Better `useReducer` typings',
+    ],
+  },
+  vite: {
+    to: 8,
+    url: 'https://vite.dev/guide/migration',
+    counted: '"Default Browser Target Change", "Rolldown" and "Removed Deprecated Features"',
+    breaking: [
+      'Default Browser Target Change',
+      'Dependency Optimizer Now Uses Rolldown',
+      'esbuild Fallbacks',
+      'JavaScript Minification by Oxc',
+      'CSS Minification by Lightning CSS',
+      'Consistent CommonJS Interop',
+      'Removed Module Resolution Using Format Sniffing',
+      'Require Calls For Externalized Modules',
+      '`import.meta.url` in UMD / IIFE',
+      'Removed `build.rollupOptions.watch.chokidar` option',
+      'Removed object form `build.rollupOptions.output.manualChunks` and deprecate function form one',
+      '`build()` Throws `BundleError`',
+      'Module Type Support and Auto Detection',
+      'Removed Deprecated Features',
+    ],
+  },
+  vitest: {
+    to: 5,
+    url: 'https://vitest.dev/guide/migration',
+    counted: 'every section but "Package Migration"',
+    breaking: [
+      'Yarn Users Must Install `vite` Explicitly',
+      '`clearMocks` is Enabled by Default',
+      '`testNamePattern` Matches the `>`-Joined Full Name',
+      'Inline Projects Inherit the Root Config by Default',
+      'Referenced Config Files Can Define Their Own Projects',
+      'Inline Projects Share the Vite Server by Default',
+      'Hoisted Mocking Calls Must Be at the Top Level',
+      'Automocked Modules Stay Automocked in the Browser',
+      'Class Mocks Keep Prototype Methods',
+      'Benchmarking API Rewrite',
+      'Vitest UI Requires an Authenticated URL',
+      'Fake Timers and `setSystemTime` Now Mock `Temporal`',
+      '`toThrow("")` Matches Any Error Message',
+      'Assertion Types Expose Return and Received Types',
+      '`expect.poll` Fails When It Times Out',
+      'Unawaited Asynchronous Assertions Fail the Test',
+      'Test Titles and Inspected Values Use `pretty-format`',
+      'Removed `test.sequential`, `describe.sequential`, and `sequential` Options',
+      'Locators in Commands are Serialized as Objects',
+      'Locators are Strict by Default',
+      '`toHaveTextContent` Now Performs Strict Equality',
+      '`render` Is Async in `vitest-browser-vue` and `vitest-browser-svelte`',
+      'Glob Coverage Thresholds No Longer Inherit `perFile`',
+      'Coverage `include` and `exclude` Match More Precisely',
+      'Config Files Are Not Looked Up From Parent Directories',
+      'DOM Environment Global Assignments Now Update the Underlying Window',
+      '`populateGlobal` Returns Descriptors in `originals`',
+      'Browser Orchestrator URL Requires a Session',
+      '`browser.api` Is Replaced by the Top-Level `api`',
+      'Generated Reports and Artifacts Use the `.vitest` Directory',
+      '`toMatchScreenshot` Now Uses a Dedicated Screenshot Directory Config',
+      'Worker and Concurrency Ids Are 1-based',
+      '`resolveConfig` Returns the Resolved Vite Config',
+      'Removed Deprecated Entrypoints',
+    ],
+  },
+  '@faker-js/faker': {
+    to: 10,
+    url: 'https://fakerjs.dev/guide/upgrading',
+    counted: '"General Breaking Changes", runtime and module-format notes aside',
+    breaking: ['Removal of Deprecated Code', 'Word Methods Default Resolution Strategy'],
+  },
+  '@typescript-eslint/utils': {
+    to: 8,
+    url: 'https://typescript-eslint.io/blog/announcing-typescript-eslint-v8',
+    counted: '"User-Facing Changes" and "Developer-Facing Changes", new features aside',
+    breaking: [
+      'Updated Configuration Rules',
+      'Replacement of `ban-types`',
+      'Tooling Breaking Changes',
+      'AST Breaking Changes',
+      'Custom Rule `meta.docs` Types',
+      'Flat Configuration `RuleTester`',
+      'Other Developer-Facing Breaking Changes',
+    ],
+  },
+  openai: {
+    to: 7,
+    url: 'https://github.com/openai/openai-node/blob/master/MIGRATION.md',
+    counted: '"Breaking changes" (the guide covers 4 → 5, the first step of 4 → 7)',
+    breaking: [
+      'Web types for `withResponse`, `asResponse`, and `APIError.headers`',
+      'Named path parameters',
+      'URI encoded path parameters',
+      'Removed request options overloads',
+      'HTTP method naming',
+      'Removed `httpAgent` in favor of `fetchOptions`',
+      'Refactor of `openai/core`, `error`, `pagination`, `resource`, `streaming` and `uploads`',
+      'Resource classes',
+      'Cleaned up `uploads` exports',
+      '`APIClient`',
+      'File handling',
+      'Shims removal',
+      'Zod helpers optionality error',
+      'Removed unnecessary classes',
+      'Beta chat namespace removed',
+      'Removed deprecated `.runFunctions` methods',
+      '`.runTools()` event / method names',
+      '`openai/src` directory removed',
     ],
   },
   eslint: {
     to: 10,
     url: 'https://eslint.org/docs/latest/use/migrate-to-10.0.0',
-    api: [
-      'eslintrc configuration removed',
-      '`Linter#defineParser`, `defineRule`, `defineRules`, `getRules` removed',
-      '`LintMessage#nodeType` removed',
-      'deprecated `SourceCode` methods removed',
+    counted: 'every section but codemods, the contents and Node.js versions',
+    breaking: [
+      '`eslint:recommended` has been updated',
+      'New configuration file lookup algorithm',
+      'Old config format no longer supported',
+      'JSX references are now tracked',
+      '`eslint-env` comments are reported as errors',
+      'Jiti < v2.2.0 are no longer supported',
+      'POSIX character classes in glob patterns',
+      '`stylish` formatter now uses native `styleText` instead of `chalk`',
+      'Deprecated options of the `radix` rule',
+      '`no-shadow-restricted-names` now reports `globalThis` by default',
+      '`func-names` schema is stricter',
+      '`allowConstructorFlags` option of `no-invalid-regexp` now accepts only unique items',
+      '`name` property added to ESLint core configs',
+      'Removal of `type` property in errors of invalid `RuleTester` cases',
+      '`Program` AST node range spans entire source text',
+      'Fixer methods now require string `text` arguments',
+      'New requirements for `ScopeManager` implementations',
+      'Removal of deprecated `context` members',
+      'Removal of deprecated `SourceCode` methods',
+      'Prohibiting `errors` or `output` of valid RuleTester test cases',
+      'Removal of `nodeType` property in `LintMessage` objects',
+    ],
+  },
+  prettier: {
+    to: 3,
+    url: 'https://prettier.io/blog/2023/07/05/3.0.0.html',
+    counted: '"Breaking Changes", Node.js versions aside',
+    breaking: [
+      'Change the default value for `trailingComma` to `all`',
+      'Remove Flow syntax support from `babel` parser',
+      'Remove support for Flow comments',
+      'Print trailing comma in type parameters and tuple types when `--trailing-comma=es5`',
+      'Add the pure `css` parser',
+      'Drop support for "comma separated interfaces" syntax',
+      'Change public APIs to asynchronous',
+      'Npm package file structures changed',
+      'Support plugins in ESM',
+      'Update `prettier.doc`',
+      '`textToDoc` trims trailing hard lines',
+      'Removed support for custom parser api',
+      'The second argument `parsers` passed to `parsers.parse` has been removed',
+      "`undefined` and `null` are not passed to plugin's `print` function",
+      'Allow using arbitrary truthy values for `label` docs',
+      '`getFileInfo()` resolves config by default',
+      'Plugin search feature has been removed',
+      'Ignore `.gitignore`d files by default',
+    ],
+  },
+  recharts: {
+    to: 3,
+    url: 'https://github.com/recharts/recharts/wiki/3.0-migration-guide',
+    counted: 'the breaking sections, new features aside',
+    breaking: [
+      'No more `CategoricalChartState`',
+      'Removal of internal props',
+      'Other breaking changes',
+      'Custom components',
+    ],
+  },
+  'react-day-picker': {
+    to: 10,
+    url: 'https://daypicker.dev/docs/upgrading-v8-to-v10',
+    counted: 'steps 2 to 7',
+    breaking: [
+      '2. Update CSS imports and styles',
+      '3. Add `onSelect` when using `selected`',
+      '4. Replace navigation boundary props',
+      '5. Update custom components',
+      '6. Update formatters, labels, and tests',
+      'Removed props',
+      'Removed hooks and internal providers',
+      'Removed utility aliases',
+      'Removed TypeScript and exported names',
+    ],
+  },
+  'react-router': {
+    to: 8,
+    url: 'https://reactrouter.com/upgrading/v7',
+    counted:
+      '"Future Flags" and "Other Breaking Changes" (the guide covers 7 → 8, the last step of 6 → 8)',
+    breaking: [
+      '`future.v8_middleware`',
+      '`future.v8_splitRouteModules`',
+      '`future.v8_viteEnvironmentApi`',
+      '`future.v8_passThroughRequests`',
+      '`future.v8_trailingSlashAwareDataRequests`',
+      '`meta`/`matches` `data` Values',
+      '`react-router-dom`',
+      'Cloudflare Vite Plugin',
+      '`@react-router/architect` `useRequestContextDomainName`',
+    ],
+  },
+  '@prisma/client': {
+    to: 7,
+    url: 'https://www.prisma.io/docs/guides/upgrade-prisma-orm/v7',
+    counted: '"Breaking changes", prerequisites aside',
+    breaking: [
+      'ESM support',
+      'Schema changes',
+      'Driver adapters',
+      'Prisma Accelerate',
+      'SSL certificate validation changes',
+      'Environment variables',
+      'Prisma config',
+      'Metrics removed',
+      'Prisma ORM v6 behavior',
+      'Prisma ORM v7 (reverted behavior)',
+      'Client middleware removed',
+      'Seeding changes',
+      'Removed CLI flags',
+      'Removed db execute flags',
+      'Migrate diff changes',
+      'Various environment variables have been removed',
+    ],
+  },
+  '@sentry/core': {
+    to: 11,
+    url: 'https://github.com/getsentry/sentry-javascript/blob/develop/MIGRATION.md',
+    counted: '"Behaviour Changes" and the API sections after it',
+    breaking: [
+      'Choosing an OpenTelemetry setup',
+      'Connecting Sentry to your OpenTelemetry traces',
+      'If you previously set `sendDefaultPii: true`',
+      'If you want to keep the v10 default behavior',
+      'RequestData',
+      'Astro client IP',
+      'Remix action form data',
+      '`vercelAIIntegration` changes',
+      '`setupKoaErrorHandler` is deprecated (Koa errors are captured automatically)',
+      '`setupHapiErrorHandler` is deprecated (Hapi errors are captured automatically)',
+      'Initializing via `--require` is no longer supported',
+      'Scope `tags` and `extra` are not applied to spans',
+      '`beforeSendSpan` receives the streamed span format',
+      'Replacing `beforeSendTransaction`',
+      'Replacing `ignoreTransactions` with `ignoreSpans`',
+      '`ignoreStatusCodes` is deprecated',
+      'Opting out of span streaming',
+      '`Sentry.spanToJSON` returns streamed span format',
+      'The `enableLogs` option was removed',
+      'Browser sessions use `unhandled` instead of `crashed`',
+      '`page` is the default browser session lifecycle mode',
+      'Web vitals are reported per soft navigation',
+      'CLS and LCP no longer report intermediate values',
+      'Back/forward-cache restores report their own web vitals',
+      'Web vital spans no longer carry a report event',
+      '`DOMException.code` is no longer set as a tag',
+      '`attachStacktrace` defaults to `true`',
+      'Incoming HTTP span hooks moved to `onSpanCreated`',
+      'Deno `node:http` server requests are tracked as sessions',
+      '`propagateTrace` renamed to `tracePropagation`',
+      'Deno server transactions are dropped for some 3xx/4xx status codes',
+      '`tracePropagationTargets` matching is now case-insensitive',
+      '`sendFeedback` rejects with an `Error`',
+      'HTTP attributes',
+      'Network attributes',
+      'Messaging and database attributes',
+      'GenAI attributes',
+      'Other attributes',
+      'Attribute constants',
+      'Span operation (`op`) changes',
+      'LangGraph no longer emits `create_agent` spans',
+      'Express: errors are captured automatically',
+      '`onUnhandledRejectionIntegration`: no warning before `Error` rejections in `strict` mode',
+      'Browser navigation timing spans',
+      'Serverless function spans',
+      'SvelteKit function spans',
+      'Filtering and sampling',
+      'HTTP spans',
+      'Routing and request handler spans',
+      'GraphQL spans',
+      'AI spans',
+      'MCP spans',
+      'Messaging spans',
+      'Cache spans',
+      'UI spans',
+      'Database spans',
+      'AI integrations no longer trace non-inference operations',
+      'Fastify: `setupFastifyErrorHandler` is deprecated',
+      '`@sentry/nextjs`',
+      'Cloudflare: `nodejs_compat` compatibility flag is now required',
+      'Cloudflare: `wrapRequestHandler` moved to `@sentry/cloudflare/request`',
+      'Cloudflare: the Vite plugin auto-instruments your Worker by default',
+      'Cloudflare: rate limiter bindings no longer emit spans',
+      '`@sentry/nuxt`: the server config is bundled, `--import` is no longer needed',
+      '`@sentry/ember` is now a v2 addon with manual setup',
+      'React Router: Vite plugin moved to `@sentry/react-router/vite`',
+      'Remix: Vite plugin moved to `@sentry/remix/vite`',
+      'React: Simpler React Router setup via `@sentry/react/react-router`',
+      '`@sentry/core` / All SDKs',
+      '`@sentry/browser`',
+      '`httpIntegration` options were consolidated',
+      '`@sentry/cloudflare`',
+      '`@sentry/opentelemetry`',
+      'AI integrations',
+      '`@sentry/react-router`',
+      'Browser and Node profiling',
+      '`@sentry/profiling-node`',
+      '`@sentry/nextjs`',
+      'Meta-framework build options',
+      'Bundler plugins: Vercel deploys use the plain Vercel environment name',
+      'Bundler plugins: `@sentry/bundler-plugins/webpack5` was removed',
+      'Removed `unstable_` bundler plugin options',
+      '`@sentry/nuxt`',
+      '`@sentry/sveltekit`',
+      '`@sentry/server-utils`',
+      '`@sentry/astro`',
+      '`@sentry/solidstart`',
+      '`@sentry/types` is no longer published',
+      '`@sentry/node-core` was merged back into `@sentry/node`',
+      '`@sentry/tanstackstart` was removed',
+      'Metrics moved out of the base CDN bundle',
+      '`InboundFilters` integration renamed to `EventFilters`',
+      '`instrumentLangGraph` renamed to `instrumentStateGraph`',
+      '`childProcess` integration split into `childProcess` and `workerThreads`',
+      'Deno default integrations renamed to match the other SDKs',
+      '`denoHttpIntegration` incoming span hooks renamed',
+      '`otlpIntegration` renamed to `openTelemetryIntegration`',
+      '`sentrySvelteKit` moved to the `@sentry/sveltekit/vite` subpath export',
     ],
   },
   '@babel/core': {
     to: 8,
     url: 'https://babeljs.io/docs/v8-migration-api',
-    api: [
-      '`parse`, `loadOptions`, `loadPartialConfig`, `transformFromAst` and `createConfigItem` need a callback (or their sync versions)',
-      'module-specific options removed',
+    counted: '"API Changes"',
+    breaking: [
+      'All packages',
+      '`@babel/core`',
+      '`@babel/generator`',
+      '`@babel/types`',
+      '`@babel/parser`',
+      '`@babel/traverse`',
+      '`@babel/eslint-plugin`',
+      '`@babel/code-frame`',
+      '`@babel/compat-data`',
+      '`@babel/preset-env`',
+      '`@babel/helper-replace-supers`',
+      '`@babel/helper-simple-access`',
+      '`@babel/highlight`',
+      '`@babel/plugin-transform-runtime`',
+      'Plugin API changes',
+    ],
+  },
+  stylelint: {
+    to: 17,
+    url: 'https://stylelint.io/migration-guide/to-17',
+    counted: '"Breaking changes", Node.js versions aside',
+    breaking: [
+      'Removed GitHub formatter',
+      'Removed `resolveNestedSelectors` option from `selector-class-pattern`',
+      'Removed `checkContextFunctionalPseudoClasses` option from `selector-max-id`',
+      'Changed default `fix` mode to `strict`',
+      'Changed `report` to be consistent and predictable in how it handles the provided position arguments',
+      'Changed `selector-max-*` syntax rules for standard CSS nesting and modern functional pseudo-classes',
+      'Changed `*-specificity` semantic rules for standard CSS nesting',
+      'Changed `no-duplicate-selectors` and `selector-no-qualifying-type` for standard CSS nesting',
+      'Changed `*-list` rules to have consistent behaviour for vendor prefixes and case',
+      'Changed `*-no-vendor-prefix` rules to have consistent behaviour for their `ignore*: []` secondary options',
+      'Changed `declaration-property-max-values` rule to have consistent behaviour for vendor prefixes',
+    ],
+  },
+  rollup: {
+    to: 4,
+    url: 'https://rollupjs.org/migration/',
+    counted: '"General Changes", "Configuration Changes" and "Changes to the Plugin API"',
+    breaking: ['General Changes', 'Configuration Changes', 'Changes to the Plugin API'],
+  },
+  zustand: {
+    to: 5,
+    url: 'https://zustand.docs.pmnd.rs/migrations/migrating-to-v5',
+    counted: '"Migration Guide"',
+    breaking: [
+      'Using custom equality functions such as `shallow`',
+      'Requiring stable selector outputs',
+      'Handling Dynamic `replace` Flag',
+      'Persist middleware no longer stores item at store creation',
+    ],
+  },
+  graphql: {
+    to: 17,
+    url: 'https://www.graphql-js.org/upgrade-guides/v16-v17',
+    counted: 'the change sections, Node.js versions and tracing aside',
+    breaking: [
+      'Conditional exports',
+      'Development mode',
+      '`graphql()` and `graphqlSync()`',
+      'GraphQL Harness',
+      'Single-result execution',
+      'Incremental delivery',
+      'Disabling error propagation',
+      'Resolver return values',
+      'Custom execution helpers',
+      'Subscription return type',
+      'Lower-level subscription helpers',
+      'Abort Signals',
+      'Execution Hooks',
+      'Default values',
+      '`undefined` and omitted input values',
+      'Coercion and validation helpers',
+      'Built-in scalar `bigint` values',
+      'Custom scalar method names',
+      'Variable Values and Resolver Info',
+      'Schema validation',
+      'Programmatic schema APIs',
+      'AST constants and visitors',
+      'Directives on directive definitions',
+      'Fragment arguments',
+      'Validation',
+      'Schema Change utilities',
+      'Removed helpers',
+      '`GraphQLError`',
+    ],
+  },
+  '@opentelemetry/core': {
+    to: 2,
+    url: 'https://github.com/open-telemetry/opentelemetry-js/blob/main/doc/upgrade-to-2.x.md',
+    counted: 'the sections marked 💥, Node.js and TypeScript versions aside',
+    breaking: [
+      '💥 Drop `window.OTEL_*` support in browsers',
+      '💥 `@opentelemetry/resources` API changes',
+      '💥 `@opentelemetry/core` API changes',
+      '💥 Tracing SDK API changes',
+      '💥 `@opentelemetry/sdk-metrics` API changes',
+      'Synchronous Resource Detector migration',
+      'Asynchronous Resource Detector migration',
+      'Resource Detector test changes',
+      '💥 Other changes',
     ],
   },
   nodemailer: {
     to: 10,
     url: 'https://github.com/nodemailer/nodemailer/blob/master/CHANGELOG.md',
-    api: [],
+    breaking: [],
   },
-  jsdom: { to: 30, url: 'https://github.com/jsdom/jsdom/releases', api: [] },
-  'cross-env': { to: 10, url: 'https://github.com/kentcdodds/cross-env#readme', api: [] },
-  turbo: { to: 2, url: 'https://turborepo.dev/blog/turbo-2-0', api: [] },
+  jsdom: { to: 30, url: 'https://github.com/jsdom/jsdom/releases', breaking: [] },
+  'cross-env': { to: 10, url: 'https://github.com/kentcdodds/cross-env#readme', breaking: [] },
+  turbo: { to: 2, url: 'https://turborepo.dev/blog/turbo-2-0', breaking: [] },
 };
 
 /**
@@ -176,6 +722,12 @@ interface Entry {
   repos: number;
   /** Of those, the ones declaring the hub below `to`. */
   reposBehind: number;
+  /**
+   * The breaking changes the score counts from: every one the type diff reports, the
+   * distinct ones (a change repeated across exports once), and the items the migration
+   * guide lists when GUIDES records it. Absent when no diff could measure the package.
+   */
+  breaking?: { total: number; distinct: number; guide?: number };
   weeklyDownloads: number;
   codemod?: string;
 }
@@ -531,23 +1083,68 @@ entries.sort((a, b) => b.weight - a.weight || a.package.localeCompare(b.package)
  * read through its `@types` member (express → @types/express). Cached per version pair.
  */
 const diffCache = join(homedir(), '.cache', 'uptide', 'queue-diff');
+/** A diff's breaking changes, all of them and the distinct ones. */
+interface Breaking {
+  total: number;
+  /** removed + shapes: what a pack has to handle, each repeated change once. */
+  distinct: number;
+  /** Exports removed or renamed: each one is its own rewrite. */
+  removed: number;
+  /** Distinct change shapes among the rest (lucide-react: one type change on every icon). */
+  shapes: number;
+}
+/**
+ * The same change repeated across many exports is one change to migrate: lucide-react 1
+ * changes every icon's type the same way. A change's shape is its kind and its before and
+ * after text, with the symbol's own name taken out; each shape counts once. A removed or
+ * renamed export counts once each, and a change reported again under an alias not at all.
+ */
+function distinctBreaking(changes: Change[]): Breaking {
+  const removed = new Set<string>();
+  const shapes = new Set<string>();
+  for (const c of changes) {
+    if (c.aliasOf) continue;
+    if (c.kind === 'removed' || c.kind === 'moved' || c.replacement) {
+      removed.add(c.path);
+      continue;
+    }
+    const own =
+      c.path
+        .split(/[#.:"()[\]\s]+/)
+        .filter(Boolean)
+        .at(-1) ?? '';
+    const strip = (text = '') => (own ? text.split(own).join('∗') : text);
+    shapes.add(`${c.kind}|${strip(c.before)}|${strip(c.after)}`);
+  }
+  return {
+    total: changes.length,
+    distinct: removed.size + shapes.size,
+    removed: removed.size,
+    shapes: shapes.size,
+  };
+}
+/** `7587 breaking API changes, 132 distinct (131 removed or renamed, 1 change shape)`. */
+const describe = (b: Breaking): string =>
+  b.distinct === b.total
+    ? `${b.total} breaking API changes`
+    : `${b.total} breaking API changes, ${b.distinct} distinct (${b.removed} removed or renamed, ${b.shapes} change shape${b.shapes === 1 ? '' : 's'})`;
 async function breakingChanges(
   name: string,
   from: string,
   to: string,
   mainOnly = false,
-): Promise<number | string> {
-  const key = `${name.replace('/', '__')}@${from}..${to}${mainOnly ? '.main' : ''}`;
+): Promise<Breaking | string> {
+  const key = `${name.replace('/', '__')}@${from}..${to}${mainOnly ? '.main' : ''}.v2`;
   const file = join(diffCache, `${key}.json`);
-  if (existsSync(file)) return JSON.parse(readFileSync(file, 'utf8')).breaking;
+  if (existsSync(file)) return JSON.parse(readFileSync(file, 'utf8')) as Breaking;
   try {
     const changes = await diffPackage({ name, from, to });
     // A subpath's symbols are written `"./add":add`; the main entry's are bare.
-    const breaking = changes.filter(
-      (c) => c.severity === 'breaking' && !(mainOnly && c.path.startsWith('"')),
-    ).length;
+    const breaking = distinctBreaking(
+      changes.filter((c) => c.severity === 'breaking' && !(mainOnly && c.path.startsWith('"'))),
+    );
     mkdirSync(diffCache, { recursive: true });
-    writeFileSync(file, JSON.stringify({ breaking }));
+    writeFileSync(file, JSON.stringify(breaking));
     return breaking;
   } catch (err) {
     // Why it could not be measured: no types to read, or the diff itself failed.
@@ -570,7 +1167,7 @@ for (const e of entries) {
   if (ranked.length >= size && scoreOf(e.weight, MAX_BREAKING) < last) break;
   console.error(`diffing ${e.package} ${e.versions[0]} → ${e.versions[1]}`);
   const mainOnly = e.package in MAIN_ENTRY_ONLY;
-  let breaking: number | string = await breakingChanges(e.package, ...e.versions, mainOnly);
+  let breaking: Breaking | string = await breakingChanges(e.package, ...e.versions, mainOnly);
   let via = mainOnly ? `; ${MAIN_ENTRY_ONLY[e.package]}` : '';
   if (typeof breaking === 'string' && e.stand) {
     const standFrom = newestOf(e.stand, majorOfVersion(e.versions[0]));
@@ -580,32 +1177,49 @@ for (const e of entries) {
       via = ` (${e.stand} ${standFrom} → ${standTo})`;
     }
   }
+  const guide =
+    GUIDES[e.package]?.to === majorOfVersion(e.versions[1]) ? GUIDES[e.package] : undefined;
+  const listed = guide?.breaking.length ?? 0;
+  const source = guide ? `the migration guide lists ${listed} (${guide.url})` : '';
   if (typeof breaking === 'string') {
-    const reason = breaking;
-    const log = CHANGELOGS[e.package];
-    const to = majorOfVersion(e.versions[1]);
-    if (!log || log.to !== to || log.api.length === 0) {
+    // Not measured: only a guide or changelog listing API changes lets it in.
+    if (listed === 0) {
       console.error(
-        `left out ${e.package}: ${reason}, and ${log?.to === to ? `its changelog lists no API change (${log.url})` : 'no changelog recorded in CHANGELOGS'}`,
+        `left out ${e.package}: ${breaking}, and ${guide ? `its guide lists no API change (${guide.url})` : 'no guide recorded in GUIDES'}`,
       );
       continue;
     }
-    e.score = scoreOf(e.weight, MIN_BREAKING);
+    const counted = Math.max(MIN_BREAKING, listed);
+    e.breaking = undefined;
+    e.score = scoreOf(e.weight, counted);
     api.set(
       e.package,
-      `API change not measured (${reason}); the changelog lists ${log.api.join(', ')} (${log.url}), scored as ${MIN_BREAKING} breaking changes`,
+      `API change not measured (${breaking}); ${source}: ${guide?.breaking.join('; ')}; scored as ${counted}`,
     );
     ranked.push(e);
     continue;
   }
-  if (breaking < MIN_BREAKING) {
-    console.error(`left out ${e.package}: ${breaking} breaking API changes${via}`);
+  // The guide's count wins when the type diff cannot see the break (CSS, config, runtime).
+  const counted = Math.max(breaking.distinct, listed);
+  e.breaking = {
+    total: breaking.total,
+    distinct: breaking.distinct,
+    ...(guide ? { guide: listed } : {}),
+  };
+  if (counted < MIN_BREAKING) {
+    console.error(
+      `left out ${e.package}: ${breaking.distinct} distinct breaking API changes${listed ? `, ${source}` : ''}${via}`,
+    );
     continue;
   }
-  e.score = scoreOf(e.weight, breaking);
+  e.score = scoreOf(e.weight, counted);
   api.set(
     e.package,
-    `${breaking} breaking API changes from ${e.versions[0]} to ${e.versions[1]}${via}`,
+    `${describe(breaking)} from ${e.versions[0]} to ${e.versions[1]}${via}${
+      listed > breaking.distinct
+        ? `; type diff understates: ${source}, scored as ${listed}: ${guide?.breaking.join('; ')}`
+        : ''
+    }`,
   );
   ranked.push(e);
 }

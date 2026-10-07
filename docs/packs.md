@@ -249,15 +249,18 @@ record no longer matches the evidence, so the label cannot outlive what supports
 - `packages/core/src/packs/registry.ts` is generated: `pack new` renders it again with the
   new entry. Every pack in it is scored by CI; only verified ones are used by the CLI.
 - `packs/queue.json` ranks the next packages worth a pack (`pnpm packs:queue`) by direct use
-  × log2(1 + breaking type changes). Direct use is how many sample repositories
+  × log2(1 + breaking changes). Direct use is how many sample repositories
   (`fixtures/corpus.json` and the pinned public applications in
-  `scripts/packs-queue-sample.ts`) declare the package in a package.json; the breaking
-  changes are the diff `check` runs between the major most of them are behind on and the
-  latest. Weekly downloads break ties. Packages that upgrade together are one entry named
+  `scripts/packs-queue-sample.ts`) declare the package in a package.json. Breaking changes are
+  the distinct ones in the diff `check` runs between the major most of them are behind on and
+  the latest: a change repeated across many exports counts once, each removed or renamed
+  export once. Where the official migration guide lists more breaking changes than the types
+  show (CSS, configuration, runtime behavior), the guide's count is used and the entry says
+  "type diff understates"; each guide's link, counted sections and items are recorded in the
+  script. Weekly downloads break ties. Packages that upgrade together are one entry named
   after their hub. Out: fewer than three sample repositories using it or behind on it, fewer
   than 10 breaking changes, an official codemod that covers the whole upgrade, and the packs
-  that exist. A package without types enters only when its changelog lists API changes
-  (recorded in the script, marked "not measured", scored as 10). A partial codemod is named
-  and counts 0.9.
+  that exist. A package no diff measures enters only when its guide lists API changes,
+  marked "not measured". A partial codemod is named and counts 0.9.
 - The **Packs** workflow (`.github/workflows/packs.yml`) runs `uptide pack test --json` for
   every pack with the ground-truth cache restored, on pull requests that touch packs.

@@ -8,23 +8,17 @@
       "members": ["react", "@types/react", "@types/react-dom", "react-dom", "react-is"],
       "from": ">=18 <19",
       "to": ">=19 <20",
-      "why": "declared directly in 48 of 52 sample repositories, 17 of them on an older major; 1645 breaking API changes from 18.3.1 to 19.3.0 (@types/react 18.3.31 → 19.3.0); upgraded with @types/react, @types/react-dom, react-dom, react-is (released in lockstep, types for react)",
+      "why": "declared directly in 48 of 52 sample repositories, 17 of them on an older major; 1645 breaking API changes, 739 distinct (701 removed or renamed, 38 change shapes) from 18.3.1 to 19.3.0 (@types/react 18.3.31 → 19.3.0); upgraded with @types/react, @types/react-dom, react-dom, react-is (released in lockstep, types for react)",
       "status": "todo",
       "repos": 48,
       "reposBehind": 17,
       "weeklyDownloads": 0,
-      "codemod": "https://react.dev/blog/2024/04/25/react-19-upgrade-guide (`react/19/migration-recipe` and `types-react-codemod preset-19` cover render, string refs, act and removed types; the guide lists the rest as manual)"
-    },
-    {
-      "package": "lucide-react",
-      "members": ["lucide-react"],
-      "from": ">=0 <1",
-      "to": ">=1 <2",
-      "why": "declared directly in 27 of 52 sample repositories, 21 of them on an older major; 7587 breaking API changes from 0.577.0 to 1.52.0",
-      "status": "todo",
-      "repos": 27,
-      "reposBehind": 21,
-      "weeklyDownloads": 0
+      "codemod": "https://react.dev/blog/2024/04/25/react-19-upgrade-guide (`react/19/migration-recipe` and `types-react-codemod preset-19` cover render, string refs, act and removed types; the guide lists the rest as manual)",
+      "breaking": {
+        "total": 1645,
+        "distinct": 739,
+        "guide": 18
+      }
     },
     {
       "package": "vitest",
@@ -37,55 +31,93 @@
       ],
       "from": ">=4 <5",
       "to": ">=5 <6",
-      "why": "declared directly in 39 of 52 sample repositories, 31 of them on an older major; 332 breaking API changes from 4.1.11 to 5.0.3; upgraded with @vitest/browser-playwright, @vitest/coverage-istanbul, @vitest/coverage-v8, @vitest/ui (released in lockstep, shared @vitest/mocker)",
+      "why": "declared directly in 39 of 52 sample repositories, 31 of them on an older major; 332 breaking API changes, 276 distinct (224 removed or renamed, 52 change shapes) from 4.1.11 to 5.0.3; upgraded with @vitest/browser-playwright, @vitest/coverage-istanbul, @vitest/coverage-v8, @vitest/ui (released in lockstep, shared @vitest/mocker)",
       "status": "todo",
       "repos": 39,
       "reposBehind": 31,
-      "weeklyDownloads": 0
+      "weeklyDownloads": 0,
+      "breaking": {
+        "total": 332,
+        "distinct": 276,
+        "guide": 34
+      }
     },
     {
       "package": "date-fns",
       "members": ["date-fns"],
       "from": ">=3 <4",
       "to": ">=4 <5",
-      "why": "declared directly in 39 of 52 sample repositories, 17 of them on an older major; 143 breaking API changes from 3.6.0 to 4.4.0; counts only the main entry: the diff does not match v4's subpath modules (date-fns/add) yet",
+      "why": "declared directly in 39 of 52 sample repositories, 17 of them on an older major; 143 breaking API changes, 123 distinct (5 removed or renamed, 118 change shapes) from 3.6.0 to 4.4.0; counts only the main entry: the diff does not match v4's subpath modules (date-fns/add) yet",
       "status": "todo",
       "repos": 39,
       "reposBehind": 17,
-      "weeklyDownloads": 0
-    },
-    {
-      "package": "ioredis",
-      "members": ["ioredis"],
-      "from": ">=5 <6",
-      "to": ">=6 <7",
-      "why": "declared directly in 24 of 52 sample repositories, 22 of them on an older major; 976 breaking API changes from 5.11.1 to 6.0.0",
-      "status": "todo",
-      "repos": 24,
-      "reposBehind": 22,
-      "weeklyDownloads": 0
+      "weeklyDownloads": 0,
+      "breaking": {
+        "total": 143,
+        "distinct": 123
+      }
     },
     {
       "package": "vite",
       "members": ["vite", "@vitejs/plugin-react", "vite-plugin-inspect"],
       "from": ">=7 <8",
       "to": ">=8 <9",
-      "why": "declared directly in 35 of 52 sample repositories, 18 of them on an older major; 49 breaking API changes from 7.3.7 to 8.3.3; upgraded with @vitejs/plugin-react, vite-plugin-inspect (plugin of vite)",
+      "why": "declared directly in 35 of 52 sample repositories, 18 of them on an older major; 49 breaking API changes, 40 distinct (6 removed or renamed, 34 change shapes) from 7.3.7 to 8.3.3; upgraded with @vitejs/plugin-react, vite-plugin-inspect (plugin of vite)",
       "status": "todo",
       "repos": 35,
       "reposBehind": 18,
-      "weeklyDownloads": 0
+      "weeklyDownloads": 0,
+      "breaking": {
+        "total": 49,
+        "distinct": 40,
+        "guide": 14
+      }
     },
     {
       "package": "recharts",
       "members": ["recharts"],
       "from": ">=2 <3",
       "to": ">=3 <4",
-      "why": "declared directly in 20 of 52 sample repositories, 14 of them on an older major; 688 breaking API changes from 2.15.4 to 3.10.1",
+      "why": "declared directly in 20 of 52 sample repositories, 14 of them on an older major; 688 breaking API changes, 659 distinct (590 removed or renamed, 69 change shapes) from 2.15.4 to 3.10.1",
       "status": "todo",
       "repos": 20,
       "reposBehind": 14,
-      "weeklyDownloads": 0
+      "weeklyDownloads": 0,
+      "breaking": {
+        "total": 688,
+        "distinct": 659,
+        "guide": 4
+      }
+    },
+    {
+      "package": "ioredis",
+      "members": ["ioredis"],
+      "from": ">=5 <6",
+      "to": ">=6 <7",
+      "why": "declared directly in 24 of 52 sample repositories, 22 of them on an older major; 976 breaking API changes, 191 distinct (1 removed or renamed, 190 change shapes) from 5.11.1 to 6.0.0",
+      "status": "todo",
+      "repos": 24,
+      "reposBehind": 22,
+      "weeklyDownloads": 0,
+      "breaking": {
+        "total": 976,
+        "distinct": 191
+      }
+    },
+    {
+      "package": "lucide-react",
+      "members": ["lucide-react"],
+      "from": ">=0 <1",
+      "to": ">=1 <2",
+      "why": "declared directly in 27 of 52 sample repositories, 21 of them on an older major; 7587 breaking API changes, 102 distinct (92 removed or renamed, 10 change shapes) from 0.577.0 to 1.52.0",
+      "status": "todo",
+      "repos": 27,
+      "reposBehind": 21,
+      "weeklyDownloads": 0,
+      "breaking": {
+        "total": 7587,
+        "distinct": 102
+      }
     },
     {
       "package": "@sentry/core",
@@ -100,11 +132,32 @@
       ],
       "from": ">=10 <11",
       "to": ">=11 <12",
-      "why": "declared directly in 22 of 52 sample repositories, 21 of them on an older major; 295 breaking API changes from 10.76.1 to 11.5.0; upgraded with @sentry/browser, @sentry/nestjs, @sentry/nextjs, @sentry/node, @sentry/profiling-node, @sentry/react (@sentry released in lockstep, @sentry/nextjs re-exports @sentry/core, @sentry/react re-exports @sentry/core, @sentry/node re-exports @sentry/core, @sentry/nestjs re-exports @sentry/core, @sentry/profiling-node re-exports @sentry/core, @sentry/browser re-exports @sentry/core)",
+      "why": "declared directly in 22 of 52 sample repositories, 21 of them on an older major; 295 breaking API changes, 289 distinct (266 removed or renamed, 23 change shapes) from 10.76.1 to 11.5.0; upgraded with @sentry/browser, @sentry/nestjs, @sentry/nextjs, @sentry/node, @sentry/profiling-node, @sentry/react (@sentry released in lockstep, @sentry/nextjs re-exports @sentry/core, @sentry/react re-exports @sentry/core, @sentry/node re-exports @sentry/core, @sentry/nestjs re-exports @sentry/core, @sentry/profiling-node re-exports @sentry/core, @sentry/browser re-exports @sentry/core)",
       "status": "todo",
       "repos": 22,
       "reposBehind": 21,
-      "weeklyDownloads": 0
+      "weeklyDownloads": 0,
+      "breaking": {
+        "total": 295,
+        "distinct": 289,
+        "guide": 98
+      }
+    },
+    {
+      "package": "@prisma/client",
+      "members": ["@prisma/client", "@prisma/adapter-pg", "@prisma/instrumentation"],
+      "from": ">=6 <7",
+      "to": ">=7 <8",
+      "why": "declared directly in 14 of 52 sample repositories, 8 of them on an older major; 5261 breaking API changes, 4403 distinct (4403 removed or renamed, 0 change shapes) from 6.19.3 to 7.10.0; upgraded with @prisma/adapter-pg, @prisma/instrumentation (@prisma released in lockstep)",
+      "status": "todo",
+      "repos": 14,
+      "reposBehind": 8,
+      "weeklyDownloads": 0,
+      "breaking": {
+        "total": 5261,
+        "distinct": 4403,
+        "guide": 16
+      }
     },
     {
       "package": "@typescript-eslint/utils",
@@ -115,55 +168,65 @@
       ],
       "from": ">=6 <7",
       "to": ">=8 <9",
-      "why": "declared directly in 20 of 52 sample repositories, 8 of them on an older major; 468 breaking API changes from 6.21.0 to 8.71.1; upgraded with @typescript-eslint/eslint-plugin, @typescript-eslint/parser (@typescript-eslint released in lockstep, @typescript-eslint/eslint-plugin re-exports @typescript-eslint/utils)",
+      "why": "declared directly in 20 of 52 sample repositories, 8 of them on an older major; 468 breaking API changes, 237 distinct (146 removed or renamed, 91 change shapes) from 6.21.0 to 8.71.1; upgraded with @typescript-eslint/eslint-plugin, @typescript-eslint/parser (@typescript-eslint released in lockstep, @typescript-eslint/eslint-plugin re-exports @typescript-eslint/utils)",
       "status": "todo",
       "repos": 20,
       "reposBehind": 8,
-      "weeklyDownloads": 0
+      "weeklyDownloads": 0,
+      "breaking": {
+        "total": 468,
+        "distinct": 237,
+        "guide": 7
+      }
     },
     {
-      "package": "@prisma/client",
-      "members": ["@prisma/client", "@prisma/adapter-pg", "@prisma/instrumentation"],
-      "from": ">=6 <7",
-      "to": ">=7 <8",
-      "why": "declared directly in 14 of 52 sample repositories, 8 of them on an older major; 5261 breaking API changes from 6.19.3 to 7.10.0; upgraded with @prisma/adapter-pg, @prisma/instrumentation (@prisma released in lockstep)",
+      "package": "tailwindcss",
+      "members": ["tailwindcss"],
+      "from": ">=3 <4",
+      "to": ">=4 <5",
+      "why": "declared directly in 35 of 52 sample repositories, 18 of them on an older major; 8 breaking API changes from 3.4.19 to 4.3.3; type diff understates: the migration guide lists 31 (https://tailwindcss.com/docs/upgrade-guide), scored as 31: Removed @tailwind directives; Removed deprecated utilities; Updated shadow, radius, and blur scales; Renamed outline utility; Default ring width change; Space-between selector; Divide selector; Using variants with gradients; Container configuration; Default border color; Default ring width and color; New default placeholder color; Buttons use the default cursor; Dialog margins removed; Hidden attribute takes priority; Using a prefix; The important modifier; Adding custom utilities; Variant stacking order; Variables in arbitrary values; Arbitrary values in grid and object-position utilities; Hover styles on mobile; Transitioning outline-color; Resetting Transforms; Transitions; Disabling core plugins; Using the theme() function; Using a JavaScript config file; Theme values in JavaScript; Using @apply with Vue, Svelte, or CSS modules; Using Sass, Less, and Stylus",
       "status": "todo",
-      "repos": 14,
-      "reposBehind": 8,
-      "weeklyDownloads": 0
-    },
-    {
-      "package": "openai",
-      "members": ["openai"],
-      "from": ">=4 <5",
-      "to": ">=7 <8",
-      "why": "declared directly in 16 of 52 sample repositories, 16 of them on an older major; 1299 breaking API changes from 4.104.0 to 7.30.0",
-      "status": "todo",
-      "repos": 16,
-      "reposBehind": 16,
-      "weeklyDownloads": 0
+      "repos": 35,
+      "reposBehind": 18,
+      "weeklyDownloads": 0,
+      "codemod": "https://tailwindcss.com/docs/upgrade-guide (`@tailwindcss/upgrade` converts config to CSS and renames utilities; custom plugins and changed defaults are manual)",
+      "breaking": {
+        "total": 8,
+        "distinct": 8,
+        "guide": 31
+      }
     },
     {
       "package": "react-day-picker",
       "members": ["react-day-picker"],
       "from": ">=9 <10",
       "to": ">=10 <11",
-      "why": "declared directly in 22 of 52 sample repositories, 21 of them on an older major; 134 breaking API changes from 9.14.0 to 10.0.2",
+      "why": "declared directly in 22 of 52 sample repositories, 21 of them on an older major; 134 breaking API changes, 133 distinct (126 removed or renamed, 7 change shapes) from 9.14.0 to 10.0.2",
       "status": "todo",
       "repos": 22,
       "reposBehind": 21,
-      "weeklyDownloads": 0
+      "weeklyDownloads": 0,
+      "breaking": {
+        "total": 134,
+        "distinct": 133,
+        "guide": 9
+      }
     },
     {
-      "package": "react-router",
-      "members": ["react-router", "@types/react-router-dom", "react-router-dom"],
-      "from": ">=6 <7",
-      "to": ">=8 <9",
-      "why": "declared directly in 23 of 52 sample repositories, 21 of them on an older major; 103 breaking API changes from 6.30.6 to 8.4.0; upgraded with @types/react-router-dom, react-router-dom (react-router-dom re-exports react-router, needs react moved)",
+      "package": "openai",
+      "members": ["openai"],
+      "from": ">=4 <5",
+      "to": ">=7 <8",
+      "why": "declared directly in 16 of 52 sample repositories, 16 of them on an older major; 1299 breaking API changes, 825 distinct (801 removed or renamed, 24 change shapes) from 4.104.0 to 7.30.0",
       "status": "todo",
-      "repos": 23,
-      "reposBehind": 21,
-      "weeklyDownloads": 0
+      "repos": 16,
+      "reposBehind": 16,
+      "weeklyDownloads": 0,
+      "breaking": {
+        "total": 1299,
+        "distinct": 825,
+        "guide": 18
+      }
     },
     {
       "package": "next",
@@ -176,34 +239,80 @@
       ],
       "from": ">=15 <16",
       "to": ">=16 <17",
-      "why": "declared directly in 27 of 52 sample repositories, 10 of them on an older major; 75 breaking API changes from 15.5.27 to 16.4.0; upgraded with @next/bundle-analyzer, @next/mdx, @next/third-parties, eslint-config-next (released in lockstep)",
+      "why": "declared directly in 27 of 52 sample repositories, 10 of them on an older major; 75 breaking API changes, 74 distinct (59 removed or renamed, 15 change shapes) from 15.5.27 to 16.4.0; upgraded with @next/bundle-analyzer, @next/mdx, @next/third-parties, eslint-config-next (released in lockstep)",
       "status": "todo",
       "repos": 27,
       "reposBehind": 10,
       "weeklyDownloads": 0,
-      "codemod": "https://nextjs.org/docs/app/guides/upgrading/version-16 (`@next/codemod upgrade` moves config, middleware to proxy and stabilized APIs; async request APIs and caching changes are reviewed by hand)"
+      "codemod": "https://nextjs.org/docs/app/guides/upgrading/version-16 (`@next/codemod upgrade` moves config, middleware to proxy and stabilized APIs; async request APIs and caching changes are reviewed by hand)",
+      "breaking": {
+        "total": 75,
+        "distinct": 74,
+        "guide": 15
+      }
+    },
+    {
+      "package": "react-router",
+      "members": ["react-router", "@types/react-router-dom", "react-router-dom"],
+      "from": ">=6 <7",
+      "to": ">=8 <9",
+      "why": "declared directly in 23 of 52 sample repositories, 21 of them on an older major; 103 breaking API changes, 83 distinct (51 removed or renamed, 32 change shapes) from 6.30.6 to 8.4.0; upgraded with @types/react-router-dom, react-router-dom (react-router-dom re-exports react-router, needs react moved)",
+      "status": "todo",
+      "repos": 23,
+      "reposBehind": 21,
+      "weeklyDownloads": 0,
+      "breaking": {
+        "total": 103,
+        "distinct": 83,
+        "guide": 9
+      }
+    },
+    {
+      "package": "prettier",
+      "members": ["prettier", "eslint-plugin-prettier", "prettier-plugin-svelte"],
+      "from": ">=2 <3",
+      "to": ">=3 <4",
+      "why": "declared directly in 31 of 52 sample repositories, 6 of them on an older major; API change not measured (no type declarations); the migration guide lists 18 (https://prettier.io/blog/2023/07/05/3.0.0.html): Change the default value for `trailingComma` to `all`; Remove Flow syntax support from `babel` parser; Remove support for Flow comments; Print trailing comma in type parameters and tuple types when `--trailing-comma=es5`; Add the pure `css` parser; Drop support for \"comma separated interfaces\" syntax; Change public APIs to asynchronous; Npm package file structures changed; Support plugins in ESM; Update `prettier.doc`; `textToDoc` trims trailing hard lines; Removed support for custom parser api; The second argument `parsers` passed to `parsers.parse` has been removed; `undefined` and `null` are not passed to plugin's `print` function; Allow using arbitrary truthy values for `label` docs; `getFileInfo()` resolves config by default; Plugin search feature has been removed; Ignore `.gitignore`d files by default; scored as 18; upgraded with eslint-plugin-prettier, prettier-plugin-svelte (plugin of prettier)",
+      "status": "todo",
+      "repos": 31,
+      "reposBehind": 6,
+      "weeklyDownloads": 0
     },
     {
       "package": "jose",
       "members": ["jose"],
       "from": ">=5 <6",
       "to": ">=6 <7",
-      "why": "declared directly in 20 of 52 sample repositories, 4 of them on an older major; 178 breaking API changes from 5.10.0 to 6.2.12",
+      "why": "declared directly in 20 of 52 sample repositories, 4 of them on an older major; 178 breaking API changes, 94 distinct (15 removed or renamed, 79 change shapes) from 5.10.0 to 6.2.12",
       "status": "todo",
       "repos": 20,
       "reposBehind": 4,
-      "weeklyDownloads": 0
+      "weeklyDownloads": 0,
+      "breaking": {
+        "total": 178,
+        "distinct": 94
+      }
     },
     {
-      "package": "@faker-js/faker",
-      "members": ["@faker-js/faker"],
+      "package": "eslint",
+      "members": [
+        "eslint",
+        "@stylistic/eslint-plugin",
+        "eslint-plugin-compat",
+        "eslint-plugin-cypress",
+        "eslint-plugin-regexp",
+        "eslint-plugin-tailwindcss",
+        "eslint-plugin-unicorn",
+        "eslint-webpack-plugin"
+      ],
       "from": ">=8 <9",
       "to": ">=10 <11",
-      "why": "declared directly in 17 of 52 sample repositories, 8 of them on an older major; 236 breaking API changes from 8.4.1 to 10.6.0",
+      "why": "declared directly in 32 of 52 sample repositories, 27 of them on an older major; API change not measured (no type declarations); the migration guide lists 21 (https://eslint.org/docs/latest/use/migrate-to-10.0.0): `eslint:recommended` has been updated; New configuration file lookup algorithm; Old config format no longer supported; JSX references are now tracked; `eslint-env` comments are reported as errors; Jiti < v2.2.0 are no longer supported; POSIX character classes in glob patterns; `stylish` formatter now uses native `styleText` instead of `chalk`; Deprecated options of the `radix` rule; `no-shadow-restricted-names` now reports `globalThis` by default; `func-names` schema is stricter; `allowConstructorFlags` option of `no-invalid-regexp` now accepts only unique items; `name` property added to ESLint core configs; Removal of `type` property in errors of invalid `RuleTester` cases; `Program` AST node range spans entire source text; Fixer methods now require string `text` arguments; New requirements for `ScopeManager` implementations; Removal of deprecated `context` members; Removal of deprecated `SourceCode` methods; Prohibiting `errors` or `output` of valid RuleTester test cases; Removal of `nodeType` property in `LintMessage` objects; scored as 21; upgraded with @stylistic/eslint-plugin, eslint-plugin-compat, eslint-plugin-cypress, eslint-plugin-regexp, eslint-plugin-tailwindcss, eslint-plugin-unicorn, eslint-webpack-plugin (plugin of eslint)",
       "status": "todo",
-      "repos": 17,
-      "reposBehind": 8,
-      "weeklyDownloads": 0
+      "repos": 32,
+      "reposBehind": 27,
+      "weeklyDownloads": 0,
+      "codemod": "https://eslint.org/docs/latest/use/migrate-to-10.0.0 (`@eslint/migrate-config` converts .eslintrc to a flat config; removed APIs, rules and plugin compatibility are manual)"
     },
     {
       "package": "@opentelemetry/core",
@@ -221,18 +330,43 @@
       "status": "todo",
       "repos": 20,
       "reposBehind": 3,
-      "weeklyDownloads": 0
+      "weeklyDownloads": 0,
+      "breaking": {
+        "total": 65,
+        "distinct": 65,
+        "guide": 9
+      }
+    },
+    {
+      "package": "@faker-js/faker",
+      "members": ["@faker-js/faker"],
+      "from": ">=8 <9",
+      "to": ">=10 <11",
+      "why": "declared directly in 17 of 52 sample repositories, 8 of them on an older major; 236 breaking API changes, 124 distinct (100 removed or renamed, 24 change shapes) from 8.4.1 to 10.6.0",
+      "status": "todo",
+      "repos": 17,
+      "reposBehind": 8,
+      "weeklyDownloads": 0,
+      "breaking": {
+        "total": 236,
+        "distinct": 124,
+        "guide": 2
+      }
     },
     {
       "package": "undici",
       "members": ["undici"],
       "from": ">=7 <8",
       "to": ">=8 <9",
-      "why": "declared directly in 16 of 52 sample repositories, 13 of them on an older major; 170 breaking API changes from 7.30.0 to 8.11.2",
+      "why": "declared directly in 16 of 52 sample repositories, 13 of them on an older major; 170 breaking API changes, 159 distinct (153 removed or renamed, 6 change shapes) from 7.30.0 to 8.11.2",
       "status": "todo",
       "repos": 16,
       "reposBehind": 13,
-      "weeklyDownloads": 0
+      "weeklyDownloads": 0,
+      "breaking": {
+        "total": 170,
+        "distinct": 159
+      }
     },
     {
       "package": "googleapis",
@@ -243,72 +377,41 @@
       "status": "todo",
       "repos": 8,
       "reposBehind": 8,
-      "weeklyDownloads": 0
-    },
-    {
-      "package": "prettier",
-      "members": ["prettier", "eslint-plugin-prettier", "prettier-plugin-svelte"],
-      "from": ">=2 <3",
-      "to": ">=3 <4",
-      "why": "declared directly in 31 of 52 sample repositories, 6 of them on an older major; API change not measured (no type declarations); the changelog lists every public API is async (`format`, `resolveConfig`), `resolveConfig.sync` removed, `doc.builders.concat` removed (https://prettier.io/blog/2023/07/05/3.0.0.html), scored as 10 breaking changes; upgraded with eslint-plugin-prettier, prettier-plugin-svelte (plugin of prettier)",
-      "status": "todo",
-      "repos": 31,
-      "reposBehind": 6,
-      "weeklyDownloads": 0
+      "weeklyDownloads": 0,
+      "breaking": {
+        "total": 13792,
+        "distinct": 13792
+      }
     },
     {
       "package": "marked",
       "members": ["marked", "@types/marked"],
       "from": ">=15 <16",
       "to": ">=18 <19",
-      "why": "declared directly in 18 of 52 sample repositories, 16 of them on an older major; 58 breaking API changes from 15.0.12 to 18.1.0; upgraded with @types/marked (types for marked)",
+      "why": "declared directly in 18 of 52 sample repositories, 16 of them on an older major; 58 breaking API changes, 51 distinct (0 removed or renamed, 51 change shapes) from 15.0.12 to 18.1.0; upgraded with @types/marked (types for marked)",
       "status": "todo",
       "repos": 18,
       "reposBehind": 16,
-      "weeklyDownloads": 0
-    },
-    {
-      "package": "pino",
-      "members": ["pino"],
-      "from": ">=8 <9",
-      "to": ">=10 <11",
-      "why": "declared directly in 12 of 52 sample repositories, 7 of them on an older major; 337 breaking API changes from 8.21.0 to 10.4.0",
-      "status": "todo",
-      "repos": 12,
-      "reposBehind": 7,
-      "weeklyDownloads": 0
-    },
-    {
-      "package": "eslint",
-      "members": [
-        "eslint",
-        "@stylistic/eslint-plugin",
-        "eslint-plugin-compat",
-        "eslint-plugin-cypress",
-        "eslint-plugin-regexp",
-        "eslint-plugin-tailwindcss",
-        "eslint-plugin-unicorn",
-        "eslint-webpack-plugin"
-      ],
-      "from": ">=8 <9",
-      "to": ">=10 <11",
-      "why": "declared directly in 32 of 52 sample repositories, 27 of them on an older major; API change not measured (no type declarations); the changelog lists eslintrc configuration removed, `Linter#defineParser`, `defineRule`, `defineRules`, `getRules` removed, `LintMessage#nodeType` removed, deprecated `SourceCode` methods removed (https://eslint.org/docs/latest/use/migrate-to-10.0.0), scored as 10 breaking changes; upgraded with @stylistic/eslint-plugin, eslint-plugin-compat, eslint-plugin-cypress, eslint-plugin-regexp, eslint-plugin-tailwindcss, eslint-plugin-unicorn, eslint-webpack-plugin (plugin of eslint)",
-      "status": "todo",
-      "repos": 32,
-      "reposBehind": 27,
       "weeklyDownloads": 0,
-      "codemod": "https://eslint.org/docs/latest/use/migrate-to-10.0.0 (`@eslint/migrate-config` converts .eslintrc to a flat config; removed APIs, rules and plugin compatibility are manual)"
+      "breaking": {
+        "total": 58,
+        "distinct": 51
+      }
     },
     {
       "package": "bullmq",
       "members": ["bullmq"],
       "from": ">=5 <6",
       "to": ">=6 <7",
-      "why": "declared directly in 12 of 52 sample repositories, 10 of them on an older major; 290 breaking API changes from 5.81.5 to 6.3.11",
+      "why": "declared directly in 12 of 52 sample repositories, 10 of them on an older major; 290 breaking API changes, 279 distinct (225 removed or renamed, 54 change shapes) from 5.81.5 to 6.3.11",
       "status": "todo",
       "repos": 12,
       "reposBehind": 10,
-      "weeklyDownloads": 0
+      "weeklyDownloads": 0,
+      "breaking": {
+        "total": 290,
+        "distinct": 279
+      }
     },
     {
       "package": "posthog-node",
@@ -319,7 +422,11 @@
       "status": "todo",
       "repos": 16,
       "reposBehind": 4,
-      "weeklyDownloads": 0
+      "weeklyDownloads": 0,
+      "breaking": {
+        "total": 65,
+        "distinct": 65
+      }
     }
   ]
 }
