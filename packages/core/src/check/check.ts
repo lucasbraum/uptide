@@ -1063,12 +1063,17 @@ async function companionPlans(
           known.workspaces.push(workspace);
           continue;
         }
-        const dir = installedPackageDirOf(
-          adapter,
-          { dir: resolve(opts.cwd, workspace) },
-          name,
-          version,
-        )?.dir;
+        // Read from disk as Node would resolve it: loading a program for every workspace
+        // just to find a manifest is what a 28-workspace repository cannot afford.
+        const cheap = (
+          adapter as {
+            installedPackageDirCheap?: (repo: RepoDir, pkg: string) => string | undefined;
+          }
+        ).installedPackageDirCheap;
+        const dir = cheap
+          ? cheap({ dir: resolve(opts.cwd, workspace) }, name)
+          : installedPackageDirOf(adapter, { dir: resolve(opts.cwd, workspace) }, name, version)
+              ?.dir;
         let manifest = {};
         try {
           if (dir) manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));

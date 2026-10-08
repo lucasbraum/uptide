@@ -192,7 +192,7 @@ export function resolvePackageDir(repo: LoadedRepo, pkg: string): string | undef
  * resolves from the workspace. A hoisting installer (yarn classic, npm) keeps one copy at the
  * repository root, which a workspace that only peer-depends on the package still sees.
  */
-function hoistedPackageDir(from: string, pkg: string): string | undefined {
+export function hoistedPackageDir(from: string, pkg: string): string | undefined {
   for (let dir = from; ; dir = dirname(dir)) {
     const candidate = join(dir, 'node_modules', pkg);
     if (existsSync(join(candidate, 'package.json'))) return candidate;

@@ -10,6 +10,7 @@ import { resolveEntryPoints } from './entry-points.js';
 import { forgetRepo, loadedRepo, readInstalled, workspacePackagesOf } from './repo.js';
 import {
   findUsagesInRepo,
+  hoistedPackageDir,
   importedPackagesOf,
   installedDependenciesOf,
   installedPackageDir,
@@ -126,6 +127,8 @@ export interface TypescriptAdapter extends LanguageAdapter {
   findUsages: NonNullable<LanguageAdapter['findUsages']>;
   /** Where the repository's compiler finds `pkg`, as a package root. */
   installedPackageDir(repo: RepoDir, pkg: string): string | undefined;
+  /** Where Node finds `pkg` from the workspace (`node_modules/<pkg>` here or above): no program is loaded. */
+  installedPackageDirCheap(repo: RepoDir, pkg: string): string | undefined;
   extractSurfaceDetailed(pkg: PackageDir): Promise<DetailedSurface>;
   /** The surface of the copy of `pkg` the repository actually resolves to (installed on disk), or undefined when it cannot be resolved. */
   installedSurface(repo: RepoDir, pkg: string, version: string): Promise<ApiSurface | undefined>;
@@ -144,6 +147,10 @@ export function createTypescriptAdapter(opts: TypescriptAdapterOptions = {}): Ty
     },
     installedPackageDir(repo, pkg) {
       return installedPackageDir(repo, pkg);
+    },
+    installedPackageDirCheap(repo, pkg) {
+      const dir = hoistedPackageDir(realpathSync(repo.dir), pkg);
+      return dir ? realpathSync(dir) : undefined;
     },
     async importedPackages(repo) {
       return importedPackagesOf(repo);
