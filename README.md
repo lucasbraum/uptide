@@ -38,14 +38,14 @@ zod                     3.25.76 → 4.6.5    major · latest on npm      verifie
 stripe (packages/api)   14.25.0 → 23.0.0   9 majors behind · latest on npm   verified   ✗ 4 breaking in 3 files    1 auto-fixable · 3 need the agent (LLM)
 
 zod   28 breaking · compiled against 4.6.5: 28 new type errors
-  compiled 11 of 11 files in 2 workspaces
+  compiled 11 of 11 files in 2 workspaces with the repo's TypeScript 5.9.3
   ✗ New error API (required_error → error)   24 sites          auto-fixable
   ✗ ZodTypeDef removed                       1 fix, 3 errors   needs the agent (LLM)
   ✗ .ip() removed                            monitoring.ts:6   needs the agent (LLM)
   ! 15 deprecated calls (.uuid, .datetime, .email, ...)   8 auto-fixable
 
 stripe   4 breaking · compiled against 23.0.0: 4 new type errors
-  compiled 7 of 7 files in 1 workspace
+  compiled 7 of 7 files in 1 workspace with the repo's TypeScript 5.9.3
   ✗ Test fixture casts widened                   renewal.test.ts:7   auto-fixable
   ✗ Subscription billing period moved to items   2 sites             needs the agent (LLM)
   ✗ apiVersion no longer matches the SDK         client.ts:9         needs the agent (LLM)
@@ -216,8 +216,9 @@ compiler rejects the code against the target, the runtime probe saw the export g
 Everything else the declaration diff suggests is **possible impact**: the types changed where
 your code uses them, nothing confirmed that it breaks, so it is listed under its own line and
 never counted as breaking. Under every analyzed package one line says how much of the code that
-uses it the compiler judged (`compiled 11 of 11 files in 2 workspaces`); when files were
-skipped, the verdict says "types partly verified" and why.
+uses it the compiler judged and which compiler (`compiled 11 of 11 files in 2 workspaces with
+the repo's TypeScript 5.9.3`: your own `node_modules/typescript`, the bundled one only when you
+install none); when files were skipped, the verdict says "types partly verified" and why.
 
 The tier is on every row of `check`, in the HTML report and in the pull request. A generic
 `fix` needs a provider API key (there are no rules to fall back on; without a key it says
@@ -350,6 +351,9 @@ for assisted fixes in `uptide fix`, and only with your own API key from ANTHROPI
 OPENAI_API_KEY or GEMINI_API_KEY: for each
 site the rules cannot migrate, the finding, the enclosing function and the compiler
 error. `uptide fix --no-llm` turns assisted fixes off. No account.
+`check` and `verify` load the `typescript` package your repository installs (resolved from its
+node_modules) to compile with, and never run your repository's scripts or other code outside
+`fix`'s verification step.
 Anonymous telemetry is off by default and asks for consent in an interactive terminal.
 Set UPTIDE_TELEMETRY=0 to disable it. No IP, code, paths or repo names are collected.
 Other network use: your npm registry for package metadata and tarballs, npm's advisory
@@ -362,7 +366,7 @@ There is no Uptide server. With telemetry off (the default):
 | | Where it runs | What leaves your machine |
 | --- | --- | --- |
 | `list`, `plan` | locally | package names/versions requested from your npm registry, and `list` sends public packages' names and installed versions to npm's advisory endpoint; metadata only, no source code |
-| `check` | locally | nothing of yours; it downloads package tarballs from your npm registry. No LLM call, and nothing in your repository is executed. |
+| `check` | locally | nothing of yours; it downloads package tarballs from your npm registry. No LLM call. It loads your installed `typescript` package to compile with, and runs no script or other code of yours. |
 | `fix`, rules and verification | locally, in a temporary clone | nothing of yours |
 | `fix`, assisted fixes | Your chosen provider's API, with **your** environment API key | per site no rule covers: the finding, the enclosing function or declaration, and the compiler error |
 | `pr`, `fix --pr` | GitHub, through your own `gh` | the branch and the pull request, when you say so |

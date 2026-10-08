@@ -19,13 +19,29 @@ export interface Verdict {
 const count = (n: number, noun: string): string => `${n} ${noun}${n === 1 ? '' : 's'}`;
 
 /**
- * `compiled 12 of 40 files in 2 workspaces; skipped: not in the workspace tsconfig (28)`: how
- * much of the code that uses the package the compiler judged, printed under every check.
+ * `compiled 12 of 40 files in 2 workspaces with the repo's TypeScript 5.4.2; skipped: not in
+ * the workspace tsconfig (28)`: how much of the code that uses the package the compiler
+ * judged, and which compiler, printed under every check.
  */
 export function coverageLine(c: NonNullable<PackageReport['compile']>['coverage']): string {
   if (!c) return '';
   const skipped = c.skipped.map((r) => `${r.reason} (${r.count})`).join(', ');
-  return `compiled ${c.compiled} of ${count(c.total, 'file')} in ${count(c.workspaces, 'workspace')}${skipped ? `; skipped: ${skipped}` : ''}`;
+  const compilers = compilersPhrase(c.compilers ?? []);
+  return `compiled ${c.compiled} of ${count(c.total, 'file')} in ${count(c.workspaces, 'workspace')}${compilers ? ` with ${compilers}` : ''}${skipped ? `; skipped: ${skipped}` : ''}`;
+}
+
+/**
+ * `the repo's TypeScript 4.9.5`; a monorepo whose workspaces install different versions
+ * names each (`the repo's TypeScript 4.9.5 and 5.4.2`), and one that installs none in some
+ * workspace says which were judged by the bundled compiler instead.
+ */
+function compilersPhrase(compilers: { version: string; own: boolean }[]): string {
+  const versions = (own: boolean) =>
+    [...new Set(compilers.filter((c) => c.own === own).map((c) => c.version))].sort().join(' and ');
+  return [
+    ...(versions(true) ? [`the repo's TypeScript ${versions(true)}`] : []),
+    ...(versions(false) ? [`the bundled TypeScript ${versions(false)}`] : []),
+  ].join(' and ');
 }
 
 /**

@@ -40,6 +40,17 @@ describe('Signal B: compile against the target version', () => {
       'src/chains.ts:6 2554 Expected 2 arguments, but got 1.',
     ]);
     expect(signal.timing.overlayMs).toBeGreaterThan(0);
+    // Judged by the repository's own compiler: the fixture sits under this repository, whose
+    // installed TypeScript is the nearest one above it.
+    const { version } = JSON.parse(
+      readFileSync(join(ROOT, '../node_modules/typescript/package.json'), 'utf8'),
+    ) as { version: string };
+    expect(signal.coverage).toEqual({
+      compiled: 4,
+      total: 4,
+      skipped: [],
+      compilers: [{ version, own: true }],
+    });
   });
 
   it('subtracts pre-existing errors instead of skipping: the upgrade error is still found', async () => {

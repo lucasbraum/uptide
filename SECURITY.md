@@ -5,11 +5,16 @@ isolates, what it does not, and how to report a problem.
 
 ## Isolation model
 
-**`uptide check`** executes nothing from your repository. It reads your files and lockfile,
-downloads the installed and the target version of the dependency from your npm registry as
-tarballs (no install, no lifecycle scripts), compiles your code against the target in
-memory, and loads the two versions of the *dependency* in a sandboxed Node process to
-compare runtime behavior. It makes no LLM call.
+**`uptide check`** runs none of your repository's scripts or code. It reads your files and
+lockfile, downloads the installed and the target version of the dependency from your npm
+registry as tarballs (no install, no lifecycle scripts), compiles your code against the
+target in memory, and loads the two versions of the *dependency* in a sandboxed Node process
+to compare runtime behavior. It makes no LLM call. To compile, `check` (like `verify`) loads
+the `typescript` package your repository installs, resolved from its `node_modules` (the
+nearest one above the workspace; never `NODE_PATH` or a global install), in Uptide's own
+process; the bundled compiler is used only when the repository installs none. That package is
+the one thing from your `node_modules` that `check` loads, and it is the compiler your own
+build already runs.
 
 **`uptide fix`** and **`uptide verify`** work in a temporary clone, never in your checkout:
 
@@ -25,7 +30,8 @@ compare runtime behavior. It makes no LLM call.
 - Git hooks are disabled for every command Uptide runs.
 - Verification runs **your code**: your type-check, your tests, your formatter and linter,
   inside the clone. This is the one place repository code is executed, and it is the point
-  of the command. Tests that need a database, cache or queue do not run unless you pass
+  of the command. The type-check loads the clone's installed `typescript` package, as
+  `check` does, and compiles with it in Uptide's process; no script of yours runs for it. Tests that need a database, cache or queue do not run unless you pass
   `--with-services --yes`, after Uptide prints what they would connect to.
 - Child processes for install and tests do not receive your LLM API key or GitHub token.
 
@@ -55,7 +61,8 @@ command, and what happened that the model above says should not.
 You will get an answer within 7 days. Fixes are released under the `next` dist-tag first
 and credited to you unless you prefer otherwise.
 
-Reports that matter most: anything executed during `check`; a lifecycle script or git hook
+Reports that matter most: anything executed during `check` beyond loading the repository's
+installed `typescript` package; a lifecycle script or git hook
 that ran; a write outside the temporary clone or `.git/uptide/`; code sent anywhere other
 than described above; a secret reaching a child process.
 

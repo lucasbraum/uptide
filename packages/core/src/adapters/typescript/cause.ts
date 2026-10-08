@@ -1,5 +1,5 @@
 import { relative } from 'node:path';
-import { ts } from 'ts-morph';
+import type { ts } from 'ts-morph';
 import type { DiagnosticCause } from '../../domain/usage.js';
 
 /**
@@ -20,13 +20,15 @@ const MAX_HOPS = 8;
 interface Programs {
   overlay: ts.Program;
   base: ts.Program;
+  /** The compiler both programs were built with: node kinds and flags are its, not the bundled one's. */
+  ts: typeof ts;
 }
 
-function deepestAt(root: ts.Node, position: number): ts.Node {
+function deepestAt(tsc: typeof ts, root: ts.Node, position: number): ts.Node {
   let node: ts.Node = root;
   for (;;) {
     let next: ts.Node | undefined;
-    ts.forEachChild(node, (child) => {
+    tsc.forEachChild(node, (child) => {
       if (!next && child.getStart() <= position && position < child.getEnd()) next = child;
     });
     if (!next) return node;
@@ -35,32 +37,32 @@ function deepestAt(root: ts.Node, position: number): ts.Node {
 }
 
 /** The expression whose type the diagnostic complains about: the identifier or access at the position. */
-function offendingExpression(node: ts.Node): ts.Expression | undefined {
+function offendingExpression(tsc: typeof ts, node: ts.Node): ts.Expression | undefined {
   let n: ts.Node | undefined = node;
-  while (n && !ts.isExpression(n)) n = n.parent;
+  while (n && !tsc.isExpression(n)) n = n.parent;
   if (!n) return undefined;
-  while (ts.isPropertyAccessExpression(n.parent) && n.parent.name === n) n = n.parent;
+  while (tsc.isPropertyAccessExpression(n.parent) && n.parent.name === n) n = n.parent;
   return n as ts.Expression;
 }
 
 /** The same declaration in the other program, by file and position. */
-function counterpart(decl: ts.Node, program: ts.Program): ts.Node | undefined {
+function counterpart(tsc: typeof ts, decl: ts.Node, program: ts.Program): ts.Node | undefined {
   const file = program.getSourceFile(decl.getSourceFile().fileName);
   if (!file) return undefined;
-  let node: ts.Node | undefined = deepestAt(file, decl.getStart());
+  let node: ts.Node | undefined = deepestAt(tsc, file, decl.getStart());
   while (node && node.kind !== decl.kind) node = node.parent;
   return node;
 }
 
-function typeText(decl: ts.Node, program: ts.Program): string | undefined {
-  const named = ts.getNameOfDeclaration(decl as ts.Declaration);
+function typeText(tsc: typeof ts, decl: ts.Node, program: ts.Program): string | undefined {
+  const named = tsc.getNameOfDeclaration(decl as ts.Declaration);
   const at = named ?? decl;
   const checker = program.getTypeChecker();
   try {
     // The installed and target copies live in different directories; `import("…")` prefixes must not count as a change.
     return (
       checker
-        .typeToString(checker.getTypeAtLocation(at), undefined, ts.TypeFormatFlags.NoTruncation)
+        .typeToString(checker.getTypeAtLocation(at), undefined, tsc.TypeFormatFlags.NoTruncation)
         .replace(/import\("[^"]*"\)\./g, '')
         // The same type prints as `ParamsDictionary` in one program and `core.ParamsDictionary` in another.
         .replace(/\b[A-Za-z_$][\w$]*\.(?=[A-Z])/g, '')
@@ -78,8 +80,9 @@ export function findCause(
   /** `file:line` of every new diagnostic, so a declaration failing itself is recognised. */
   erroredLines: Set<string>,
 ): DiagnosticCause | undefined {
+  const tsc = programs.ts;
   if (diagnostic.start === undefined) return undefined;
-  if (!/\b(unknown|any)\b/.test(ts.flattenDiagnosticMessageText(diagnostic.messageText, ' ')))
+  if (!/\b(unknown|any)\b/.test(tsc.flattenDiagnosticMessageText(diagnostic.messageText, ' ')))
     return undefined;
   const checker = programs.overlay.getTypeChecker();
   const inRepo = (n: ts.Node): boolean => {
@@ -89,12 +92,12 @@ export function findCause(
   const declarationOf = (expr: ts.Node): ts.Declaration | undefined => {
     const symbol = checker.getSymbolAtLocation(expr);
     const target =
-      symbol && symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
+      symbol && symbol.flags & tsc.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
     return target?.declarations?.[0];
   };
   const lineOf = (n: ts.Node): string => {
     const f = n.getSourceFile();
-    const named = ts.getNameOfDeclaration(n as ts.Declaration);
+    const named = tsc.getNameOfDeclaration(n as ts.Declaration);
     return `${relative(repoDir, f.fileName)}:${f.getLineAndCharacterOfPosition((named ?? n).getStart()).line + 1}`;
   };
   const site = `${relative(repoDir, file.fileName)}:${file.getLineAndCharacterOfPosition(diagnostic.start).line + 1}`;
@@ -103,12 +106,13 @@ export function findCause(
     const at = lineOf(decl);
     if (at === site) return undefined;
     if (erroredLines.has(at))
-      return causeAt(decl, 'which itself fails to compile against the target', repoDir);
-    const before = counterpart(decl, programs.base);
-    const after = typeText(decl, programs.overlay);
-    const earlier = before ? typeText(before, programs.base) : undefined;
+      return causeAt(tsc, decl, 'which itself fails to compile against the target', repoDir);
+    const before = counterpart(tsc, decl, programs.base);
+    const after = typeText(tsc, decl, programs.overlay);
+    const earlier = before ? typeText(tsc, before, programs.base) : undefined;
     if (after !== undefined && earlier !== undefined && after !== earlier) {
       return causeAt(
+        tsc,
         decl,
         `whose type changed from \`${clip(earlier)}\` to \`${clip(after)}\``,
         repoDir,
@@ -117,33 +121,34 @@ export function findCause(
     return undefined;
   };
   const isAny = (n: ts.Node): boolean =>
-    (checker.getTypeAtLocation(n).flags & ts.TypeFlags.Any) !== 0;
+    (checker.getTypeAtLocation(n).flags & tsc.TypeFlags.Any) !== 0;
   /** An `any` value's origin: the import or repo declaration it came from. */
   const origin = (start: ts.Node): DiagnosticCause | undefined => {
     let n: ts.Node | undefined = start;
     for (let hop = 0; n && hop < MAX_HOPS; hop++) {
-      if (ts.isParenthesizedExpression(n) || ts.isAwaitExpression(n) || ts.isAsExpression(n)) {
+      if (tsc.isParenthesizedExpression(n) || tsc.isAwaitExpression(n) || tsc.isAsExpression(n)) {
         n = n.expression;
         continue;
       }
-      if (ts.isCallExpression(n) || ts.isNewExpression(n)) {
-        n = ts.isPropertyAccessExpression(n.expression) ? n.expression.expression : n.expression;
+      if (tsc.isCallExpression(n) || tsc.isNewExpression(n)) {
+        n = tsc.isPropertyAccessExpression(n.expression) ? n.expression.expression : n.expression;
         continue;
       }
-      if (ts.isPropertyAccessExpression(n)) {
+      if (tsc.isPropertyAccessExpression(n)) {
         n = n.expression;
         continue;
       }
-      if (!ts.isIdentifier(n)) return undefined;
+      if (!tsc.isIdentifier(n)) return undefined;
       const symbol = checker.getSymbolAtLocation(n);
       const decl = symbol?.declarations?.[0];
       if (!decl || !inRepo(decl)) return undefined;
-      if (ts.isImportSpecifier(decl) || ts.isImportClause(decl) || ts.isNamespaceImport(decl)) {
-        const importDecl = decl.getSourceFile() && findImportDeclaration(decl);
+      if (tsc.isImportSpecifier(decl) || tsc.isImportClause(decl) || tsc.isNamespaceImport(decl)) {
+        const importDecl = decl.getSourceFile() && findImportDeclaration(tsc, decl);
         const from = importDecl
           ? importDecl.moduleSpecifier.getText().replace(/['"]/g, '')
           : 'an import';
         return causeAt(
+          tsc,
           decl,
           `imported from \`${from}\`, which is typed \`any\` against the target`,
           repoDir,
@@ -151,7 +156,7 @@ export function findCause(
       }
       const judged = judge(decl);
       if (judged) return judged;
-      if (ts.isVariableDeclaration(decl) && decl.initializer) {
+      if (tsc.isVariableDeclaration(decl) && decl.initializer) {
         n = decl.initializer;
         continue;
       }
@@ -160,20 +165,20 @@ export function findCause(
     return undefined;
   };
 
-  let expr: ts.Node | undefined = offendingExpression(deepestAt(file, diagnostic.start));
+  let expr: ts.Node | undefined = offendingExpression(tsc, deepestAt(tsc, file, diagnostic.start));
   for (let hop = 0; expr && hop < MAX_HOPS; hop++) {
     if (
-      ts.isParenthesizedExpression(expr) ||
-      ts.isAwaitExpression(expr) ||
-      ts.isAsExpression(expr)
+      tsc.isParenthesizedExpression(expr) ||
+      tsc.isAwaitExpression(expr) ||
+      tsc.isAsExpression(expr)
     ) {
       expr = expr.expression;
       continue;
     }
-    if (ts.isCallExpression(expr) || ts.isNewExpression(expr)) {
+    if (tsc.isCallExpression(expr) || tsc.isNewExpression(expr)) {
       const call = expr;
       const callee = call.expression;
-      const target = ts.isPropertyAccessExpression(callee) ? callee.name : callee;
+      const target = tsc.isPropertyAccessExpression(callee) ? callee.name : callee;
       const decl = declarationOf(target);
       if (decl && inRepo(decl)) {
         const judged = judge(decl);
@@ -181,45 +186,45 @@ export function findCause(
         // The callee is unchanged and compiles: the fault came in through an argument.
         const anyArg = (call.arguments ?? []).find((a) => isAny(a));
         if (anyArg) return origin(anyArg);
-        expr = returnedExpression(decl);
+        expr = returnedExpression(tsc, decl);
         continue;
       }
       // A package callee (`schema.safeParse`): the receiver carries the type that changed.
-      expr = ts.isPropertyAccessExpression(callee) ? callee.expression : undefined;
+      expr = tsc.isPropertyAccessExpression(callee) ? callee.expression : undefined;
       continue;
     }
-    if (ts.isIdentifier(expr) || ts.isPropertyAccessExpression(expr)) {
-      const target = ts.isPropertyAccessExpression(expr) ? expr.name : expr;
+    if (tsc.isIdentifier(expr) || tsc.isPropertyAccessExpression(expr)) {
+      const target = tsc.isPropertyAccessExpression(expr) ? expr.name : expr;
       const decl = declarationOf(target);
       if (!decl || !inRepo(decl)) {
-        if (ts.isPropertyAccessExpression(expr)) {
+        if (tsc.isPropertyAccessExpression(expr)) {
           expr = expr.expression;
           continue;
         }
-        if (ts.isIdentifier(expr) && isAny(expr)) return origin(expr);
+        if (tsc.isIdentifier(expr) && isAny(expr)) return origin(expr);
         return undefined;
       }
-      if (ts.isImportSpecifier(decl) || ts.isImportClause(decl) || ts.isNamespaceImport(decl)) {
+      if (tsc.isImportSpecifier(decl) || tsc.isImportClause(decl) || tsc.isNamespaceImport(decl)) {
         return isAny(expr) ? origin(expr) : undefined;
       }
       const judged = judge(decl);
       if (judged) return judged;
-      if (ts.isVariableDeclaration(decl) || ts.isPropertyDeclaration(decl)) {
+      if (tsc.isVariableDeclaration(decl) || tsc.isPropertyDeclaration(decl)) {
         expr = decl.initializer;
         continue;
       }
-      if (ts.isParameter(decl)) {
+      if (tsc.isParameter(decl)) {
         const fn = decl.parent;
         // A callback's parameter is typed by whatever the callback was passed to; look there first.
-        if (ts.isCallExpression(fn.parent)) {
+        if (tsc.isCallExpression(fn.parent)) {
           expr = fn.parent;
           continue;
         }
         return judge(fn);
       }
       if (
-        (ts.isPropertySignature(decl) || ts.isPropertyAssignment(decl)) &&
-        ts.isPropertyAccessExpression(expr)
+        (tsc.isPropertySignature(decl) || tsc.isPropertyAssignment(decl)) &&
+        tsc.isPropertyAccessExpression(expr)
       ) {
         expr = expr.expression;
         continue;
@@ -231,26 +236,26 @@ export function findCause(
   return undefined;
 }
 
-function findImportDeclaration(node: ts.Node): ts.ImportDeclaration | undefined {
+function findImportDeclaration(tsc: typeof ts, node: ts.Node): ts.ImportDeclaration | undefined {
   let n: ts.Node | undefined = node;
-  while (n && !ts.isImportDeclaration(n)) n = n.parent;
+  while (n && !tsc.isImportDeclaration(n)) n = n.parent;
   return n;
 }
 
-function returnedExpression(decl: ts.Declaration): ts.Expression | undefined {
+function returnedExpression(tsc: typeof ts, decl: ts.Declaration): ts.Expression | undefined {
   let body: ts.Node | undefined;
-  if (ts.isVariableDeclaration(decl) && decl.initializer) body = decl.initializer;
-  else if (ts.isFunctionLike(decl) && 'body' in decl) body = (decl as { body?: ts.Node }).body;
+  if (tsc.isVariableDeclaration(decl) && decl.initializer) body = decl.initializer;
+  else if (tsc.isFunctionLike(decl) && 'body' in decl) body = (decl as { body?: ts.Node }).body;
   if (!body) return undefined;
-  if (ts.isArrowFunction(body) || ts.isFunctionExpression(body)) body = body.body;
-  if (body && ts.isExpression(body)) return body;
+  if (tsc.isArrowFunction(body) || tsc.isFunctionExpression(body)) body = body.body;
+  if (body && tsc.isExpression(body)) return body;
   let returned: ts.Expression | undefined;
   const visit = (n: ts.Node): void => {
     if (returned) return;
-    if (ts.isReturnStatement(n) && n.expression) returned = n.expression;
-    else if (!ts.isFunctionLike(n)) ts.forEachChild(n, visit);
+    if (tsc.isReturnStatement(n) && n.expression) returned = n.expression;
+    else if (!tsc.isFunctionLike(n)) tsc.forEachChild(n, visit);
   };
-  if (body) ts.forEachChild(body, visit);
+  if (body) tsc.forEachChild(body, visit);
   return returned;
 }
 
@@ -259,14 +264,14 @@ function clip(text: string): string {
   return one.length > 80 ? `${one.slice(0, 77)}...` : one;
 }
 
-function causeAt(decl: ts.Node, reason: string, repoDir: string): DiagnosticCause {
+function causeAt(tsc: typeof ts, decl: ts.Node, reason: string, repoDir: string): DiagnosticCause {
   const file = decl.getSourceFile();
   let holder: ts.Node = decl;
-  let named = ts.getNameOfDeclaration(decl as ts.Declaration);
-  while (!named && holder.parent && !ts.isSourceFile(holder.parent)) {
+  let named = tsc.getNameOfDeclaration(decl as ts.Declaration);
+  while (!named && holder.parent && !tsc.isSourceFile(holder.parent)) {
     holder = holder.parent;
-    if (ts.isBlock(holder) || ts.isCallExpression(holder)) break;
-    named = ts.getNameOfDeclaration(holder as ts.Declaration);
+    if (tsc.isBlock(holder) || tsc.isCallExpression(holder)) break;
+    named = tsc.getNameOfDeclaration(holder as ts.Declaration);
   }
   const { line } = file.getLineAndCharacterOfPosition((named ?? decl).getStart());
   return {
@@ -298,18 +303,19 @@ export function parameterCause(
   /** The repository root: another workspace's source (mapped from `workspace:*`) is the repository's too. */
   rootDir = repoDir,
 ): DiagnosticCause | undefined {
+  const tsc = programs.ts;
   if (diagnostic.start === undefined || !MISMATCH_CODES.has(diagnostic.code)) return undefined;
   const checker = programs.overlay.getTypeChecker();
   const inRepo = (n: ts.Node): boolean => {
     const f = n.getSourceFile().fileName;
     return f.startsWith(`${rootDir}/`) && !f.includes('/node_modules/');
   };
-  const node = deepestAt(file, diagnostic.start);
+  const node = deepestAt(tsc, file, diagnostic.start);
   let decl: ts.Declaration | undefined;
   // An argument of a call: the parameter it lands on, through the resolved signature.
-  for (let n: ts.Node | undefined = node; n && !ts.isStatement(n); n = n.parent) {
+  for (let n: ts.Node | undefined = node; n && !tsc.isStatement(n); n = n.parent) {
     const parent: ts.Node | undefined = n.parent;
-    if (parent && (ts.isCallExpression(parent) || ts.isNewExpression(parent))) {
+    if (parent && (tsc.isCallExpression(parent) || tsc.isNewExpression(parent))) {
       // The callee of an inner call (`use(boxed())` reported at `boxed`): keep climbing.
       const index = parent.arguments?.indexOf(n as ts.Expression) ?? -1;
       if (index < 0) continue;
@@ -319,24 +325,25 @@ export function parameterCause(
       decl = parameter?.valueDeclaration;
       break;
     }
-    if (parent && ts.isJsxAttribute(parent) && parent.initializer === n) {
+    if (parent && tsc.isJsxAttribute(parent) && parent.initializer === n) {
       const symbol = checker.getSymbolAtLocation(parent.name);
       decl = symbol?.declarations?.[0];
       break;
     }
   }
   if (!decl || !inRepo(decl)) return undefined;
-  if (!ts.isParameter(decl) && !ts.isPropertySignature(decl) && !ts.isPropertyDeclaration(decl))
+  if (!tsc.isParameter(decl) && !tsc.isPropertySignature(decl) && !tsc.isPropertyDeclaration(decl))
     return undefined;
   const typeNode = decl.type;
-  if (!typeNode || !namesForeignType(typeNode, checker, inRepo)) return undefined;
+  if (!typeNode || !namesForeignType(tsc, typeNode, checker, inRepo)) return undefined;
   const site = `${relative(repoDir, file.fileName)}:${file.getLineAndCharacterOfPosition(diagnostic.start).line + 1}`;
   const at = decl.getSourceFile();
   const declLine = `${relative(repoDir, at.fileName)}:${at.getLineAndCharacterOfPosition(decl.getStart()).line + 1}`;
   if (declLine === site) return undefined;
-  const what = ts.isParameter(decl) ? 'parameter' : 'prop';
-  const name = ts.getNameOfDeclaration(decl)?.getText() ?? '(anonymous)';
+  const what = tsc.isParameter(decl) ? 'parameter' : 'prop';
+  const name = tsc.getNameOfDeclaration(decl)?.getText() ?? '(anonymous)';
   const cause = causeAt(
+    tsc,
     decl,
     `whose ${what} \`${name}: ${clip(typeNode.getText())}\` no longer accepts what the target gives it; widen the ${what}'s type there`,
     repoDir,
@@ -347,6 +354,7 @@ export function parameterCause(
 
 /** Whether a type annotation refers to a type declared outside the repository. */
 function namesForeignType(
+  tsc: typeof ts,
   typeNode: ts.TypeNode,
   checker: ts.TypeChecker,
   inRepo: (n: ts.Node) => boolean,
@@ -354,14 +362,14 @@ function namesForeignType(
   let foreign = false;
   const visit = (n: ts.Node): void => {
     if (foreign) return;
-    if (ts.isTypeReferenceNode(n) || ts.isExpressionWithTypeArguments(n)) {
-      const name = ts.isTypeReferenceNode(n) ? n.typeName : n.expression;
+    if (tsc.isTypeReferenceNode(n) || tsc.isExpressionWithTypeArguments(n)) {
+      const name = tsc.isTypeReferenceNode(n) ? n.typeName : n.expression;
       const symbol = checker.getSymbolAtLocation(name);
       const target =
-        symbol && symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
+        symbol && symbol.flags & tsc.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
       if (target?.declarations?.some((d) => !inRepo(d))) foreign = true;
     }
-    ts.forEachChild(n, visit);
+    tsc.forEachChild(n, visit);
   };
   visit(typeNode);
   return foreign;

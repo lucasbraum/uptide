@@ -28,7 +28,10 @@ export interface LoadedRepo {
   /** name -> exact installed version for this package's direct dependencies (from the lockfile). */
   installed: Map<string, string>;
   project: Project;
+  /** The repository's own tsconfig.json, when it has one. */
   tsconfig: string | undefined;
+  /** Without one, the nearest tsconfig.json above it (a monorepo root's that includes this workspace): its options apply, not its file list. */
+  inheritedTsconfig: string | undefined;
   /** `allowJs` from the tsconfig: whether `.js`/`.jsx` files are part of the project and the scan. */
   includesJs: boolean;
   /** Workspace dependencies compiled from their built output because no source could be mapped, when that output is stale. */
@@ -47,6 +50,15 @@ export function findRepoRoot(cwd: string): string | undefined {
 }
 
 const SYNTHETIC_EXCLUDES = ['**/node_modules/**', '**/dist/**', '**/build/**'];
+
+/** The nearest tsconfig.json strictly above `dir`, as a workspace without its own is configured by. */
+export function inheritedTsconfigOf(dir: string): string | undefined {
+  for (let current = dirname(resolve(dir)); ; current = dirname(current)) {
+    const candidate = join(current, 'tsconfig.json');
+    if (existsSync(candidate)) return candidate;
+    if (dirname(current) === current) return undefined;
+  }
+}
 
 const repos = new Map<string, LoadedRepo>();
 // A program or checker a failed analysis was inside may be half updated: reload them.
@@ -171,13 +183,15 @@ export function loadRepo(cwd: string, rootFiles?: string[]): LoadedRepo {
   const sources = workspaceSourceMap(dir, installed);
   const sourcePaths = Object.keys(sources.paths).length > 0 ? sources.paths : undefined;
   let project: Project;
+  // A repository on TypeScript 5 is read with TypeScript 5's defaults for what its tsconfig
+  // leaves unset (legacy-options.ts); one on TypeScript 6 with the compiler's own.
+  const major = repositoryTypescriptMajor(dir);
+  const legacyDefaults = (config: string): ts.CompilerOptions =>
+    major === undefined || major < 6 ? typescriptFiveDefaults(declaredOptions(config)) : {};
+  const inherited = existsSync(tsconfig) ? undefined : inheritedTsconfigOf(dir);
   if (existsSync(tsconfig)) {
     const declared = sourcePaths ? declaredPaths(tsconfig) : { paths: {} };
-    // A repository on TypeScript 5 is read with TypeScript 5's defaults for what its tsconfig
-    // leaves unset (legacy-options.ts); one on TypeScript 6 with the compiler's own.
-    const major = repositoryTypescriptMajor(dir);
-    const legacy =
-      major === undefined || major < 6 ? typescriptFiveDefaults(declaredOptions(tsconfig)) : {};
+    const legacy = legacyDefaults(tsconfig);
     project = new Project({
       tsConfigFilePath: tsconfig,
       skipAddingFilesFromTsConfig: rootFiles !== undefined,
@@ -199,6 +213,8 @@ export function loadRepo(cwd: string, rootFiles?: string[]): LoadedRepo {
       }
     }
   } else {
+    // No tsconfig of its own: the options of the one above it (a monorepo root's `include`
+    // often covers the workspace), over the defaults below; the file list is the workspace's.
     project = new Project({
       skipAddingFilesFromTsConfig: true,
       skipFileDependencyResolution: true,
@@ -207,9 +223,10 @@ export function loadRepo(cwd: string, rootFiles?: string[]): LoadedRepo {
         module: ts.ModuleKind.ESNext,
         moduleResolution: ts.ModuleResolutionKind.Bundler,
         strict: true,
+        allowJs: false,
+        ...(inherited ? { ...legacyDefaults(inherited), ...declaredOptions(inherited) } : {}),
         noEmit: true,
         skipLibCheck: true,
-        allowJs: false,
         ...(sourcePaths ? { paths: sourcePaths } : {}),
       },
     });
@@ -235,6 +252,7 @@ export function loadRepo(cwd: string, rootFiles?: string[]): LoadedRepo {
     installed,
     project,
     tsconfig: existsSync(tsconfig) ? tsconfig : undefined,
+    inheritedTsconfig: inherited,
     includesJs: project.getCompilerOptions().allowJs === true,
     warnings: sources.warnings,
   };

@@ -437,6 +437,41 @@ describe('mergeAcrossWorkspaces', () => {
       status: 'safe',
     });
   });
+
+  it('merges coverage across workspaces, naming each compiler once', () => {
+    const compile = (version: string, own: boolean) => ({
+      baselineErrors: 0,
+      unresolvedInTarget: [],
+      unresolvedFiles: [],
+      unattributed: [],
+      newErrors: 0,
+      coverage: {
+        compiled: 1,
+        total: 1,
+        workspaces: 1,
+        skipped: [],
+        compilers: [{ version, own }],
+      },
+    });
+    const out = mergeAcrossWorkspaces(
+      [
+        base('packages/api', 'zod', { compile: compile('4.9.5', true) }),
+        base('packages/web', 'zod', { compile: compile('4.9.5', true) }),
+        base('packages/shared', 'zod', { compile: compile('6.0.2', false) }),
+      ],
+      {},
+    );
+    expect(out[0]?.compile?.coverage).toEqual({
+      compiled: 3,
+      total: 3,
+      workspaces: 3,
+      skipped: [],
+      compilers: [
+        { version: '4.9.5', own: true },
+        { version: '6.0.2', own: false },
+      ],
+    });
+  });
 });
 
 describe('summarize', () => {

@@ -3,7 +3,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ts } from 'ts-morph';
 import { afterAll, expect, it } from 'vitest';
-import { consumerCompilerDir, resolveCompiler } from './verify.js';
+import {
+  consumerCompilerDir,
+  describeCompiler,
+  repositoryCompiler,
+  resolveCompiler,
+} from '../adapters/typescript/compiler.js';
 
 const scratch = mkdtempSync(join(tmpdir(), 'uptide-compiler-'));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
@@ -68,4 +73,16 @@ it('never takes a compiler from NODE_PATH or the global folders', () => {
   const bare = join(scratch, 'bare');
   mkdirSync(bare, { recursive: true });
   expect(resolveCompiler(bare)).toBe(ts);
+});
+
+it("names the repository's compiler for the coverage line, and the bundled one when there is none", () => {
+  // The scratch repository made above installs a stub; the bare directory installs nothing.
+  const own = repositoryCompiler(join(scratch, 'repo', 'packages', 'app'));
+  expect(own).toMatchObject({ version: '0.0.0-own', own: true });
+  expect(describeCompiler(own)).toBe("the repo's TypeScript 0.0.0-own");
+  const bundled = repositoryCompiler(join(scratch, 'bare'));
+  expect(bundled).toMatchObject({ ts, version: ts.version, own: false });
+  expect(describeCompiler(bundled)).toBe(`the bundled TypeScript ${ts.version}`);
+  // Loaded once per install directory: two workspaces under one root share the module.
+  expect(repositoryCompiler(join(scratch, 'repo'))).toBe(own);
 });
