@@ -94,6 +94,12 @@ export interface MigrationRule {
 /** Packs own dependency knowledge. The runner owns git, verification, and publication. */
 export interface MigrationPack {
   readonly name: string;
+  /**
+   * Packages that always move with this one, even when the installed version of each already
+   * accepts the target (the ones its migration guide upgrades together). Release-group
+   * members published at the target's own version (`react-dom`) and `@types/*` need no entry.
+   */
+  readonly companions?: readonly string[];
   readonly defaultTarget: string;
   readonly rules: readonly MigrationRule[];
   supports(from: string, to: string): boolean;

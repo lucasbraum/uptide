@@ -129,6 +129,12 @@ export interface PackageReport {
   companions?: { name: string; from: string; to: string; reason: string }[];
   /** Members of that group with no release that agrees with the target. */
   companionConflicts?: string[];
+  /**
+   * Packages left in place because their installed peer range rejects the target and nothing
+   * moves them with it: `next-mdx-remote-client 1.1.2 declares react >= 18.3.0 < 19.0.0`.
+   * Possible impact; never compiled at another version, never counted as breaking.
+   */
+  peerConflicts?: string[];
   /** Set when the entry merges several workspaces (`workspace` is then `*`). */
   workspaces?: string[];
   /**

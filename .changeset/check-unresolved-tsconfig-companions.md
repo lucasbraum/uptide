@@ -10,7 +10,10 @@ Two fixes to `check`:
   diagnostics into findings, and says so in the coverage line (a file governed by such a
   nested project is dropped from the workspace that happens to reach it):
   `compiled 5 of 7 files in 2 workspaces; not compiled: docs/tsconfig.json (extends "@tsconfig/docusaurus/tsconfig.json" cannot be resolved)`.
-- **Companions move only when they have to, and by the smallest step.** A companion whose
-  installed version already accepts the new target stays where it is. One whose peer range
-  rejects it moves to the lowest release above the installed one that accepts the target (a
-  release that pins the target exactly still wins), not the newest major the registry has.
+- **A package that only peers on the package is left in place when its peer range rejects the
+  target.** What always moves with the package stays as before: the release group published at
+  the target's own version (`react-dom`), `@types/*`, the exact pins of the target, and the
+  packages a pack names in `companions`, even when their installed range already accepts the
+  target. Any other package whose installed peer range rejects the target is not moved and not
+  compiled at another version; `check` lists it under possible impact, never as breaking:
+  `? possible impact, peer conflict: next-mdx-remote-client 1.1.2 declares react >= 18.3.0 < 19.0.0`.

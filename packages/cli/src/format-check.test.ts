@@ -261,6 +261,29 @@ describe('formatCheck, the first screen', () => {
     expect(out).toContain('npx uptide@next fix ai');
   });
 
+  it('lists a peer conflict as possible impact, never as breaking', () => {
+    const out = formatCheck(
+      report([
+        pkg({
+          name: 'react',
+          installed: '18.3.1',
+          latest: '19.2.1',
+          target: '19.2.1',
+          majorsBehind: 1,
+          status: 'breaking',
+          findings: [removed('app/chat.ts', 3)],
+          peerConflicts: ['next-mdx-remote-client 1.1.2 declares react >= 18.3.0 < 19.0.0'],
+        }),
+      ]),
+      shown,
+    );
+    expect(out).toContain(
+      '? possible impact, peer conflict: next-mdx-remote-client 1.1.2 declares react >= 18.3.0 < 19.0.0',
+    );
+    // One breaking site (the finding), not two: the peer conflict adds nothing to the count.
+    expect(out).toMatch(/\b1 breaking\b|1 site/);
+  });
+
   it('says where each target came from: the npm dist-tag, or the one asked for', () => {
     const latest = formatCheck(report([pkg({ name: 'twilio' })]), shown);
     expect(latest).toContain('5.0.1 → 5.3.0   minor · latest on npm');

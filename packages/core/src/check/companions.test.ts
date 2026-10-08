@@ -85,7 +85,7 @@ describe('companionsOf', () => {
       installed: repository,
       manifests,
     });
-    expect(plan).toEqual({ companions: [], conflicts: [] });
+    expect(plan).toEqual({ companions: [], conflicts: [], peerConflicts: [] });
   });
 
   it('reports a member with no release that agrees, instead of moving the package alone', async () => {
@@ -146,7 +146,7 @@ describe('companionsOf, a member that already agrees', () => {
       manifests: async (name) =>
         name === '@modelcontextprotocol/sdk' ? versions : manifests(name),
     });
-    expect(plan).toEqual({ companions: [], conflicts: [] });
+    expect(plan).toEqual({ companions: [], conflicts: [], peerConflicts: [] });
   });
 });
 
@@ -222,7 +222,7 @@ describe('companionsOf, react 18 → 19', () => {
     expect(plan.reason).toBe('peer link, types for react, react-dom');
   });
 
-  it('leaves a companion alone when its installed copy already accepts the target', async () => {
+  it('moves a lockstep companion even when its installed copy accepts the target', async () => {
     const plan = await companionsOf({
       name: 'react',
       target: '19.2.1',
@@ -242,17 +242,19 @@ describe('companionsOf, react 18 → 19', () => {
             }
           : manifests(name),
     });
-    expect(plan.companions.map((c) => `${c.name} ${c.to}`)).toEqual(['@types/react 19.2.7']);
+    expect(plan.companions.map((c) => `${c.name} ${c.to}`)).toEqual([
+      '@types/react 19.2.7',
+      'react-dom 19.2.1',
+    ]);
   });
 
-  it('moves a companion whose peer range rejects the target to the lowest release that accepts it', async () => {
-    // next-mdx-remote-client 1.x peers react `>= 18.3.0 < 19.0.0`; 2.0.0 is the first release
-    // that takes 19. The newest (2.1.12 wants `>= 19.1.0`) is a different, larger upgrade.
+  it('leaves a package whose peer range rejects the target in place and reports it as a peer conflict', async () => {
+    // next-mdx-remote-client 1.x peers react `>= 18.3.0 < 19.0.0`: the real upgrade kept it at
+    // 1.1.2. It is not released with react (no 19.2.1), so nothing moves it, and nothing is
+    // compiled at another version of it.
     const mdx = {
       '1.1.2': { peerDependencies: { react: '>= 18.3.0 < 19.0.0' } },
-      '1.1.9': { peerDependencies: { react: '>= 18.3.0 < 19.0.0' } },
       '2.0.0': { peerDependencies: { react: '>=19.0.0' } },
-      '2.1.2': { peerDependencies: { react: '^19.1.0' } },
       '2.1.12': { peerDependencies: { react: '>= 19.1.0' } },
     };
     const plan = await companionsOf({
@@ -264,35 +266,48 @@ describe('companionsOf, react 18 → 19', () => {
           ...installed('next-mdx-remote-client', '1.1.2', ['apps/docs']),
           manifest: mdx['1.1.2'],
         },
+        {
+          ...installed('react-dom', '18.3.1', ['apps/docs']),
+          manifest: { peerDependencies: { react: '^18.3.1' } },
+        },
       ],
-      manifests: async (name) => (name === 'next-mdx-remote-client' ? mdx : manifests(name)),
+      manifests: async (name) =>
+        name === 'next-mdx-remote-client'
+          ? mdx
+          : name === 'react-dom'
+            ? { ...react['react-dom'], '18.3.1': { peerDependencies: { react: '^18.3.1' } } }
+            : manifests(name),
     });
-    expect(plan.companions).toEqual([
-      {
-        name: 'next-mdx-remote-client',
-        from: '1.1.2',
-        to: '2.0.0',
-        reason: 'next-mdx-remote-client 2.0.0 accepts react 19.2.1 (>=19.0.0)',
-      },
+    expect(plan.peerConflicts).toEqual([
+      'next-mdx-remote-client 1.1.2 declares react >= 18.3.0 < 19.0.0',
     ]);
+    // Not an upgrade that cannot agree, and not moved: only the release-group member moves.
+    expect(plan.conflicts).toEqual([]);
+    expect(plan.companions.map((c) => `${c.name} ${c.to}`)).toEqual(['react-dom 19.2.1']);
   });
 
-  it('does not pick a release older than the installed one', async () => {
-    const lib = {
-      '0.9.0': { peerDependencies: { react: '*' } },
-      '1.0.0': { peerDependencies: { react: '^18' } },
-      '2.0.0': { peerDependencies: { react: '^19' } },
+  it('moves a package the pack names even when its installed peer range accepts the target', async () => {
+    // No release of it at the target's version, so only the pack's list moves it.
+    const wrapper = {
+      '2.0.0': { peerDependencies: { react: '^18 || ^19' } },
+      '2.1.0': { peerDependencies: { react: '^18 || ^19' } },
     };
-    const plan = await companionsOf({
+    const input = {
       name: 'react',
-      target: '19.0.0',
+      target: '19.2.1',
       installed: [
-        installed('react', '18.2.0', ['.']),
-        { ...installed('lib', '1.0.0', ['.']), manifest: lib['1.0.0'] },
+        installed('react', '18.3.1', ['.']),
+        { ...installed('react-wrapper', '2.0.0', ['.']), manifest: wrapper['2.0.0'] },
       ],
-      manifests: async (name) => (name === 'lib' ? lib : manifests(name)),
-    });
-    expect(plan.companions.map((c) => `${c.name} ${c.to}`)).toEqual(['lib 2.0.0']);
+      manifests: async (name: string) => (name === 'react-wrapper' ? wrapper : manifests(name)),
+    };
+    const alone = await companionsOf(input);
+    expect(alone.companions).toEqual([]);
+    expect(alone.peerConflicts).toEqual([]);
+    const named = await companionsOf({ ...input, lockstep: ['react-wrapper'] });
+    expect(named.companions.map((c) => `${c.name} ${c.from} → ${c.to}`)).toEqual([
+      'react-wrapper 2.0.0 → 2.1.0',
+    ]);
   });
 
   it('leaves a types package declared in an unrelated workspace alone', async () => {
@@ -305,6 +320,6 @@ describe('companionsOf, react 18 → 19', () => {
       ],
       manifests,
     });
-    expect(plan).toEqual({ companions: [], conflicts: [] });
+    expect(plan).toEqual({ companions: [], conflicts: [], peerConflicts: [] });
   });
 });

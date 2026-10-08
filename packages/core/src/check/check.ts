@@ -616,6 +616,8 @@ export function mergeAcrossWorkspaces(
     const conflicts = [...new Set(list.flatMap((p) => p.companionConflicts ?? []))];
     if (companions.length > 0) combined.companions = companions;
     if (conflicts.length > 0) combined.companionConflicts = conflicts;
+    const peerConflicts = [...new Set(list.flatMap((p) => p.peerConflicts ?? []))].sort();
+    if (peerConflicts.length > 0) combined.peerConflicts = peerConflicts;
     const members = [
       ...new Map(list.flatMap((p) => p.members ?? []).map((m) => [m.name, m])).values(),
     ];
@@ -1107,8 +1109,10 @@ async function companionPlans(
         target,
         installed: [...installed.values()],
         manifests: (name) => manifests(name),
+        lockstep: packsOf(opts).find((p) => p.name === lead)?.companions ?? [],
       });
-      if (plan.companions.length > 0 || plan.conflicts.length > 0) plans[lead] = plan;
+      if (plan.companions.length > 0 || plan.conflicts.length > 0 || plan.peerConflicts.length > 0)
+        plans[lead] = plan;
     } catch {
       // A registry that cannot answer leaves the package alone, as before.
     }
@@ -1557,6 +1561,7 @@ async function checkGroup(
       (prepared.length === 1 ? prepared[0]?.target : targets.at(-1))) as string,
     ...(plan?.companions.length ? { companions: plan.companions } : {}),
     ...(plan?.conflicts.length ? { companionConflicts: plan.conflicts } : {}),
+    ...(plan?.peerConflicts.length ? { peerConflicts: plan.peerConflicts } : {}),
     majorsBehind: Math.max(...prepared.map((p) => majorsBehind(p.installedVersion, p.target))),
     findings: [],
     callSitesChecked: 0,

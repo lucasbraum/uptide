@@ -40,6 +40,12 @@ that no source supports does not belong in a pack. `supports(from, to)` defaults
 ranges; a pack may narrow it (stripe also requires the target to be newer than what is
 installed).
 
+A pack may also name `companions`: packages that always move with the package, even when
+their installed version already accepts the target. A release-group member published at the
+target's own version (`react-dom`) and `@types/*` need no entry. A package that only peers on
+the package and whose installed range rejects the target is left in place and listed under
+possible impact as a peer conflict; it is never compiled at another version.
+
 ### Mechanical rules: detect and rewrite
 
 ```ts
