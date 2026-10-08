@@ -186,6 +186,17 @@ describe('definePack', () => {
     instructions: 'only the site',
   });
 
+  it('carries the packages the pack says always move with it, and none by default', () => {
+    expect(pack.companions).toBeUndefined();
+    const named = definePack({
+      meta: pack.meta,
+      rules: [],
+      instructions: 'x',
+      companions: ['toy-plugin'],
+    });
+    expect(named.companions).toEqual(['toy-plugin']);
+  });
+
   it('rewrites only the reported occurrence, within the supported versions', () => {
     const text = 'oldName(oldName(1));';
     const out = pack.transform(text, finding(1, 9), {

@@ -298,6 +298,8 @@ export interface PackSpec {
   instructions: string;
   /** The version `fix` falls back to when the registry cannot answer. */
   defaultTarget?: string;
+  /** Packages that always move with the package (`MigrationPack.companions`). */
+  companions?: readonly string[];
 }
 
 /**
@@ -313,6 +315,7 @@ export function definePack(spec: PackSpec): Pack {
     rules: spec.rules,
     behavior,
     instructions: spec.instructions,
+    ...(spec.companions ? { companions: spec.companions } : {}),
     defaultTarget: spec.defaultTarget ?? '',
     supports: (from, to) => satisfies(from, spec.meta.from) && satisfies(to, spec.meta.to),
     transform(text, finding, context) {

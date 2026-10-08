@@ -79,6 +79,9 @@ function onlyOnLine(
 }
 
 export const aiPack = definePack({
+  // A community provider that only peers on `ai`: its 3.x range rejects `ai` 7 and nothing in the
+  // registry says to move it, but its 4.x takes `ai` 7 and the repository's upgrade moved it.
+  companions: ['ai-sdk-ollama'],
   meta: {
     package: 'ai',
     from: '>=6 <7',
