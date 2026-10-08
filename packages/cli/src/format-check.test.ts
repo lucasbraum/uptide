@@ -368,7 +368,7 @@ describe('tiers, the time budget and failures on the first screen', () => {
     const out = formatCheck(report([generic]), { color: false });
     expect(out).toContain('✗ 1 breaking, 1 possible');
     expect(out).toContain(
-      '? possible impact: 1 site in 1 file   not confirmed by the compiler or the runtime probe',
+      '? possible impact: 1 site in 1 file   the types changed where this code uses them; nothing confirmed that it breaks, so these are not counted as breaking',
     );
     expect(out).toMatch(/\n {4}\? sharp\.cache removed +image\.ts:4/);
     expect(out).not.toContain('unverified');

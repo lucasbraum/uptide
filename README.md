@@ -38,12 +38,14 @@ zod                     3.25.76 → 4.6.5    major · latest on npm      verifie
 stripe (packages/api)   14.25.0 → 23.0.0   9 majors behind · latest on npm   verified   ✗ 4 breaking in 3 files    1 auto-fixable · 3 need the agent (LLM)
 
 zod   28 breaking · compiled against 4.6.5: 28 new type errors
+  compiled 11 of 11 files in 2 workspaces
   ✗ New error API (required_error → error)   24 sites          auto-fixable
   ✗ ZodTypeDef removed                       1 fix, 3 errors   needs the agent (LLM)
   ✗ .ip() removed                            monitoring.ts:6   needs the agent (LLM)
   ! 15 deprecated calls (.uuid, .datetime, .email, ...)   8 auto-fixable
 
 stripe   4 breaking · compiled against 23.0.0: 4 new type errors
+  compiled 7 of 7 files in 1 workspace
   ✗ Test fixture casts widened                   renewal.test.ts:7   auto-fixable
   ✗ Subscription billing period moved to items   2 sites             needs the agent (LLM)
   ✗ apiVersion no longer matches the SDK         client.ts:9         needs the agent (LLM)
@@ -206,7 +208,16 @@ Every direct dependency can be discovered and selected for analysis. What differ
 | Tier | Dependencies | What you get |
 | --- | --- | --- |
 | **Verified** | zod 3 → 4, stripe 14 and newer, ai 6 → 7 | A migration pack: rules written for that dependency, a guide for the agent, behavior checks (zod schemas compared on generated inputs; Stripe changelog filtered to what you call), and ground truth from public repositories the pack is scored against ([docs/packs.md](docs/packs.md)). `fix` migrates by rule first, by agent for the rest. |
-| **Generic** | any other dependency | The same analysis without a pack. A finding is called breaking only when your compiler or the runtime probe confirms it, or when it is a `require()` of an ESM-only package or an import of a removed export; everything else is in `--details`. `fix` migrates with the agent alone, under the same verification, and says so in the pull request. |
+| **Generic** | any other dependency | The same analysis without a pack. `fix` migrates with the agent alone, under the same verification, and says so in the pull request. |
+
+In both tiers a finding is called breaking only when something confirms it at the site: your
+compiler rejects the code against the target, the runtime probe saw the export go, it is a
+`require()` of an ESM-only package or an import of a removed export, or a pack found it.
+Everything else the declaration diff suggests is **possible impact**: the types changed where
+your code uses them, nothing confirmed that it breaks, so it is listed under its own line and
+never counted as breaking. Under every analyzed package one line says how much of the code that
+uses it the compiler judged (`compiled 11 of 11 files in 2 workspaces`); when files were
+skipped, the verdict says "types partly verified" and why.
 
 The tier is on every row of `check`, in the HTML report and in the pull request. A generic
 `fix` needs a provider API key (there are no rules to fall back on; without a key it says

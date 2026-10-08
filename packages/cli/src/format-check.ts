@@ -285,7 +285,7 @@ function sectionLines(row: Row, colors: Colors): string[] {
   // there: listed apart, never counted as breaking.
   if (possible.length > 0) {
     lines.push(
-      `  ${colors.magenta('?')} possible impact: ${plural(sitesOf(possible), 'site')} in ${plural(filesOf(possible), 'file')}   ${colors.dim('not confirmed by the compiler or the runtime probe')}`,
+      `  ${colors.magenta('?')} possible impact: ${plural(sitesOf(possible), 'site')} in ${plural(filesOf(possible), 'file')}   ${colors.dim('the types changed where this code uses them; nothing confirmed that it breaks, so these are not counted as breaking')}`,
     );
     for (const g of listedPossible) lines.push(`  ${ruleLine(g)}`);
     if (listedPossible.length < possible.length) {
