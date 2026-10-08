@@ -150,7 +150,9 @@ open a **Pack request** issue, and say you are writing it.
 These are what make Uptide safe to run on someone else's code. A pull request that breaks
 one is not merged, whatever else it does.
 
-- `check` makes no LLM call and executes nothing from the repository it reads.
+- `check` makes no LLM call and runs no script or code of the repository it reads. The one
+  package it loads from the repository's `node_modules` is its installed `typescript`, to
+  compile with (as `verify` does); the bundled compiler stands in only when there is none.
 - Dependencies are installed with lifecycle scripts disabled; third-party code is never run
   outside the designed verification step of `fix`.
 - `fix` and `verify` work in a temporary clone. The user's checkout, services, git config

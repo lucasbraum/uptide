@@ -351,6 +351,9 @@ for assisted fixes in `uptide fix`, and only with your own API key from ANTHROPI
 OPENAI_API_KEY or GEMINI_API_KEY: for each
 site the rules cannot migrate, the finding, the enclosing function and the compiler
 error. `uptide fix --no-llm` turns assisted fixes off. No account.
+`check` and `verify` load the `typescript` package your repository installs (resolved from its
+node_modules) to compile with, and never run your repository's scripts or other code outside
+`fix`'s verification step.
 Anonymous telemetry is off by default and asks for consent in an interactive terminal.
 Set UPTIDE_TELEMETRY=0 to disable it. No IP, code, paths or repo names are collected.
 Other network use: your npm registry for package metadata and tarballs, npm's advisory
@@ -363,7 +366,7 @@ There is no Uptide server. With telemetry off (the default):
 | | Where it runs | What leaves your machine |
 | --- | --- | --- |
 | `list`, `plan` | locally | package names/versions requested from your npm registry, and `list` sends public packages' names and installed versions to npm's advisory endpoint; metadata only, no source code |
-| `check` | locally | nothing of yours; it downloads package tarballs from your npm registry. No LLM call, and nothing in your repository is executed. |
+| `check` | locally | nothing of yours; it downloads package tarballs from your npm registry. No LLM call. It loads your installed `typescript` package to compile with, and runs no script or other code of yours. |
 | `fix`, rules and verification | locally, in a temporary clone | nothing of yours |
 | `fix`, assisted fixes | Your chosen provider's API, with **your** environment API key | per site no rule covers: the finding, the enclosing function or declaration, and the compiler error |
 | `pr`, `fix --pr` | GitHub, through your own `gh` | the branch and the pull request, when you say so |

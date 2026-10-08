@@ -255,7 +255,10 @@ project references one level down) or, without one, from `**/*.ts,tsx` minus
 `node_modules`, `dist` and `build`. A scoped program (the files that use one package) also
 holds the ambient `.d.ts` files the tsconfig includes (`vite-env.d.ts`, `css.d.ts`): nothing
 imports them, and without them `*.module.css` imports and `declare global` names fail.
-Nothing in the repository is executed.
+Nothing in the repository is executed, with one deliberate load: the repository's installed
+`typescript` package (resolved from its `node_modules`, see the compile section) is loaded
+into Uptide's process to compile with, as `verify` has done since #40; no script or other
+code of the repository runs.
 
 The compiler bundled with ts-morph is TypeScript 6, whose defaults for an option a tsconfig
 leaves unset differ from TypeScript 5's: `strict` on, no automatic `@types` inclusion, a
