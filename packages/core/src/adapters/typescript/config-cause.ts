@@ -87,6 +87,7 @@ export function jsxNamespaceCause(
       line: location?.line ?? 1,
       reason: `"jsx": "${setting}" reads JSX element types from the global JSX namespace, which ${who} no longer declares; "jsxImportSource": "react" (or "jsx": "react-jsx") makes the compiler read them from react/jsx-runtime`,
       config: true,
+      anchorOnly: true,
     },
     explains: (d) => JSX_NAMESPACE_CODES.has(d.code),
   };

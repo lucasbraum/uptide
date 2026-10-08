@@ -123,6 +123,12 @@ export interface DiagnosticCause {
    * resolves the cluster is there, and the diagnostics under it are evidence, not sites to fix.
    */
   config?: true;
+  /**
+   * The one edit is at the cause itself (a compiler option, a parameter's type), so the
+   * cluster is one site and its diagnostics are evidence; without it, the diagnostics are
+   * the sites and the cause is where to look first.
+   */
+  anchorOnly?: true;
 }
 
 /** The files Signal B was asked to judge and what became of them: the denominator of a verdict. */

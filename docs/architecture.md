@@ -257,6 +257,12 @@ holds the ambient `.d.ts` files the tsconfig includes (`vite-env.d.ts`, `css.d.t
 imports them, and without them `*.module.css` imports and `declare global` names fail.
 Nothing in the repository is executed.
 
+A `/// <reference types="react" />` or an automatic `types` entry naming a package the
+overlay serves is resolved inside the overlay too (`resolveTypeReferenceDirectiveReferences`,
+with the overlay's `node_modules/@types` as the only type root): resolved from the
+repository it would bring the installed copy in beside the target, two copies of one
+package's types, and what the target removed would still be declared.
+
 The compiler bundled with ts-morph is TypeScript 6, whose defaults for an option a tsconfig
 leaves unset differ from TypeScript 5's: `strict` on, no automatic `@types` inclusion, a
 modern `target`, `module` and resolution, `esModuleInterop` on. A repository on TypeScript 5
@@ -555,6 +561,15 @@ as one `cause` finding marked `anchorOnly`: it counts as one site, the plan and 
 the tsconfig, the diagnostics are its `downstream` evidence, and a pack rule claims the
 anchor when it claims most of the errors under it (`ruleFor`). A `JSX.Element` written in
 code is still a site of its own.
+
+A root cause can be a repository parameter (`parameterCause` in `cause.ts`). A mismatch the
+compiler reports at an argument (TS2345) or a JSX attribute (TS2322) whose parameter or prop
+is declared in the repository with a type that names something from outside it
+(`usePassThroughWheelEvents(ref: RefObject<HTMLElement>)`, rejected at eleven call sites once
+the target's `useRef` returns `RefObject<HTMLElement | null>`) is anchored at the parameter,
+`anchorOnly`, when at least two sites trip it: the one edit is the parameter's type, as the
+migration guides say, and the call sites are evidence. A parameter one site trips is left to
+that site, which may as well be the argument's.
 
 A diagnostic confirms exactly one usage: the innermost whose span contains the
 diagnostic's start. `z.string().trim().url()` is three usages on one line, and an error

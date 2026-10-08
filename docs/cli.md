@@ -120,7 +120,10 @@ A root cause that is a compiler option is one site. When the target drops the gl
 namespace and the workspace's `"jsx": "preserve"` (or `"react"`) reads JSX element types
 from it, every element in every file errors with one fix: `check` reports one finding at the
 `jsx` line of the tsconfig that sets it (`"jsxImportSource": "react"` resolves it), with the
-diagnostics as evidence, and `--details` shows a few of them.
+diagnostics as evidence, and `--details` shows a few of them. A repository parameter that
+several call sites trip over (a hook typed `RefObject<HTMLElement>` once `useRef` returns
+`RefObject<HTMLElement | null>`) is reported the same way: one finding at the parameter, with
+the call sites as evidence.
 
 ### Partial results
 

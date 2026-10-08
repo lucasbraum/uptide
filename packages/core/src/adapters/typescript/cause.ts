@@ -276,3 +276,91 @@ function causeAt(decl: ts.Node, reason: string, repoDir: string): DiagnosticCaus
     reason,
   };
 }
+
+/** Argument not assignable to parameter; type not assignable (a JSX attribute to its prop). */
+const MISMATCH_CODES = new Set([2345, 2322]);
+
+/**
+ * A mismatch the compiler reports at an argument whose parameter is a repository declaration:
+ * `usePassThroughWheelEvents(ref)` rejected at eleven call sites because the hook's parameter
+ * is typed `RefObject<HTMLElement>` and the target's `useRef` now returns
+ * `RefObject<HTMLElement | null>`. The one edit is the parameter (or the prop, for a JSX
+ * attribute), as the migration guides say; the call sites are evidence. The parameter is
+ * blamed only when its declared type names something from outside the repository (a package
+ * or library type), and the caller clusters the result: a parameter one site trips is left
+ * to that site.
+ */
+export function parameterCause(
+  programs: Programs,
+  diagnostic: ts.Diagnostic,
+  file: ts.SourceFile,
+  repoDir: string,
+): DiagnosticCause | undefined {
+  if (diagnostic.start === undefined || !MISMATCH_CODES.has(diagnostic.code)) return undefined;
+  const checker = programs.overlay.getTypeChecker();
+  const inRepo = (n: ts.Node): boolean => {
+    const f = n.getSourceFile().fileName;
+    return f.startsWith(`${repoDir}/`) && !f.includes('/node_modules/');
+  };
+  const node = deepestAt(file, diagnostic.start);
+  let decl: ts.Declaration | undefined;
+  // An argument of a call: the parameter it lands on, through the resolved signature.
+  for (let n: ts.Node | undefined = node; n && !ts.isStatement(n); n = n.parent) {
+    const parent: ts.Node | undefined = n.parent;
+    if (parent && (ts.isCallExpression(parent) || ts.isNewExpression(parent))) {
+      // The callee of an inner call (`use(boxed())` reported at `boxed`): keep climbing.
+      const index = parent.arguments?.indexOf(n as ts.Expression) ?? -1;
+      if (index < 0) continue;
+      const signature = checker.getResolvedSignature(parent);
+      const parameters = signature?.parameters ?? [];
+      const parameter = parameters[Math.min(index, parameters.length - 1)];
+      decl = parameter?.valueDeclaration;
+      break;
+    }
+    if (parent && ts.isJsxAttribute(parent) && parent.initializer === n) {
+      const symbol = checker.getSymbolAtLocation(parent.name);
+      decl = symbol?.declarations?.[0];
+      break;
+    }
+  }
+  if (!decl || !inRepo(decl)) return undefined;
+  if (!ts.isParameter(decl) && !ts.isPropertySignature(decl) && !ts.isPropertyDeclaration(decl))
+    return undefined;
+  const typeNode = decl.type;
+  if (!typeNode || !namesForeignType(typeNode, checker, inRepo)) return undefined;
+  const site = `${relative(repoDir, file.fileName)}:${file.getLineAndCharacterOfPosition(diagnostic.start).line + 1}`;
+  const at = decl.getSourceFile();
+  const declLine = `${relative(repoDir, at.fileName)}:${at.getLineAndCharacterOfPosition(decl.getStart()).line + 1}`;
+  if (declLine === site) return undefined;
+  const what = ts.isParameter(decl) ? 'parameter' : 'prop';
+  const name = ts.getNameOfDeclaration(decl)?.getText() ?? '(anonymous)';
+  const cause = causeAt(
+    decl,
+    `whose ${what} \`${name}: ${clip(typeNode.getText())}\` no longer accepts what the target gives it; widen the ${what}'s type there`,
+    repoDir,
+  );
+  // The anchor is the parameter itself, not the function that holds it.
+  return { ...cause, name, line: cause.line, anchorOnly: true };
+}
+
+/** Whether a type annotation refers to a type declared outside the repository. */
+function namesForeignType(
+  typeNode: ts.TypeNode,
+  checker: ts.TypeChecker,
+  inRepo: (n: ts.Node) => boolean,
+): boolean {
+  let foreign = false;
+  const visit = (n: ts.Node): void => {
+    if (foreign) return;
+    if (ts.isTypeReferenceNode(n) || ts.isExpressionWithTypeArguments(n)) {
+      const name = ts.isTypeReferenceNode(n) ? n.typeName : n.expression;
+      const symbol = checker.getSymbolAtLocation(name);
+      const target =
+        symbol && symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
+      if (target?.declarations?.some((d) => !inRepo(d))) foreign = true;
+    }
+    ts.forEachChild(n, visit);
+  };
+  visit(typeNode);
+  return foreign;
+}

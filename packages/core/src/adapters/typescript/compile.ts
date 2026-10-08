@@ -4,10 +4,15 @@ import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 import { ts } from 'ts-morph';
 import type { CompileOptions, RepoDir } from '../../domain/adapter.js';
-import type { CompileCoverage, CompileDiagnostic, CompileSignal } from '../../domain/usage.js';
+import type {
+  CompileCoverage,
+  CompileDiagnostic,
+  CompileSignal,
+  DiagnosticCause,
+} from '../../domain/usage.js';
 import { satisfies } from '../../fetch/range.js';
 import { onReset } from '../../shared-state.js';
-import { findCause } from './cause.js';
+import { findCause, parameterCause } from './cause.js';
 import { jsxNamespaceCause } from './config-cause.js';
 import { type LoadedRepo, loadedRepo, ownsFile } from './repo.js';
 import {
@@ -20,6 +25,7 @@ import {
   satisfyWanted,
   type Wanted,
 } from './target-deps.js';
+import { typesPackageOf } from '../../check/types-release.js';
 import { resolvePackageDir } from './usages.js';
 
 /**
@@ -522,6 +528,61 @@ function overlayProgram(
   // Not `oldProgram: base`: structure reuse copies the baseline's module resolutions and
   // silently bypasses the overlay. Sharing source files and resolutions through the host
   // (above) gives the same saving without that.
+  // A `/// <reference types="react" />` (or an automatic `types` entry) naming a target or a
+  // linked dependency must land in the overlay too: resolved from the repository it would
+  // bring the installed copy in beside the target, two copies of one package's types, and
+  // what the target removed (the global JSX namespace) would still be declared.
+  const served = (name: string): boolean =>
+    targets.some(
+      (t) =>
+        t.name === name ||
+        t.specifier === name ||
+        typesPackageOf(t.specifier ?? t.name) === typesPackageOf(name),
+    ) ||
+    deps.links.has(name) ||
+    deps.links.has(typesPackageOf(name));
+  host.resolveTypeReferenceDirectiveReferences = (
+    directives,
+    containingFile,
+    _redirect,
+    _opts,
+    containingSourceFile,
+  ) =>
+    directives.map((directive) => {
+      const name = typeof directive === 'string' ? directive : directive.fileName;
+      const mode =
+        containingSourceFile && typeof directive !== 'string'
+          ? ts.getModeForFileReference(directive, containingSourceFile.impliedNodeFormat)
+          : undefined;
+      if (served(name)) {
+        // The primary lookup is the type roots, which default to the repository's
+        // node_modules/@types: the overlay's is the only root a served name may come from.
+        const inOverlay: ts.CompilerOptions = {
+          ...noPaths,
+          typeRoots: [join(overlay, 'node_modules', '@types')],
+          configFilePath: undefined,
+        };
+        const found = ts.resolveTypeReferenceDirective(
+          name,
+          probe,
+          inOverlay,
+          host,
+          undefined,
+          undefined,
+          mode,
+        );
+        return found;
+      }
+      return ts.resolveTypeReferenceDirective(
+        name,
+        containingFile,
+        options,
+        host,
+        undefined,
+        undefined,
+        mode,
+      );
+    });
   const program = ts.createProgram({ rootNames: [...base.getRootFileNames()], options, host });
   // `declare module 'x'` inside the target makes the compiler try to resolve `x` too; an
   // augmentation target is not an import and must not count as a missing dependency.
@@ -688,10 +749,27 @@ export async function compileAgainstTargets(
       repo.dir,
       targets.map((t) => t.name),
     );
+    // A repository parameter several call sites trip over is one edit; one site keeps its
+    // own diagnostic, which may as well be the argument's.
+    const byParameter = new Map<string, DiagnosticCause>();
+    const parameterOf = new Map<ts.Diagnostic, string>();
+    for (const { d, overlaid } of fresh) {
+      const cause = parameterCause({ overlay: program, base: checked }, d, overlaid, repo.dir);
+      if (!cause) continue;
+      const key = `${cause.file}:${cause.line}:${cause.name}`;
+      byParameter.set(key, cause);
+      parameterOf.set(d, key);
+    }
+    const shared = new Map<string, number>();
+    for (const key of parameterOf.values()) shared.set(key, (shared.get(key) ?? 0) + 1);
     const diagnostics: CompileDiagnostic[] = fresh.map(({ d, overlaid }) => {
       const diagnostic = toDiagnostic(d, overlaid, repo.dir);
+      const parameter = parameterOf.get(d);
       const cause =
         (jsx?.explains(d) ? jsx.cause : undefined) ??
+        (parameter !== undefined && (shared.get(parameter) ?? 0) >= 2
+          ? byParameter.get(parameter)
+          : undefined) ??
         findCause({ overlay: program, base: checked }, d, overlaid, repo.dir, erroredLines);
       if (cause) diagnostic.cause = cause;
       return diagnostic;

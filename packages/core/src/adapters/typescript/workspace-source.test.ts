@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, utimesSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -38,5 +38,36 @@ describe('workspaceSourceMap', () => {
     expect(map.warnings).toEqual([
       'dep: compiled against its built lib/index.d.ts, which is older than its source; rebuild it or the results may be stale',
     ]);
+  });
+
+  it("follows workspace links hoisted to the root, and the linked packages' own links", () => {
+    // A Yarn or npm workspace: `packages/app` depends on `@acme/ui` (workspace:*), hoisted to the
+    // root node_modules as a symlink; `@acme/ui` re-exports from `@acme/core`, linked the same way.
+    const repo = mkdtempSync(join(tmpdir(), 'uptide-hoist-'));
+    const pkg = (name: string, deps: Record<string, string> = {}): string => {
+      const dir = join(repo, 'packages', name.replace('@acme/', ''));
+      mkdirSync(join(dir, 'src'), { recursive: true });
+      writeFileSync(
+        join(dir, 'package.json'),
+        JSON.stringify({ name, types: './dist/index.d.ts', dependencies: deps }),
+      );
+      writeFileSync(
+        join(dir, 'tsconfig.json'),
+        JSON.stringify({ compilerOptions: { outDir: 'dist', rootDir: 'src' } }),
+      );
+      writeFileSync(join(dir, 'src/index.ts'), 'export const x = 1;\n');
+      return dir;
+    };
+    const core = pkg('@acme/core');
+    const ui = pkg('@acme/ui', { '@acme/core': 'workspace:*' });
+    const app = pkg('@acme/app', { '@acme/ui': 'workspace:*' });
+    mkdirSync(join(repo, 'node_modules', '@acme'), { recursive: true });
+    symlinkSync(core, join(repo, 'node_modules', '@acme', 'core'), 'dir');
+    symlinkSync(ui, join(repo, 'node_modules', '@acme', 'ui'), 'dir');
+    const map = workspaceSourceMap(app, new Map([['@acme/ui', 'workspace:*']]));
+    expect(map.paths).toEqual({
+      '@acme/ui': [join(ui, 'src/index.ts')],
+      '@acme/core': [join(core, 'src/index.ts')],
+    });
   });
 });
