@@ -1,3 +1,4 @@
+import { posix } from 'node:path';
 import type { Change } from '../domain/change.js';
 import type { Finding } from '../domain/report.js';
 import type { ApiSurface } from '../domain/surface.js';
@@ -75,13 +76,16 @@ export function unattributedFindings(
       source: 'types',
       confidence: 1,
       evidence: 'checker',
-      notes: describeCluster(group.length, { ...cause, file: `${filePrefix}${cause.file}` }),
+      notes: describeCluster(group.length, {
+        ...cause,
+        file: posix.normalize(`${filePrefix}${cause.file}`),
+      }),
     };
     return {
       change,
       usage,
       downstream: group.map((d) => ({
-        file: `${filePrefix}${d.file}`,
+        file: posix.normalize(`${filePrefix}${d.file}`),
         line: d.line,
         code: d.code,
         message: d.message.split('\n')[0] ?? d.message,

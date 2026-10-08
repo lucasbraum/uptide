@@ -1,5 +1,5 @@
 import { readFileSync, realpathSync } from 'node:fs';
-import { join, relative, resolve, sep } from 'node:path';
+import { join, posix, relative, resolve, sep } from 'node:path';
 import { typescriptAdapter } from '../adapters/typescript/index.js';
 import { createFsSurfaceCache } from '../cache/fs-surface-cache.js';
 import { diffDirs } from '../diff-package.js';
@@ -547,8 +547,10 @@ export function mergeAcrossWorkspaces(
   for (const list of groups.values()) {
     const catalog = list.some((p) => catalogByWorkspace[p.workspace]?.includes(p.name));
     if (list.length < 2 && !catalog) continue;
+    // A cause in another workspace's source is reported relative to this one (`../editor/x.ts`):
+    // normalized, it is the repository path.
     const prefixed = (p: PackageReport, file: string): string =>
-      p.workspace === '.' ? file : `${p.workspace}/${file}`;
+      posix.normalize(p.workspace === '.' ? file : `${p.workspace}/${file}`);
     const first = list[0] as PackageReport;
     const sum = (pick: (p: PackageReport) => number): number =>
       list.reduce((n, p) => n + pick(p), 0);
@@ -809,7 +811,11 @@ async function checkWorkspace(ctx: Ctx, job: WorkspaceJob): Promise<PackageRepor
   }
   {
     const dir = resolve(opts.cwd, workspace);
-    const repo: RepoDir = { dir, ...(job.rootFiles ? { rootFiles: job.rootFiles } : {}) };
+    const repo: RepoDir = {
+      dir,
+      root: resolve(opts.cwd),
+      ...(job.rootFiles ? { rootFiles: job.rootFiles } : {}),
+    };
     const installed = new Map(Object.entries(installedByWorkspace[workspace] ?? {}));
     // Another workspace that declares the dependency itself answers for its own files, whether
     // nested under this one (the root's include) or pulled in through a project reference.

@@ -295,12 +295,14 @@ export function parameterCause(
   diagnostic: ts.Diagnostic,
   file: ts.SourceFile,
   repoDir: string,
+  /** The repository root: another workspace's source (mapped from `workspace:*`) is the repository's too. */
+  rootDir = repoDir,
 ): DiagnosticCause | undefined {
   if (diagnostic.start === undefined || !MISMATCH_CODES.has(diagnostic.code)) return undefined;
   const checker = programs.overlay.getTypeChecker();
   const inRepo = (n: ts.Node): boolean => {
     const f = n.getSourceFile().fileName;
-    return f.startsWith(`${repoDir}/`) && !f.includes('/node_modules/');
+    return f.startsWith(`${rootDir}/`) && !f.includes('/node_modules/');
   };
   const node = deepestAt(file, diagnostic.start);
   let decl: ts.Declaration | undefined;

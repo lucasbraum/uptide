@@ -14,6 +14,8 @@ export interface PackageDir {
 /** A consumer repository on disk. Read only: nothing in it is ever executed. */
 export interface RepoDir {
   dir: string;
+  /** The repository root when `dir` is a workspace inside it: what another workspace's source is still part of. */
+  root?: string;
   /** Absolute source roots for a named check; imports are followed by the compiler. */
   rootFiles?: string[];
   /**
