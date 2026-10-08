@@ -3,8 +3,8 @@
   "truth": "sha256-0afe6281b88ad7b3e34d418d3fe1fccc7f84817945b557cb30a3134c5c3fc359",
   "repos": 2,
   "breaking": {
-    "precision": 0.883,
-    "recall": 0.6434,
-    "falsePositives": 11
+    "precision": 0.957,
+    "recall": 0.6899,
+    "falsePositives": 4
   }
 }
