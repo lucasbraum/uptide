@@ -222,7 +222,7 @@ describe('companionsOf, react 18 → 19', () => {
     expect(plan.reason).toBe('peer link, types for react, react-dom');
   });
 
-  it('moves a lockstep companion even when its installed copy accepts the target', async () => {
+  it('leaves a companion alone when its installed copy already accepts the target', async () => {
     const plan = await companionsOf({
       name: 'react',
       target: '19.2.1',
@@ -242,10 +242,57 @@ describe('companionsOf, react 18 → 19', () => {
             }
           : manifests(name),
     });
-    expect(plan.companions.map((c) => `${c.name} ${c.to}`)).toEqual([
-      '@types/react 19.2.7',
-      'react-dom 19.2.1',
+    expect(plan.companions.map((c) => `${c.name} ${c.to}`)).toEqual(['@types/react 19.2.7']);
+  });
+
+  it('moves a companion whose peer range rejects the target to the lowest release that accepts it', async () => {
+    // next-mdx-remote-client 1.x peers react `>= 18.3.0 < 19.0.0`; 2.0.0 is the first release
+    // that takes 19. The newest (2.1.12 wants `>= 19.1.0`) is a different, larger upgrade.
+    const mdx = {
+      '1.1.2': { peerDependencies: { react: '>= 18.3.0 < 19.0.0' } },
+      '1.1.9': { peerDependencies: { react: '>= 18.3.0 < 19.0.0' } },
+      '2.0.0': { peerDependencies: { react: '>=19.0.0' } },
+      '2.1.2': { peerDependencies: { react: '^19.1.0' } },
+      '2.1.12': { peerDependencies: { react: '>= 19.1.0' } },
+    };
+    const plan = await companionsOf({
+      name: 'react',
+      target: '19.2.1',
+      installed: [
+        installed('react', '18.3.1', ['apps/docs']),
+        {
+          ...installed('next-mdx-remote-client', '1.1.2', ['apps/docs']),
+          manifest: mdx['1.1.2'],
+        },
+      ],
+      manifests: async (name) => (name === 'next-mdx-remote-client' ? mdx : manifests(name)),
+    });
+    expect(plan.companions).toEqual([
+      {
+        name: 'next-mdx-remote-client',
+        from: '1.1.2',
+        to: '2.0.0',
+        reason: 'next-mdx-remote-client 2.0.0 accepts react 19.2.1 (>=19.0.0)',
+      },
     ]);
+  });
+
+  it('does not pick a release older than the installed one', async () => {
+    const lib = {
+      '0.9.0': { peerDependencies: { react: '*' } },
+      '1.0.0': { peerDependencies: { react: '^18' } },
+      '2.0.0': { peerDependencies: { react: '^19' } },
+    };
+    const plan = await companionsOf({
+      name: 'react',
+      target: '19.0.0',
+      installed: [
+        installed('react', '18.2.0', ['.']),
+        { ...installed('lib', '1.0.0', ['.']), manifest: lib['1.0.0'] },
+      ],
+      manifests: async (name) => (name === 'lib' ? lib : manifests(name)),
+    });
+    expect(plan.companions.map((c) => `${c.name} ${c.to}`)).toEqual(['lib 2.0.0']);
   });
 
   it('leaves a types package declared in an unrelated workspace alone', async () => {

@@ -91,16 +91,8 @@ function agreeing(
   const pinned = targetManifest.dependencies?.[name];
   if (pinned && EXACT.test(pinned) && versions[pinned])
     return { version: pinned, reason: `${lead} ${target} pins ${name} ${pinned}` };
-  // Released in lockstep: its release at the target's own version asks for the target
-  // (react-dom 19.0.0 peer-requires react ^19.0.0). The installed copy may accept the target
-  // too (`^18 || ^19`), but the upgrade the repository makes moves both.
-  const same = versions[target];
-  const sameRange = same?.dependencies?.[lead] ?? same?.peerDependencies?.[lead];
-  if (same && sameRange !== undefined && accepts(sameRange, target) && target !== installed.version)
-    return {
-      version: target,
-      reason: `${name} ${target} is released with ${lead} ${target} (${EXACT.test(sameRange) ? 'pins' : 'peer'} ${sameRange})`,
-    };
+  // Nothing to move when the installed copy already accepts the target: a companion moves
+  // only when its own peer or dependency range rejects the new version.
   const current = versions[installed.version] ?? installed.manifest;
   const range = current.dependencies?.[lead] ?? current.peerDependencies?.[lead];
   if (range !== undefined && accepts(range, target))
@@ -108,17 +100,31 @@ function agreeing(
       version: installed.version,
       reason: `${name} ${installed.version} accepts ${lead} ${target}`,
     };
+  // Released in lockstep: its release at the target's own version asks for the target
+  // (react-dom 19.0.0 peer-requires react ^19.0.0).
+  const same = versions[target];
+  const sameRange = same?.dependencies?.[lead] ?? same?.peerDependencies?.[lead];
+  if (same && sameRange !== undefined && accepts(sameRange, target) && target !== installed.version)
+    return {
+      version: target,
+      reason: `${name} ${target} is released with ${lead} ${target} (${EXACT.test(sameRange) ? 'pins' : 'peer'} ${sameRange})`,
+    };
   const candidates = Object.keys(versions).filter(stable).sort(compareVersions).reverse();
+  // A release that pins the target exactly agrees with it: the newest such release.
   for (const version of candidates) {
     const m = versions[version] ?? {};
-    const range = m.dependencies?.[lead] ?? m.peerDependencies?.[lead];
-    if (range === undefined || !accepts(range, target)) continue;
-    return {
-      version,
-      reason: EXACT.test(range)
-        ? `${name} ${version} pins ${lead} ${target}`
-        : `${name} ${version} accepts ${lead} ${target} (${range})`,
-    };
+    const pin = m.dependencies?.[lead] ?? m.peerDependencies?.[lead];
+    if (pin !== undefined && EXACT.test(pin) && accepts(pin, target))
+      return { version, reason: `${name} ${version} pins ${lead} ${target}` };
+  }
+  // Else the lowest release past the installed one whose range accepts the target: the
+  // smallest move that agrees, not the newest major the registry has.
+  for (const version of [...candidates].reverse()) {
+    if (compareVersions(version, installed.version) <= 0) continue;
+    const m = versions[version] ?? {};
+    const accepted = m.dependencies?.[lead] ?? m.peerDependencies?.[lead];
+    if (accepted === undefined || !accepts(accepted, target)) continue;
+    return { version, reason: `${name} ${version} accepts ${lead} ${target} (${accepted})` };
   }
   const leadPins = exactPins(targetManifest);
   for (const version of candidates) {

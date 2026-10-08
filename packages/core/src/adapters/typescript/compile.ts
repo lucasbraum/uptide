@@ -13,7 +13,7 @@ import type {
 import { satisfies } from '../../fetch/range.js';
 import { onReset } from '../../shared-state.js';
 import { findCause, parameterCause } from './cause.js';
-import { type Compiler, repositoryCompiler } from './compiler.js';
+import { type Compiler, repositoryCompiler, unresolvedConfig } from './compiler.js';
 import { jsxNamespaceCause } from './config-cause.js';
 import { type LoadedRepo, loadedRepo, ownsFile } from './repo.js';
 import {
@@ -714,6 +714,26 @@ export async function compileAgainstTargets(
         reason: 'invalid tsconfig',
         count: options.files?.length ?? 0,
       }),
+      unresolvedInTarget: [],
+      unresolvedFiles: [],
+      linkedDependencies: [],
+      unsatisfiedDependencies: [],
+      timing: { baselineMs: 0, overlayMs: 0, dependenciesMs: 0 },
+    };
+  }
+  // A project whose tsconfig cannot be resolved is not compiled: its diagnostics would come from
+  // options the repository never builds with, and none of them is a place to change.
+  const unresolved = repo.tsconfig ? unresolvedConfig(compiler.ts, repo.tsconfig) : undefined;
+  if (repo.tsconfig && unresolved !== undefined) {
+    const requested = options.files?.length ?? 0;
+    return {
+      diagnostics: [],
+      baselineErrors: 0,
+      skipped: `not compiled: tsconfig.json (${unresolved})`,
+      coverage: {
+        ...coverageOf(compiler, 0, 0, { reason: 'tsconfig cannot be resolved', count: requested }),
+        notCompiled: [{ path: 'tsconfig.json', reason: unresolved }],
+      },
       unresolvedInTarget: [],
       unresolvedFiles: [],
       linkedDependencies: [],

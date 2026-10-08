@@ -1,3 +1,4 @@
+export { unresolvedConfig } from './adapters/typescript/compiler.js';
 export {
   createTypescriptAdapter,
   type TypescriptAdapterOptions,

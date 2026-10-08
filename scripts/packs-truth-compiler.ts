@@ -1,5 +1,6 @@
 import { createRequire } from 'node:module';
 import { dirname, join, relative } from 'node:path';
+import { unresolvedConfig } from '@uptide/core';
 
 export interface Diagnostic {
   file: string;
@@ -18,7 +19,11 @@ const DEPRECATED = new Set([6385, 6387]);
 export function compilerDiagnostics(
   project: string,
   configs: string[],
-): { compiler: string; diagnostics: Diagnostic[] } {
+): {
+  compiler: string;
+  diagnostics: Diagnostic[];
+  notCompiled: { path: string; reason: string }[];
+} {
   const require = createRequire(join(project, 'package.json'));
   let ts = require(
     require.resolve('typescript', {
@@ -33,8 +38,16 @@ export function compilerDiagnostics(
     ts = own;
   }
   const out: Diagnostic[] = [];
+  const notCompiled: { path: string; reason: string }[] = [];
   for (const config of configs) {
     const file = join(project, config);
+    // A tsconfig that extends what is not installed is no project the repository builds: its
+    // diagnostics come from options it never has, so none of them is a site (as `check` does).
+    const unresolved = unresolvedConfig(ts, file);
+    if (unresolved !== undefined) {
+      notCompiled.push({ path: config, reason: unresolved });
+      continue;
+    }
     const parsed = ts.getParsedCommandLineOfConfigFile(
       file,
       {},
@@ -77,6 +90,7 @@ export function compilerDiagnostics(
   }
   return {
     compiler,
+    notCompiled,
     diagnostics: out.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line),
   };
 }

@@ -53,6 +53,29 @@ describe('Signal B: compile against the target version', () => {
     });
   });
 
+  it('does not compile a project whose tsconfig extends what is not installed, and says so', async () => {
+    const dir = consumerCopy((d) => {
+      const config = JSON.parse(readFileSync(join(d, 'tsconfig.json'), 'utf8')) as object;
+      writeFileSync(
+        join(d, 'tsconfig.json'),
+        JSON.stringify({ extends: '@not-installed/base/tsconfig.json', ...config }),
+      );
+    });
+    const signal = await compileAgainstTarget({ dir }, 'synthetic', join(ROOT, 'synthetic-v2'));
+    // No diagnostics at all: none of them could be a place to change.
+    expect(signal.diagnostics).toEqual([]);
+    expect(signal.skipped).toBe(
+      'not compiled: tsconfig.json (extends "@not-installed/base/tsconfig.json" cannot be resolved)',
+    );
+    expect(signal.coverage.compiled).toBe(0);
+    expect(signal.coverage.notCompiled).toEqual([
+      {
+        path: 'tsconfig.json',
+        reason: 'extends "@not-installed/base/tsconfig.json" cannot be resolved',
+      },
+    ]);
+  });
+
   it('subtracts pre-existing errors instead of skipping: the upgrade error is still found', async () => {
     const dir = consumerCopy((d) =>
       writeFileSync(join(d, 'src/broken.ts'), 'export const n: number = "not a number";\n'),

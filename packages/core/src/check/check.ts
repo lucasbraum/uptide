@@ -635,6 +635,12 @@ export function mergeAcrossWorkspaces(
       const skipped = new Map<string, number>();
       for (const c of coverages)
         for (const r of c.skipped) skipped.set(r.reason, (skipped.get(r.reason) ?? 0) + r.count);
+      const notCompiled = compiled.flatMap((p) =>
+        (p.compile?.coverage?.notCompiled ?? []).map((n) => ({
+          path: prefixed(p, n.path),
+          reason: n.reason,
+        })),
+      );
       combined.compile = {
         ...firstCompiled.compile,
         // Skipped in one workspace, compiled in another: the coverage says how much of each.
@@ -647,6 +653,7 @@ export function mergeAcrossWorkspaces(
                 total: coverages.reduce((n, c) => n + c.total, 0),
                 workspaces: coverages.reduce((n, c) => n + c.workspaces, 0),
                 skipped: [...skipped].map(([reason, count]) => ({ reason, count })),
+                ...(notCompiled.length > 0 ? { notCompiled } : {}),
                 ...(coverages.some((c) => c.compilers)
                   ? { compilers: uniqueCompilers(coverages.flatMap((c) => c.compilers ?? [])) }
                   : {}),
