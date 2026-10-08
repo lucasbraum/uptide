@@ -1,0 +1,5 @@
+{
+  "$comment": "Public repositories at the commit before they upgraded react from >=18 <19 to >=19 <20, and every finding the pack must report there. See docs/packs.md, \"Ground truth\".",
+  "package": "react",
+  "repos": []
+}
