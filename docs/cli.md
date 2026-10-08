@@ -108,11 +108,14 @@ It is never counted as breaking.
 ### Coverage
 
 Under every analyzed package, one line says how much of the code that uses it the compiler
-judged: `compiled 355 of 356 files in 5 workspaces; skipped: most files cannot resolve their
-imports at the installed version (1)`. The files are the ones that import the package and the
-ones importing those, per workspace, each compiled under its own tsconfig; a skipped one
-says why (not in the workspace tsconfig, a workspace whose baseline cannot resolve its
-imports, an invalid tsconfig). When not every file was compiled, the verdict says `types
+judged, and with which compiler: `compiled 355 of 356 files in 5 workspaces with the repo's
+TypeScript 4.9.5; skipped: most files cannot resolve their imports at the installed version
+(1)`. The compiler is the repository's own `node_modules/typescript` (the one its build runs,
+so the errors and their lines are the ones `tsc` would print); only a repository that installs
+none is judged by the bundled one, and the line says so (`with the bundled TypeScript 6.0.2`).
+The files are the ones that import the package and the ones importing those, per workspace,
+each compiled under its own tsconfig; a skipped one says why (not in the workspace tsconfig,
+a workspace whose baseline cannot resolve its imports, an invalid tsconfig). When not every file was compiled, the verdict says `types
 partly verified: compiled N of M files ...` instead of `compiled against <version>`: a clean
 result only covers what was compiled.
 

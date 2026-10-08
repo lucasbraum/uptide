@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
 import { builtinModules } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
@@ -13,6 +13,7 @@ import type {
 import { satisfies } from '../../fetch/range.js';
 import { onReset } from '../../shared-state.js';
 import { findCause, parameterCause } from './cause.js';
+import { type Compiler, repositoryCompiler } from './compiler.js';
 import { jsxNamespaceCause } from './config-cause.js';
 import { type LoadedRepo, loadedRepo, ownsFile } from './repo.js';
 import {
@@ -43,6 +44,11 @@ import { resolvePackageDir } from './usages.js';
  * parsed fresh), and only the files that use the package, plus the files importing those,
  * are type-checked. A file that neither imports the package nor imports a file that does
  * cannot see a type of it change.
+ *
+ * The compiler is the repository's own (compiler.ts): its errors, at its positions, are the
+ * ones the repository's build would print. The bundled compiler parses the repository for
+ * Signal A either way; when it is also the one that judges, the overlay shares its program,
+ * otherwise a baseline program is built once per workspace with the repository's compiler.
  */
 
 const CANNOT_FIND_MODULE = 2307;
@@ -197,6 +203,7 @@ const NOT_IN_TSCONFIG = 'not in the workspace tsconfig';
 
 /** What became of the files asked about: compiled, or skipped and why. */
 function coverageOf(
+  compiler: Compiler,
   compiled: number,
   missing: number,
   skipped?: { reason: string; count: number },
@@ -209,6 +216,7 @@ function coverageOf(
     compiled,
     total: compiled + reasons.reduce((n, r) => n + r.count, 0),
     skipped: reasons,
+    compilers: [{ version: compiler.version, own: compiler.own }],
   };
 }
 
@@ -284,6 +292,7 @@ function checkedOptions(base: ts.Program): ts.CompilerOptions {
  * checking only. Files inside `insideOverlay` are parsed fresh (once, into `parsed`).
  */
 function sharedHost(
+  compiler: Compiler,
   base: ts.Program,
   insideOverlay: (file: string) => boolean,
   parsed: Map<string, ts.SourceFile>,
@@ -299,13 +308,17 @@ function sharedHost(
       ) => ts.ResolvedModuleWithFailedLookupLocations | undefined)
     | undefined;
 } {
+  const tsc = compiler.ts;
   const options = checkedOptions(base);
-  const host = ts.createCompilerHost(options, true);
-  // Shared source files carry ts-morph's canonical `path`, which is case-sensitive; the
-  // overlay must canonicalize the same way, or `createProgram` rewrites `file.path` on the
-  // shared objects and the baseline program can no longer find its own module resolutions.
-  host.useCaseSensitiveFileNames = () => true;
-  host.getCanonicalFileName = (fileName) => fileName;
+  const host = tsc.createCompilerHost(options, true);
+  // Shared source files carry the baseline's canonical `path`; the overlay must canonicalize
+  // the same way, or `createProgram` rewrites `file.path` on the shared objects and the
+  // baseline program can no longer find its own module resolutions. A ts-morph baseline is
+  // case-sensitive whatever the file system; a native one canonicalizes as the default host does.
+  if (!compiler.own) {
+    host.useCaseSensitiveFileNames = () => true;
+    host.getCanonicalFileName = (fileName) => fileName;
+  }
   host.getCurrentDirectory = () => base.getCurrentDirectory();
   const noPaths: ts.CompilerOptions = { ...options, paths: undefined, baseUrl: undefined };
   // ts-morph serves the standard library from its own bundled copy, whose path the default
@@ -314,7 +327,7 @@ function sharedHost(
   if (anyLib) {
     const libDir = dirname(anyLib.fileName);
     host.getDefaultLibLocation = () => libDir;
-    host.getDefaultLibFileName = (o) => join(libDir, ts.getDefaultLibFileName(o));
+    host.getDefaultLibFileName = (o) => join(libDir, tsc.getDefaultLibFileName(o));
   }
   const defaultFileExists = host.fileExists;
   host.fileExists = (fileName) =>
@@ -355,6 +368,7 @@ function sharedHost(
  * what the compiler reads, and it is read here once per file.
  */
 function usageModes(
+  tsc: typeof ts,
   options: ts.CompilerOptions,
   host: ts.ModuleResolutionHost,
 ): (file: ts.SourceFile, usage: ts.StringLiteralLike) => ts.ResolutionMode {
@@ -364,17 +378,111 @@ function usageModes(
   const formats = new Map<string, ts.ResolutionMode>();
   return (file, usage) => {
     if (file.impliedNodeFormat !== undefined || !nodeish)
-      return ts.getModeForUsageLocation(file, usage, options);
+      return tsc.getModeForUsageLocation(file, usage, options);
     let format = formats.get(file.fileName);
     if (format === undefined && !formats.has(file.fileName)) {
-      format = ts.getImpliedNodeFormatForFile(file.fileName, undefined, host, options);
+      format = tsc.getImpliedNodeFormatForFile(file.fileName, undefined, host, options);
       formats.set(file.fileName, format);
     }
     // Not mutated: the baseline program keyed its own resolutions by the format it had.
     const withFormat = Object.create(file, {
       impliedNodeFormat: { value: format },
     }) as ts.SourceFile;
-    return ts.getModeForUsageLocation(withFormat, usage, options);
+    return tsc.getModeForUsageLocation(withFormat, usage, options);
+  };
+}
+
+type Resolve = (
+  name: string,
+  literal: ts.StringLiteralLike | undefined,
+  containingFile: string,
+  containingSourceFile: ts.SourceFile | undefined,
+) => ts.ResolvedModuleWithFailedLookupLocations;
+
+/**
+ * One resolver, asked the way each compiler asks: TypeScript 5 and later hand over the import
+ * literals (`resolveModuleNameLiterals`), TypeScript 4 the names, with the file they sit in.
+ */
+function installResolver(host: ts.CompilerHost, resolve: Resolve): void {
+  host.resolveModuleNameLiterals = (literals, containingFile, _r, _o, containingSourceFile) =>
+    literals.map((l) => resolve(l.text, l, containingFile, containingSourceFile));
+  host.resolveModuleNames = (names, containingFile, _reused, _redirect, _o, containingSourceFile) =>
+    names.map((name) => {
+      // The file's import literals are kept by the parser (`imports` is internal, and older
+      // than TypeScript 4 itself); the one for this name says which resolution mode applies.
+      const literal = (
+        containingSourceFile as { imports?: readonly ts.StringLiteralLike[] } | undefined
+      )?.imports?.find((l) => l.text === name);
+      return resolve(name, literal, containingFile, containingSourceFile).resolvedModule;
+    });
+}
+
+/**
+ * The repository's own compiler over the files the ts-morph program holds, built once per
+ * workspace, with the options the repository's tsconfig gives that compiler (not the ones
+ * the bundled compiler read into the ts-morph program: an option the newer compiler
+ * dropped, or defaults differently, is the repository's compiler's to read). With the
+ * bundled compiler, the ts-morph program itself is the baseline.
+ */
+let nativeBases = new WeakMap<LoadedRepo, ts.Program>();
+
+function nativeBase(repo: LoadedRepo, compiler: Compiler): ts.Program {
+  const morph = repo.project.getProgram().compilerObject;
+  if (!compiler.own) return morph;
+  let program = nativeBases.get(repo);
+  if (program) return program;
+  const tsc = compiler.ts;
+  const options: ts.CompilerOptions = {
+    ...nativeOptions(repo, tsc, morph.getCompilerOptions()),
+    noEmit: true,
+    skipLibCheck: true,
+    checkJs: true,
+  };
+  program = tsc.createProgram({
+    rootNames: [...morph.getRootFileNames()],
+    options,
+    host: tsc.createCompilerHost(options, true),
+  });
+  nativeBases.set(repo, program);
+  return program;
+}
+
+function nativeOptions(
+  repo: LoadedRepo,
+  tsc: typeof ts,
+  morph: ts.CompilerOptions,
+): ts.CompilerOptions {
+  let declared: ts.CompilerOptions | undefined;
+  if (repo.tsconfig) {
+    try {
+      const parsed = tsc.readConfigFile(repo.tsconfig, (p) => readFileSync(p, 'utf8'));
+      if (parsed.config)
+        declared = tsc.parseJsonConfigFileContent(
+          parsed.config,
+          tsc.sys,
+          dirname(repo.tsconfig),
+          undefined,
+          repo.tsconfig,
+        ).options;
+    } catch {
+      // Unreadable by this compiler: the synthetic options below, as for no tsconfig at all.
+    }
+  }
+  if (!declared) {
+    declared = {
+      target: tsc.ScriptTarget.ES2022,
+      module: tsc.ModuleKind.ESNext,
+      // `bundler` arrived with TypeScript 5; before it, `node` (Node10, value 2) is the nearest.
+      moduleResolution: tsc.ModuleResolutionKind.Bundler ?? (2 as ts.ModuleResolutionKind),
+      strict: true,
+      allowJs: morph.allowJs ?? false,
+    };
+  }
+  return {
+    ...declared,
+    // Workspace dependencies mapped to their source (repo.ts): the same map, whichever compiler.
+    ...(morph.paths ? { paths: morph.paths } : {}),
+    ...(repo.tsconfig ? { configFilePath: repo.tsconfig } : {}),
   };
 }
 
@@ -385,28 +493,35 @@ onReset(() => {
   baselines = new WeakMap();
   importers = new WeakMap();
   checkedBaselines = new WeakMap();
+  nativeBases = new WeakMap();
 });
 
-function checkedBaseline(repo: LoadedRepo, base: ts.Program): ts.Program {
+function checkedBaseline(repo: LoadedRepo, compiler: Compiler, base: ts.Program): ts.Program {
+  // A native baseline is built with JavaScript checked from the start.
+  if (compiler.own) return base;
   let program = checkedBaselines.get(repo);
   if (program) return program;
-  const { options, host, resolvedByBaseline } = sharedHost(base, () => false, new Map());
-  host.resolveModuleNameLiterals = (literals, containingFile, _r, _o, containingSourceFile) =>
-    literals.map(
-      (literal) =>
-        resolvedByBaseline?.(
-          containingSourceFile,
-          literal.text,
-          ts.getModeForUsageLocation(containingSourceFile, literal, options),
-        ) ?? ts.resolveModuleName(literal.text, containingFile, options, host),
-    );
-  program = ts.createProgram({ rootNames: [...base.getRootFileNames()], options, host });
+  const tsc = compiler.ts;
+  const { options, host, resolvedByBaseline } = sharedHost(compiler, base, () => false, new Map());
+  installResolver(
+    host,
+    (name, literal, containingFile, containingSourceFile) =>
+      (literal && containingSourceFile
+        ? resolvedByBaseline?.(
+            containingSourceFile,
+            name,
+            tsc.getModeForUsageLocation(containingSourceFile, literal, options),
+          )
+        : undefined) ?? tsc.resolveModuleName(name, containingFile, options, host),
+  );
+  program = tsc.createProgram({ rootNames: [...base.getRootFileNames()], options, host });
   checkedBaselines.set(repo, program);
   return program;
 }
 
 function overlayProgram(
   repo: LoadedRepo,
+  compiler: Compiler,
   base: ts.Program,
   targets: Target[],
   overlay: string,
@@ -430,110 +545,109 @@ function overlayProgram(
   const repoProbe = join(repo.dir, '__uptide_probe__.ts');
   const unresolvedInTarget = new Set<string>();
   const unresolvedFiles = new Set<string>();
-  const { options, host, noPaths, resolvedByBaseline } = sharedHost(base, insideOverlay, parsed);
-  const modeOf = usageModes(options, host);
-  host.resolveModuleNameLiterals = (
-    literals,
-    containingFile,
-    _redirect,
-    _opts,
-    containingSourceFile,
-  ) =>
-    literals.map((literal) => {
-      const name = literal.text;
-      // Under Node16/NodeNext the importing file's format picks the `import` or `require`
-      // condition; resolving from the probe would read the probe's (CommonJS) format instead.
-      const mode = containingSourceFile ? modeOf(containingSourceFile, literal) : undefined;
-      if (targets.some((t) => isPackageSpecifier(name, t.specifier ?? t.name))) {
-        // The repo's own `paths` may map the package (a linked checkout, a test fixture);
-        // inside the overlay only the symlinked target may answer.
-        return ts.resolveModuleName(name, probe, noPaths, host, undefined, undefined, mode);
-      }
-      if (!insideOverlay(containingFile)) {
-        // Outside the overlay nothing changed: the baseline's resolution is reused, no disk lookups.
-        const known = resolvedByBaseline?.(containingSourceFile, name, mode);
-        if (known) return known;
-      }
-      if (insideOverlay(containingFile) && isBare(name)) {
-        // Inside the target and its linked dependencies, the overlay's node_modules answers first.
-        const linked = ts.resolveModuleName(name, probe, noPaths, host, undefined, undefined, mode);
-        if (linked.resolvedModule) return linked;
-      }
-      const from = overlayDirOf(containingFile);
-      const dep = packageNameOf(name);
-      if (from !== undefined && isBare(name)) {
-        // The importer declares a range: the consumer's copy (however the repo maps it) stands
-        // in only when it satisfies that range; otherwise the next round links a proper version.
-        const range = declaredRange(from, dep);
-        if (range !== undefined && !deps.decided.has(dep) && !deps.links.has(dep)) {
-          const importer = overlayDirs.get(from) as string;
-          const consumer = installedVersion(repo, dep);
-          if (consumer && isPeerOnly(from, dep)) {
-            // A peer is the consumer's to provide: upgrading the target leaves the consumer's
-            // copy where it is, so that is what the target is compiled against. Fetching the
-            // version the peer range asks for would compile against two copies of the peer,
-            // which no install has, and report errors that are not there.
-            deps.decided.add(dep);
-            if (!satisfies(consumer.version, range))
-              deps.unsatisfied.push(
-                `${dep}@${consumer.version} is outside the peer range ${range} of ${importer}; compiled against the installed ${dep}`,
-              );
-          } else if (!consumerCopySatisfies(importer, dep, range, consumer?.version)) {
-            wanted.set(dep, { range, from: importer });
-          }
-        }
-        // An untyped dependency is typed by the @types package the importer declares next to
-        // it (vitest 5: `chai` and `@types/chai`). Nothing imports `@types/x` by name, so it
-        // is wanted with `x`: without it the import is `any` and the ambient namespace it
-        // declares (`Chai`) is missing, which shows up as errors at the consumer's call sites.
-        const typesDep = `@types/${dep.startsWith('@') ? dep.slice(1).replace('/', '__') : dep}`;
-        const typesRange = declaredRange(from, typesDep);
-        if (typesRange !== undefined && !deps.decided.has(typesDep) && !deps.links.has(typesDep)) {
-          const importer = overlayDirs.get(from) as string;
-          const consumer = installedVersion(repo, typesDep);
-          if (!consumerCopySatisfies(importer, typesDep, typesRange, consumer?.version))
-            wanted.set(typesDep, { range: typesRange, from: importer });
+  const tsc = compiler.ts;
+  const { options, host, noPaths, resolvedByBaseline } = sharedHost(
+    compiler,
+    base,
+    insideOverlay,
+    parsed,
+  );
+  const modeOf = usageModes(tsc, options, host);
+  installResolver(host, (name, literal, containingFile, containingSourceFile) => {
+    // Under Node16/NodeNext the importing file's format picks the `import` or `require`
+    // condition; resolving from the probe would read the probe's (CommonJS) format instead.
+    const mode =
+      containingSourceFile && literal ? modeOf(containingSourceFile, literal) : undefined;
+    if (targets.some((t) => isPackageSpecifier(name, t.specifier ?? t.name))) {
+      // The repo's own `paths` may map the package (a linked checkout, a test fixture);
+      // inside the overlay only the symlinked target may answer.
+      return tsc.resolveModuleName(name, probe, noPaths, host, undefined, undefined, mode);
+    }
+    if (!insideOverlay(containingFile) && containingSourceFile) {
+      // Outside the overlay nothing changed: the baseline's resolution is reused, no disk lookups.
+      const known = resolvedByBaseline?.(containingSourceFile, name, mode);
+      if (known) return known;
+    }
+    if (insideOverlay(containingFile) && isBare(name)) {
+      // Inside the target and its linked dependencies, the overlay's node_modules answers first.
+      const linked = tsc.resolveModuleName(name, probe, noPaths, host, undefined, undefined, mode);
+      if (linked.resolvedModule) return linked;
+    }
+    const from = overlayDirOf(containingFile);
+    const dep = packageNameOf(name);
+    if (from !== undefined && isBare(name)) {
+      // The importer declares a range: the consumer's copy (however the repo maps it) stands
+      // in only when it satisfies that range; otherwise the next round links a proper version.
+      const range = declaredRange(from, dep);
+      if (range !== undefined && !deps.decided.has(dep) && !deps.links.has(dep)) {
+        const importer = overlayDirs.get(from) as string;
+        const consumer = installedVersion(repo, dep);
+        if (consumer && isPeerOnly(from, dep)) {
+          // A peer is the consumer's to provide: upgrading the target leaves the consumer's
+          // copy where it is, so that is what the target is compiled against. Fetching the
+          // version the peer range asks for would compile against two copies of the peer,
+          // which no install has, and report errors that are not there.
+          deps.decided.add(dep);
+          if (!satisfies(consumer.version, range))
+            deps.unsatisfied.push(
+              `${dep}@${consumer.version} is outside the peer range ${range} of ${importer}; compiled against the installed ${dep}`,
+            );
+        } else if (!consumerCopySatisfies(importer, dep, range, consumer?.version)) {
+          wanted.set(dep, { range, from: importer });
         }
       }
-      const direct = ts.resolveModuleName(
-        name,
-        containingFile,
-        options,
-        host,
-        undefined,
-        undefined,
-        mode,
-      );
-      if (direct.resolvedModule || from === undefined || !isBare(name)) return direct;
-      const fromRepo = ts.resolveModuleName(
-        name,
-        repoProbe,
-        options,
-        host,
-        undefined,
-        undefined,
-        mode,
-      );
-      // A Node builtin is an ambient module of @types/node, which the program resolves on its own.
-      const builtin = name.startsWith('node:') || builtinModules.includes(dep);
-      if (!fromRepo.resolvedModule && !wanted.has(dep) && !builtin) {
-        unresolvedInTarget.add(dep);
-        const owner = overlayDirs.get(from);
-        if (owner !== undefined && targets.some((t) => t.name === owner))
-          unresolvedFiles.add(relative(from, containingFile));
+      // An untyped dependency is typed by the @types package the importer declares next to
+      // it (vitest 5: `chai` and `@types/chai`). Nothing imports `@types/x` by name, so it
+      // is wanted with `x`: without it the import is `any` and the ambient namespace it
+      // declares (`Chai`) is missing, which shows up as errors at the consumer's call sites.
+      const typesDep = `@types/${dep.startsWith('@') ? dep.slice(1).replace('/', '__') : dep}`;
+      const typesRange = declaredRange(from, typesDep);
+      if (typesRange !== undefined && !deps.decided.has(typesDep) && !deps.links.has(typesDep)) {
+        const importer = overlayDirs.get(from) as string;
+        const consumer = installedVersion(repo, typesDep);
+        if (!consumerCopySatisfies(importer, typesDep, typesRange, consumer?.version))
+          wanted.set(typesDep, { range: typesRange, from: importer });
       }
-      return fromRepo;
-    });
+    }
+    const direct = tsc.resolveModuleName(
+      name,
+      containingFile,
+      options,
+      host,
+      undefined,
+      undefined,
+      mode,
+    );
+    if (direct.resolvedModule || from === undefined || !isBare(name)) return direct;
+    const fromRepo = tsc.resolveModuleName(
+      name,
+      repoProbe,
+      options,
+      host,
+      undefined,
+      undefined,
+      mode,
+    );
+    // A Node builtin is an ambient module of @types/node, which the program resolves on its own.
+    const builtin = name.startsWith('node:') || builtinModules.includes(dep);
+    if (!fromRepo.resolvedModule && !wanted.has(dep) && !builtin) {
+      unresolvedInTarget.add(dep);
+      const owner = overlayDirs.get(from);
+      if (owner !== undefined && targets.some((t) => t.name === owner))
+        unresolvedFiles.add(relative(from, containingFile));
+    }
+    return fromRepo;
+  });
   // Not `oldProgram: base`: structure reuse copies the baseline's module resolutions and
   // silently bypasses the overlay. Sharing source files and resolutions through the host
   // (above) gives the same saving without that.
-  const program = ts.createProgram({ rootNames: [...base.getRootFileNames()], options, host });
+  const program = tsc.createProgram({ rootNames: [...base.getRootFileNames()], options, host });
   // `declare module 'x'` inside the target makes the compiler try to resolve `x` too; an
   // augmentation target is not an import and must not count as a missing dependency.
   for (const file of program.getSourceFiles()) {
     if (!insideOverlay(file.fileName)) continue;
-    ts.forEachChild(file, (node) => {
-      if (ts.isModuleDeclaration(node) && ts.isStringLiteral(node.name)) {
+    tsc.forEachChild(file, (node) => {
+      if (tsc.isModuleDeclaration(node) && tsc.isStringLiteral(node.name)) {
         unresolvedInTarget.delete(node.name.text);
         if (unresolvedInTarget.size === 0) unresolvedFiles.clear();
       }
@@ -551,6 +665,7 @@ function overlayProgram(
 /** Rounds of "compile, see what the overlay imports, satisfy it"; the last program is the answer. */
 async function convergedOverlay(
   repo: LoadedRepo,
+  compiler: Compiler,
   base: ts.Program,
   targets: Target[],
   overlay: string,
@@ -560,7 +675,7 @@ async function convergedOverlay(
   const MAX_ROUNDS = 5;
   const parsed = new Map<string, ts.SourceFile>();
   for (let round = 0; ; round++) {
-    const result = overlayProgram(repo, base, targets, overlay, deps, parsed);
+    const result = overlayProgram(repo, compiler, base, targets, overlay, deps, parsed);
     if (result.wanted.size === 0 || round === MAX_ROUNDS - 1) return result;
     const added = await satisfyWanted(repo, deps, result.wanted, fetcher);
     if (added === 0) return result;
@@ -583,6 +698,7 @@ export async function compileAgainstTargets(
   targets: Target[],
   options: CompileOptions = {},
 ): Promise<CompileSignal> {
+  const compiler = repositoryCompiler(realpathSync(repoRef.dir));
   let repo: LoadedRepo;
   try {
     repo = loadedRepo(realpathSync(repoRef.dir), repoRef.rootFiles);
@@ -592,7 +708,10 @@ export async function compileAgainstTargets(
       diagnostics: [],
       baselineErrors: 0,
       skipped: `invalid tsconfig: ${message}`,
-      coverage: coverageOf(0, 0, { reason: 'invalid tsconfig', count: options.files?.length ?? 0 }),
+      coverage: coverageOf(compiler, 0, 0, {
+        reason: 'invalid tsconfig',
+        count: options.files?.length ?? 0,
+      }),
       unresolvedInTarget: [],
       unresolvedFiles: [],
       linkedDependencies: [],
@@ -601,7 +720,7 @@ export async function compileAgainstTargets(
     };
   }
   const t0 = Date.now();
-  const base = repo.project.getProgram().compilerObject;
+  const base = nativeBase(repo, compiler);
   // Diagnostics come from a baseline that checks JavaScript too; files and resolutions are the
   // ts-morph program's. With baseline targets (the @types release the installed runtime
   // should have), the baseline is itself an overlay, built once for this compile.
@@ -621,11 +740,12 @@ export async function compileAgainstTargets(
   let checked: ts.Program;
   const memoized = baselineTargets.length === 0;
   if (memoized) {
-    checked = checkedBaseline(repo, base);
+    checked = checkedBaseline(repo, compiler, base);
   } else {
     baselineOverlayDir = mkdtempSync(join(tmpdir(), 'uptide-baseline-'));
     checked = overlayProgram(
       repo,
+      compiler,
       base,
       baselineTargets,
       baselineOverlayDir,
@@ -647,7 +767,10 @@ export async function compileAgainstTargets(
       diagnostics: [],
       baselineErrors: baseline.length,
       skipped,
-      coverage: coverageOf(0, missing, { reason: skipReasonOf(skipped), count: files.length }),
+      coverage: coverageOf(compiler, 0, missing, {
+        reason: skipReasonOf(skipped),
+        count: files.length,
+      }),
       unresolvedInTarget: [],
       unresolvedFiles: [],
       linkedDependencies: [],
@@ -664,6 +787,7 @@ export async function compileAgainstTargets(
     const t1 = Date.now();
     const { program, unresolvedInTarget, unresolvedFiles } = await convergedOverlay(
       repo,
+      compiler,
       base,
       targets,
       overlay,
@@ -687,8 +811,9 @@ export async function compileAgainstTargets(
     );
     // One compiler option can explain hundreds of diagnostics (the JSX namespace the target no
     // longer declares): those are anchored at the option, the rest traced to a declaration.
+    const programs = { overlay: program, base: checked, ts: compiler.ts };
     const jsx = jsxNamespaceCause(
-      { overlay: program, base: checked },
+      programs,
       fresh.map(({ d }) => d),
       repo.dir,
       targets.map((t) => t.name),
@@ -698,13 +823,7 @@ export async function compileAgainstTargets(
     const byParameter = new Map<string, DiagnosticCause>();
     const parameterOf = new Map<ts.Diagnostic, string>();
     for (const { d, overlaid } of fresh) {
-      const cause = parameterCause(
-        { overlay: program, base: checked },
-        d,
-        overlaid,
-        repo.dir,
-        repoRef.root ?? repo.dir,
-      );
+      const cause = parameterCause(programs, d, overlaid, repo.dir, repoRef.root ?? repo.dir);
       if (!cause) continue;
       const key = `${cause.file}:${cause.line}:${cause.name}`;
       byParameter.set(key, cause);
@@ -720,7 +839,7 @@ export async function compileAgainstTargets(
         (parameter !== undefined && (shared.get(parameter) ?? 0) >= 2
           ? byParameter.get(parameter)
           : undefined) ??
-        findCause({ overlay: program, base: checked }, d, overlaid, repo.dir, erroredLines);
+        findCause(programs, d, overlaid, repo.dir, erroredLines);
       if (cause) diagnostic.cause = cause;
       return diagnostic;
     });
@@ -729,7 +848,7 @@ export async function compileAgainstTargets(
         (a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.column - b.column,
       ),
       baselineErrors: baseline.length,
-      coverage: coverageOf(files.length, missing),
+      coverage: coverageOf(compiler, files.length, missing),
       unresolvedInTarget: [...unresolvedInTarget].sort(),
       unresolvedFiles: [...unresolvedFiles].sort(),
       linkedDependencies: deps.linked,

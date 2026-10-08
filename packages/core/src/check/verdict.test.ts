@@ -70,6 +70,22 @@ it('says the types are partly verified when some files that use the package were
   // Every file compiled: the clean verdict, with the coverage printed beside it.
   const full = { compiled: 1, total: 1, workspaces: 1, skipped: [] };
   expect(coverageLine(full)).toBe('compiled 1 of 1 file in 1 workspace');
+  // Which compiler judged: the repository's own, else the bundled one; a monorepo may use both.
+  expect(coverageLine({ ...full, compilers: [{ version: '4.9.5', own: true }] })).toBe(
+    "compiled 1 of 1 file in 1 workspace with the repo's TypeScript 4.9.5",
+  );
+  expect(
+    coverageLine({
+      ...coverage,
+      compilers: [
+        { version: '5.4.2', own: true },
+        { version: '4.9.5', own: true },
+        { version: '6.0.2', own: false },
+      ],
+    }),
+  ).toBe(
+    "compiled 12 of 40 files in 2 workspaces with the repo's TypeScript 4.9.5 and 5.4.2 and the bundled TypeScript 6.0.2; skipped: not in the workspace tsconfig (20), most files cannot resolve their imports at the installed version (8)",
+  );
   expect(verdictOf(report({ compile: { ...compile, newErrors: 0, coverage: full } })).summary).toBe(
     '0 breaking · compiled against 4.6.5: 0 new type errors',
   );

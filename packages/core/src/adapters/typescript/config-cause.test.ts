@@ -47,7 +47,7 @@ describe('the JSX namespace a compiler option reads', () => {
       overlay.getSourceFile(join(root, 'src', 'App.tsx')),
     );
     expect(fresh.map((d) => d.code)).toEqual([7026]);
-    const found = jsxNamespaceCause({ overlay, base }, fresh, root, ['@types/react']);
+    const found = jsxNamespaceCause({ overlay, base, ts }, fresh, root, ['@types/react']);
     expect(found?.cause).toMatchObject({
       name: 'jsx',
       file: 'tsconfig.json',
@@ -66,7 +66,7 @@ describe('the JSX namespace a compiler option reads', () => {
     // Nothing new: the base program has the namespace, and so does this "overlay".
     expect(
       jsxNamespaceCause(
-        { overlay: base, base },
+        { overlay: base, base, ts },
         base.getSemanticDiagnostics(base.getSourceFile(app)),
         root,
         ['x'],
@@ -79,7 +79,7 @@ describe('the JSX namespace a compiler option reads', () => {
     // With an import source the namespace comes from the runtime module: another cause entirely.
     expect(
       jsxNamespaceCause(
-        { overlay: explicit.overlay, base: explicit.base },
+        { overlay: explicit.overlay, base: explicit.base, ts },
         diagnostics,
         explicit.root,
         ['x'],
@@ -87,7 +87,7 @@ describe('the JSX namespace a compiler option reads', () => {
     ).toBeUndefined();
     // Nothing that says the namespace is missing: nothing to anchor.
     expect(
-      jsxNamespaceCause({ overlay, base }, [{ code: 2322 } as ts.Diagnostic], root, ['x']),
+      jsxNamespaceCause({ overlay, base, ts }, [{ code: 2322 } as ts.Diagnostic], root, ['x']),
     ).toBeUndefined();
   });
 });

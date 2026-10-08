@@ -518,6 +518,15 @@ export function summarize(packages: PackageReport[]): CheckReport['summary'] {
   };
 }
 
+/** One entry per compiler the workspaces were judged with. */
+function uniqueCompilers(
+  compilers: { version: string; own: boolean }[],
+): { version: string; own: boolean }[] {
+  const seen = new Map<string, { version: string; own: boolean }>();
+  for (const c of compilers) seen.set(`${c.own}:${c.version}`, c);
+  return [...seen.values()];
+}
+
 /**
  * One dependency, one decision. A dependency at the same installed version and target in
  * several workspaces (a pnpm catalog entry, or plain duplication) is one entry, with the
@@ -638,6 +647,9 @@ export function mergeAcrossWorkspaces(
                 total: coverages.reduce((n, c) => n + c.total, 0),
                 workspaces: coverages.reduce((n, c) => n + c.workspaces, 0),
                 skipped: [...skipped].map(([reason, count]) => ({ reason, count })),
+                ...(coverages.some((c) => c.compilers)
+                  ? { compilers: uniqueCompilers(coverages.flatMap((c) => c.compilers ?? [])) }
+                  : {}),
               },
             }
           : {}),

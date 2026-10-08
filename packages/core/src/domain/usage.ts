@@ -139,6 +139,8 @@ export interface CompileCoverage {
   total: number;
   /** Why the rest were not compiled, one entry per reason. */
   skipped: { reason: string; count: number }[];
+  /** Which TypeScript judged: the repository's own install, or the bundled fallback. Absent in reports stored before it was kept. */
+  compilers?: { version: string; own: boolean }[];
 }
 
 /** Signal B: the repo type-checked against the target version. */

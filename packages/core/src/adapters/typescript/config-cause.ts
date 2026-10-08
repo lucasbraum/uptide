@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
-import { ts } from 'ts-morph';
+import type { ts } from 'ts-morph';
 import type { DiagnosticCause } from '../../domain/usage.js';
 
 /**
@@ -18,10 +18,15 @@ const JSX_NAMESPACE_CODES = new Set([7026, 2602]);
 interface Programs {
   overlay: ts.Program;
   base: ts.Program;
+  /** The compiler the programs were built with. */
+  ts: typeof ts;
 }
 
 /** The nearest config in the `extends` chain that sets `compilerOptions.jsx`, and the line of that setting. */
-function jsxSettingLocation(configFile: string): { file: string; line: number } | undefined {
+function jsxSettingLocation(
+  tsc: typeof ts,
+  configFile: string,
+): { file: string; line: number } | undefined {
   const seen = new Set<string>();
   for (let file = configFile; !seen.has(file); ) {
     seen.add(file);
@@ -31,7 +36,7 @@ function jsxSettingLocation(configFile: string): { file: string; line: number } 
     } catch {
       return undefined;
     }
-    const parsed = ts.parseConfigFileTextToJson(file, text).config as
+    const parsed = tsc.parseConfigFileTextToJson(file, text).config as
       | { compilerOptions?: { jsx?: unknown }; extends?: string | string[] }
       | undefined;
     if (parsed?.compilerOptions?.jsx !== undefined) {
@@ -50,9 +55,9 @@ function jsxSettingLocation(configFile: string): { file: string; line: number } 
   return undefined;
 }
 
-function hasGlobalJsx(program: ts.Program): boolean {
+function hasGlobalJsx(tsc: typeof ts, program: ts.Program): boolean {
   const checker = program.getTypeChecker();
-  return checker.resolveName('JSX', undefined, ts.SymbolFlags.Namespace, false) !== undefined;
+  return checker.resolveName('JSX', undefined, tsc.SymbolFlags.Namespace, false) !== undefined;
 }
 
 /**
@@ -67,18 +72,19 @@ export function jsxNamespaceCause(
   targets: readonly string[],
 ): { cause: DiagnosticCause; explains: (d: ts.Diagnostic) => boolean } | undefined {
   if (!fresh.some((d) => JSX_NAMESPACE_CODES.has(d.code))) return undefined;
+  const tsc = programs.ts;
   const options = programs.overlay.getCompilerOptions();
   const jsx = options.jsx;
   // react-jsx reads the namespace from the runtime module, not the global: another cause.
-  if (jsx === undefined || jsx === ts.JsxEmit.ReactJSX || jsx === ts.JsxEmit.ReactJSXDev)
+  if (jsx === undefined || jsx === tsc.JsxEmit.ReactJSX || jsx === tsc.JsxEmit.ReactJSXDev)
     return undefined;
   if (options.jsxImportSource !== undefined) return undefined;
-  if (hasGlobalJsx(programs.overlay) || !hasGlobalJsx(programs.base)) return undefined;
+  if (hasGlobalJsx(tsc, programs.overlay) || !hasGlobalJsx(tsc, programs.base)) return undefined;
   const configFile = options.configFilePath as string | undefined;
-  const location = configFile ? jsxSettingLocation(configFile) : undefined;
+  const location = configFile ? jsxSettingLocation(tsc, configFile) : undefined;
   const file = location?.file ?? configFile;
   if (!file) return undefined;
-  const setting = ts.JsxEmit[jsx]?.toLowerCase() ?? String(jsx);
+  const setting = tsc.JsxEmit[jsx]?.toLowerCase() ?? String(jsx);
   const who = targets.find((t) => t.startsWith('@types/')) ?? targets[0] ?? 'the target';
   return {
     cause: {

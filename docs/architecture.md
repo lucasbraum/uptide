@@ -352,19 +352,38 @@ inside pkg@ver, results may be incomplete"). Those never become findings: with
 `skipLibCheck` an unresolved import inside a declaration file makes the type `any`,
 which hides errors rather than inventing them.
 
+The compiler is the repository's own (`src/adapters/typescript/compiler.ts`): the
+`node_modules/typescript` in the workspace or the nearest ancestor that installs one, the way
+its build and `fix`'s verification find it, never one from `NODE_PATH` or a global folder. Its
+errors, at its positions, are the ones the repository's `tsc` prints; the newer bundled
+compiler moves some (a JSX child's "not assignable to ReactNode" sits on the element's first
+line in TypeScript 4.9 and on the child in 6) and judges by its own defaults. The bundled
+compiler still parses the repository for Signal A (ts-morph is built on it), and when it is
+also the one that judges (the repository installs none), the overlay shares the ts-morph
+program. Otherwise a baseline program is built once per workspace with the repository's
+compiler, from the ts-morph program's root files and the options that compiler reads from the
+repository's tsconfig (an option a newer compiler dropped or defaults differently is the
+repository's compiler's to read), with the same workspace-source `paths`; the overlay shares
+that baseline instead. The host's resolver is installed both ways the compilers ask
+(`resolveModuleNameLiterals` from TypeScript 5, `resolveModuleNames` before it), and the cause
+tracers take the compiler with the programs: node kinds and flags are its, not the bundled
+one's. Which compiler judged is part of the coverage (`compilers`), and the coverage line names
+it (`with the repo's TypeScript 4.9.5`, or `with the bundled TypeScript 6.0.2`; a monorepo
+whose workspaces differ names each).
+
 Every compile says what it covered (`CompileSignal.coverage`): the files it was asked about
 (the package's usage files and the files importing them, per workspace) and how many it
 type-checked, with a reason for each file it did not: outside the workspace's tsconfig, a
 workspace whose baseline is structurally broken, an invalid tsconfig. Merged across
 workspaces into `PackageReport.compile.coverage` (`compiled 355 of 356 files in 5
-workspaces; skipped: ...`), it is printed under every analyzed package, and a package whose
+workspaces with the repo's TypeScript 4.9.5; skipped: ...`), it is printed under every analyzed package, and a package whose
 files were not all compiled gets the verdict "types partly verified" with that line instead
 of "compiled against <version>" (`src/check/verdict.ts`).
 
 Cost is proportional to the package, not the repository. The overlay is a raw compiler
 `Program` that shares the baseline's parsed and bound source files and its module
 resolutions (only the target and its linked dependencies are parsed, once per compile);
-its host canonicalizes paths exactly as ts-morph does, since `createProgram` rewrites
+its host canonicalizes paths exactly as the baseline's does, since `createProgram` rewrites
 `file.path` on shared files. Only the files Signal A found usages in, plus the files
 importing those, are type-checked, on both sides; a file that neither imports the package
 nor imports a file that does cannot see a type of it change. Baseline diagnostics are
