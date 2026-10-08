@@ -80,8 +80,15 @@ function onlyOnLine(
 
 export const aiPack = definePack({
   // A community provider that only peers on `ai`: its 3.x range rejects `ai` 7 and nothing in the
-  // registry says to move it, but its 4.x takes `ai` 7 and the repository's upgrade moved it.
-  companions: ['ai-sdk-ollama'],
+  // registry says to move it. The AI SDK's own 7.0 guide does not name community providers, so the
+  // source is the package's own documentation, which says each `ai-sdk-ollama` major targets one
+  // `ai` major (4.x is `ai@^7`, 3.x stays on `ai@^6`).
+  companions: [
+    {
+      name: 'ai-sdk-ollama',
+      source: 'https://github.com/jagreehal/ai-sdk-ollama/blob/main/README.md',
+    },
+  ],
   meta: {
     package: 'ai',
     from: '>=6 <7',

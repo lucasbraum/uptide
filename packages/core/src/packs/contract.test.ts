@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import type { Finding } from '../domain/report.js';
 import {
+  companionProblems,
   definePack,
   type GroundTruth,
   recordedStatus,
@@ -126,6 +127,39 @@ describe('the verified gate', () => {
   });
 });
 
+describe('companionProblems', () => {
+  const source = 'https://example.com/toy/changelog';
+
+  it('accepts an entry with a name and an https source, and no entries at all', () => {
+    expect(companionProblems(undefined, 'toy')).toEqual([]);
+    expect(companionProblems([{ name: 'toy-plugin', source }], 'toy')).toEqual([]);
+  });
+
+  it('refuses an entry with no source, an empty one, or one that is not an https URL', () => {
+    const problems = companionProblems(
+      [
+        { name: 'no-source' },
+        { name: 'empty-source', source: '' },
+        { name: 'plain-text', source: 'the migration guide' },
+        { name: 'insecure', source: 'http://example.com/guide' },
+        { name: 'local', source: 'file:///etc/hosts' },
+      ],
+      'toy',
+    );
+    expect(problems).toHaveLength(5);
+    expect(problems[0]).toBe(
+      'companions[0] "no-source": source must be the https URL of the official migration guide or changelog that says it moves with toy',
+    );
+  });
+
+  it("refuses an entry without a name, or one that names the pack's own package", () => {
+    expect(companionProblems([{ source }], 'toy')).toEqual(['companions[0]: name is empty']);
+    expect(companionProblems([{ name: 'toy', source }], 'toy')).toEqual([
+      'companions[0] "toy": a pack does not name its own package',
+    ]);
+  });
+});
+
 describe('definePack', () => {
   const finding = (line: number, column: number, rule?: string): Finding => ({
     change: {
@@ -188,13 +222,9 @@ describe('definePack', () => {
 
   it('carries the packages the pack says always move with it, and none by default', () => {
     expect(pack.companions).toBeUndefined();
-    const named = definePack({
-      meta: pack.meta,
-      rules: [],
-      instructions: 'x',
-      companions: ['toy-plugin'],
-    });
-    expect(named.companions).toEqual(['toy-plugin']);
+    const companions = [{ name: 'toy-plugin', source: 'https://example.com/toy/changelog' }];
+    const named = definePack({ meta: pack.meta, rules: [], instructions: 'x', companions });
+    expect(named.companions).toEqual(companions);
   });
 
   it('rewrites only the reported occurrence, within the supported versions', () => {

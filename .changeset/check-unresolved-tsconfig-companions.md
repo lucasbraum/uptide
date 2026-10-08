@@ -13,7 +13,7 @@ Two fixes to `check`:
 - **A package that only peers on the package is left in place when its peer range rejects the
   target.** What always moves with the package stays as before: the release group published at
   the target's own version (`react-dom`), `@types/*`, the exact pins of the target, and the
-  packages a pack names in `companions`, even when their installed range already accepts the
+  packages a pack names in `companions` (each with the official page that says so), even when their installed range already accepts the
   target. Any other package whose installed peer range rejects the target is not moved and not
   compiled at another version; `check` lists it under possible impact, never as breaking:
   `? possible impact, peer conflict: next-mdx-remote-client 1.1.2 declares react >= 18.3.0 < 19.0.0`.
