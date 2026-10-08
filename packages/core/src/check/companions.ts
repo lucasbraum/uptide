@@ -2,6 +2,7 @@ import { satisfies } from '../fetch/range.js';
 import type { Manifest } from '../list/evidence.js';
 import { dependencyGroups } from '../list/groups.js';
 import type { ListedDependency } from '../list/list.js';
+import { typedPackageOf, typesPackageOf, typesReleaseFor } from './types-release.js';
 import { compareVersions, parseVersion } from './version.js';
 
 /**
@@ -11,12 +12,17 @@ import { compareVersions, parseVersion } from './version.js';
  * group is the one `list` shows (`dependencyGroups`: family, peer link, shared pin); the
  * version each companion moves to is the one that agrees with the target:
  * - the version the target pins exactly (`ai@7.0.9` → `@ai-sdk/provider` 4.0.1);
+ * - else its release at the target's own version, when that release asks for the target
+ *   (`react-dom` 19.0.0 peer-requires `react` ^19.0.0: released in lockstep);
  * - else the installed one, when its range for the target already accepts it
  *   (`@modelcontextprotocol/sdk` 1.28.0 takes `zod` `^3.25 || ^4.0`: nothing to move);
  * - else its newest release that pins the target exactly, or whose range for it accepts
  *   the target (`@ai-sdk/react@4.0.10` → `ai` 7.0.9);
  * - else its newest release whose exact pins agree with every exact pin of the target
  *   (`@ai-sdk/openai` on `@ai-sdk/provider`).
+ * `@types/<pkg>` moves with `<pkg>` by name (nothing in its manifest says so): to the release
+ * that types the version `<pkg>` moves to (`types-release.ts`). A companion can move with a
+ * companion: `@types/react-dom` with `react-dom`, which moves with `react`.
  */
 export interface Companion {
   name: string;
@@ -85,6 +91,16 @@ function agreeing(
   const pinned = targetManifest.dependencies?.[name];
   if (pinned && EXACT.test(pinned) && versions[pinned])
     return { version: pinned, reason: `${lead} ${target} pins ${name} ${pinned}` };
+  // Released in lockstep: its release at the target's own version asks for the target
+  // (react-dom 19.0.0 peer-requires react ^19.0.0). The installed copy may accept the target
+  // too (`^18 || ^19`), but the upgrade the repository makes moves both.
+  const same = versions[target];
+  const sameRange = same?.dependencies?.[lead] ?? same?.peerDependencies?.[lead];
+  if (same && sameRange !== undefined && accepts(sameRange, target) && target !== installed.version)
+    return {
+      version: target,
+      reason: `${name} ${target} is released with ${lead} ${target} (${EXACT.test(sameRange) ? 'pins' : 'peer'} ${sameRange})`,
+    };
   const current = versions[installed.version] ?? installed.manifest;
   const range = current.dependencies?.[lead] ?? current.peerDependencies?.[lead];
   if (range !== undefined && accepts(range, target))
@@ -117,6 +133,30 @@ function agreeing(
   return undefined;
 }
 
+/** Whether a workspace of `dep` serves a workspace of `host`: the same one, or an ancestor (the root hoists for all). */
+function visibleFrom(dep: InstalledDependency, host: InstalledDependency): boolean {
+  return dep.workspaces.some((d) =>
+    host.workspaces.some((h) => h === d || d === '.' || h.startsWith(`${d}/`)),
+  );
+}
+
+/** `@types/<pkg>` for a `<pkg>` of the plan: the only link a types package has to its runtime. */
+function typesOf(dep: InstalledDependency, host: InstalledDependency): boolean {
+  return typedPackageOf(dep.name) === host.name && visibleFrom(dep, host);
+}
+
+/** The `@types` release that types `host@hostTarget`, when it is not the installed one. */
+function typesMove(
+  dep: InstalledDependency,
+  host: string,
+  hostTarget: string,
+  versions: Manifests,
+): { version: string; reason: string } | undefined {
+  const version = typesReleaseFor(Object.keys(versions), hostTarget, dep.version);
+  if (version === undefined) return undefined;
+  return { version, reason: `${dep.name} ${version} types ${host} ${hostTarget}` };
+}
+
 /**
  * What moves with `name@target` in a repository, from its installed dependencies and the
  * registry's manifests of every version (`manifests`, one cached packument per package).
@@ -131,25 +171,81 @@ export async function companionsOf(input: {
   if (!lead) return { companions: [], conflicts: [] };
   const targetManifest = (await input.manifests(input.name))[input.target];
   if (!targetManifest) return { companions: [], conflicts: [] };
-  // Plausible members: related to the lead, then the rest of their families.
-  const direct = input.installed.filter((d) => d.name !== lead.name && related(lead, d));
-  const families = new Set(direct.map((d) => scopeOf(d.name)).filter(Boolean));
+  // Plausible members: related to the lead, the rest of their families, and the types
+  // packages of any of those; then what relates to a member the same way, until nothing new.
   const scope = scopeOf(lead.name);
+  const members: InstalledDependency[] = [lead];
+  const families = new Set<string>();
   if (scope) families.add(scope);
-  const candidates = input.installed.filter(
-    (d) =>
-      d.name !== lead.name &&
-      (direct.includes(d) ||
-        (families.has(scopeOf(d.name)) && d.workspaces.some((w) => lead.workspaces.includes(w)))),
-  );
+  const grow = (): boolean => {
+    let grew = false;
+    for (const d of input.installed) {
+      if (members.includes(d) || d.name === lead.name) continue;
+      const host = members.find((m) => related(m, d) || typesOf(d, m));
+      const scope = scopeOf(d.name);
+      const family =
+        scope !== undefined &&
+        families.has(scope) &&
+        d.workspaces.some((w) => lead.workspaces.includes(w));
+      if (!host && !family) continue;
+      members.push(d);
+      if (host && scope !== undefined) families.add(scope);
+      grew = true;
+    }
+    return grew;
+  };
+  while (grow()) {
+    // until the closure is complete
+  }
+  const candidates = members.filter((d) => d !== lead);
   if (candidates.length === 0) return { companions: [], conflicts: [] };
 
+  // Each candidate moves to the version that agrees with a decided package: the lead, else a
+  // companion already placed (`@types/react-dom` with `react-dom`, which moved with `react`).
+  const decided = new Map<string, { version: string; manifest: Manifests[string] }>([
+    [lead.name, { version: input.target, manifest: targetManifest }],
+  ]);
   const moves = new Map<string, { version: string; reason: string } | undefined>();
-  for (const c of candidates)
-    moves.set(
-      c.name,
-      agreeing(c, lead.name, input.target, targetManifest, await input.manifests(c.name)),
-    );
+  const typesLinked = new Set<string>();
+  const names = new Set(members.map((m) => m.name));
+  // A types package waits for the package it types (`@types/react-dom` for `react-dom`), which
+  // may be placed in a later pass; only when that never happens does its own manifest decide.
+  for (let progress = true, waitForTyped = true; progress || waitForTyped; ) {
+    if (!progress) waitForTyped = false;
+    progress = false;
+    for (const c of candidates) {
+      if (moves.get(c.name) !== undefined) continue;
+      const typed = typedPackageOf(c.name);
+      const typesHost =
+        typed !== undefined && decided.has(typed)
+          ? input.installed.find((d) => d.name === typed && typesOf(c, d))
+          : undefined;
+      if (!typesHost && typed !== undefined && names.has(typed) && waitForTyped) continue;
+      const versions = await input.manifests(c.name);
+      let move: { version: string; reason: string } | undefined;
+      if (typesHost) {
+        move = typesMove(
+          c,
+          typed as string,
+          decided.get(typed as string)?.version as string,
+          versions,
+        );
+        if (move) typesLinked.add(c.name);
+      } else {
+        for (const [host, at] of decided) {
+          const hostDep = input.installed.find((d) => d.name === host);
+          if (!hostDep || !related(hostDep, c)) continue;
+          move = agreeing(c, host, at.version, at.manifest, versions);
+          if (move) break;
+        }
+      }
+      moves.set(c.name, move);
+      if (move) {
+        decided.set(c.name, { version: move.version, manifest: versions[move.version] ?? {} });
+        progress = true;
+      }
+    }
+  }
 
   // The group, as `list` draws it, with each member at the version that agrees.
   const listed = (d: InstalledDependency, latest: string): ListedDependency =>
@@ -177,29 +273,55 @@ export async function companionsOf(input: {
   const group = dependencyGroups(packages, metadata, targets).find((g) =>
     g.members.some((m) => m.name === lead.name),
   );
-  if (!group) return { companions: [], conflicts: [] };
+  const inGroup = new Set((group?.members ?? [listed(lead, input.target)]).map((m) => m.name));
+  // `list` links nothing to a types package: `@types/<pkg>` joins the group of its `<pkg>`,
+  // and what `list` would group with it (`@types/react-dom`, a peer of `@types/react`) follows.
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const c of candidates) {
+      if (inGroup.has(c.name) || moves.get(c.name) === undefined) continue;
+      const typed = typedPackageOf(c.name);
+      const joins =
+        (typesLinked.has(c.name) && typed !== undefined && inGroup.has(typed)) ||
+        dependencyGroups(packages, metadata, targets).some(
+          (g) =>
+            g.members.some((m) => m.name === c.name) && g.members.some((m) => inGroup.has(m.name)),
+        );
+      if (!joins) continue;
+      inGroup.add(c.name);
+      grew = true;
+    }
+  }
+  if (inGroup.size < 2) return { companions: [], conflicts: [] };
   const companions: Companion[] = [];
   const conflicts: string[] = [];
-  for (const member of group.members) {
-    if (member.name === lead.name) continue;
+  for (const member of candidates.filter((c) => inGroup.has(c.name))) {
     const move = moves.get(member.name);
     if (!move) {
       conflicts.push(
-        `${member.name} ${member.current} has no release that agrees with ${lead.name} ${input.target}`,
+        `${member.name} ${member.version} has no release that agrees with ${lead.name} ${input.target}`,
       );
       continue;
     }
-    if (move.version === member.current) continue;
+    if (move.version === member.version) continue;
     companions.push({
       name: member.name,
-      from: member.current,
+      from: member.version,
       to: move.version,
       reason: move.reason,
     });
   }
+  const typed = [
+    ...new Set(
+      companions.filter((c) => typesLinked.has(c.name)).map((c) => typedPackageOf(c.name)),
+    ),
+  ];
+  const reason = [group?.reason, typed.length ? `types for ${typed.join(', ')}` : undefined]
+    .filter(Boolean)
+    .join(', ');
   return {
     companions: companions.sort((a, b) => a.name.localeCompare(b.name)),
     conflicts,
-    ...(group.reason ? { reason: group.reason } : {}),
+    ...(reason ? { reason } : {}),
   };
 }

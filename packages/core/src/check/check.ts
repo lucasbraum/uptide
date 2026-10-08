@@ -55,6 +55,7 @@ import { isBehind, rankCandidates } from './rank.js';
 import { groupRootCauses } from './root-cause.js';
 import { runtimeChangeFindings } from './runtime-changes.js';
 import { confirmGeneric, evidenceOf, tierOf } from './tier.js';
+import { typesPackageOf, typesReleaseFor } from './types-release.js';
 import { unattributedFindings } from './unattributed.js';
 import { verdictOf } from './verdict.js';
 import { compareVersions, majorsBehind, parseVersion } from './version.js';
@@ -1011,8 +1012,11 @@ async function companionPlans(
     const target =
       opts.targets?.[lead] ?? (await fetcher.resolve(lead, 'latest').catch(() => undefined));
     if (!target) continue;
+    // Every workspace's dependencies: a companion may be declared above the workspace that
+    // declares the lead (`@types/react` at the root, hoisted for the app that has `react`);
+    // `companionsOf` decides which of them a workspace of the lead can see.
     const installed = new Map<string, InstalledDependency>();
-    for (const workspace of declaring)
+    for (const workspace of workspaces)
       for (const [name, version] of Object.entries(installedByWorkspace[workspace] ?? {})) {
         if (linked(version)) continue;
         const known = installed.get(`${name}@${version}`);
@@ -1294,7 +1298,7 @@ async function prepare(
   const nodeTypes = installedPackageDirOf(ctx.adapter, repo, '@types/node', '')?.dir;
   if (installedDir && nodeTypes) installedDir.types = [nodeTypes];
   // Typed through DefinitelyTyped: the surface to diff is @types/<name>'s, at the version matching the target's major.
-  const typesName = `@types/${name.startsWith('@') ? name.slice(1).replace('/', '__') : name}`;
+  const typesName = typesPackageOf(name);
   const typesDir = installedPackageDirOf(ctx.adapter, repo, typesName, '');
   let types: Prepared['types'];
   let runtimeDir: PackageDir | undefined;
@@ -1302,17 +1306,14 @@ async function prepare(
     const typesInstalled = readManifest(typesDir.dir)?.version ?? '0.0.0';
     const major = parseVersion(target)?.major;
     const published = (await ctx.fetcher.versions?.(typesName).catch(() => [])) ?? [];
-    // The @types release of the target's major; never below what is installed (@types/passport 1.x
-    // types passport 0.x), else the latest release.
-    const sameMajor = major === undefined ? undefined : maxSatisfying(published, `${major}.x`);
-    const latestTypes = published.at(-1);
+    // The @types release that types the target (its major.minor, else its major; never below
+    // what is installed: @types/passport 1.x types passport 0.x), else the latest release. A
+    // companion plan that moves the types package names the release outright.
     const typesTarget =
-      sameMajor !== undefined && compareVersions(sameMajor, typesInstalled) >= 0
-        ? sameMajor
-        : latestTypes !== undefined && compareVersions(latestTypes, typesInstalled) >= 0
-          ? latestTypes
-          : typesInstalled;
-    if (typesTarget !== sameMajor && published.length > 0)
+      ctx.opts.targets?.[typesName] ??
+      typesReleaseFor(published, target, typesInstalled) ??
+      typesInstalled;
+    if (major !== undefined && parseVersion(typesTarget)?.major !== major && published.length > 0)
       notes.push(
         `${typesName} has no ${major}.x release above ${typesInstalled}; diffed against ${typesTarget}`,
       );
