@@ -3,7 +3,7 @@ import type { Finding, RuntimeReport } from '../domain/report.js';
 import { stripePack } from '../packs/stripe/index.js';
 import { zodPack } from '../packs/zod/index.js';
 import { isBehind, rankCandidates } from './rank.js';
-import { confirmGeneric, evidenceOf, tierOf } from './tier.js';
+import { confirmBreaking, evidenceOf, tierOf } from './tier.js';
 
 const finding = (
   change: Partial<Finding['change']>,
@@ -74,7 +74,7 @@ describe('evidence for a breaking finding', () => {
     const confirmed = finding({}, { compileError: 'Expected 2 arguments, but got 1.' });
     const bare = finding({});
     const deprecated = { ...finding({ kind: 'deprecated' }), severity: 'deprecated' } as Finding;
-    const out = confirmGeneric([confirmed, bare, deprecated], (f) => evidenceOf(f));
+    const out = confirmBreaking([confirmed, bare, deprecated], (f) => evidenceOf(f));
     expect(out.map((f) => [f.severity, f.evidence])).toEqual([
       ['breaking', 'compiler'],
       ['unverified', undefined],

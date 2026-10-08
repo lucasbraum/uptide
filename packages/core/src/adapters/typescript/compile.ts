@@ -4,10 +4,11 @@ import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 import { ts } from 'ts-morph';
 import type { CompileOptions, RepoDir } from '../../domain/adapter.js';
-import type { CompileDiagnostic, CompileSignal } from '../../domain/usage.js';
+import type { CompileCoverage, CompileDiagnostic, CompileSignal } from '../../domain/usage.js';
 import { satisfies } from '../../fetch/range.js';
 import { onReset } from '../../shared-state.js';
 import { findCause } from './cause.js';
+import { jsxNamespaceCause } from './config-cause.js';
 import { type LoadedRepo, loadedRepo, ownsFile } from './repo.js';
 import {
   consumerCopySatisfies,
@@ -153,28 +154,57 @@ function importersOf(repo: LoadedRepo): Map<string, Set<string>> {
   return map;
 }
 
-/** The files whose diagnostics can change: the ones using the package, and the ones importing those. */
+/**
+ * The files whose diagnostics can change: the ones using the package, and the ones importing
+ * those. `missing` counts the requested files the program does not hold (outside the
+ * workspace's tsconfig): nothing can be said about them, and the coverage says so.
+ */
 function filesToCheck(
   repo: LoadedRepo,
   repoRef: RepoDir,
   program: ts.Program,
   requested: string[] | undefined,
-): ts.SourceFile[] {
+): { files: ts.SourceFile[]; missing: number } {
   const own = (f: ts.SourceFile): boolean =>
     !f.isDeclarationFile &&
     isRepoError({ category: ts.DiagnosticCategory.Error, file: f } as ts.Diagnostic, repo.dir) &&
     ownsFile(repoRef, f.fileName);
-  if (!requested) return program.getSourceFiles().filter(own);
+  if (!requested) return { files: program.getSourceFiles().filter(own), missing: 0 };
   const wanted = new Set<string>();
   const reverse = importersOf(repo);
+  let missing = 0;
   for (const rel of requested) {
     const abs = join(repo.dir, rel);
+    if (!ownsFile(repoRef, abs)) continue;
+    if (!program.getSourceFile(abs)) missing++;
     wanted.add(abs);
     for (const importer of reverse.get(abs) ?? []) wanted.add(importer);
   }
-  return [...wanted]
-    .map((p) => program.getSourceFile(p))
-    .filter((f): f is ts.SourceFile => f !== undefined && own(f));
+  return {
+    files: [...wanted]
+      .map((p) => program.getSourceFile(p))
+      .filter((f): f is ts.SourceFile => f !== undefined && own(f)),
+    missing,
+  };
+}
+
+const NOT_IN_TSCONFIG = 'not in the workspace tsconfig';
+
+/** What became of the files asked about: compiled, or skipped and why. */
+function coverageOf(
+  compiled: number,
+  missing: number,
+  skipped?: { reason: string; count: number },
+): CompileCoverage {
+  const reasons = [
+    ...(skipped && skipped.count > 0 ? [skipped] : []),
+    ...(missing > 0 ? [{ reason: NOT_IN_TSCONFIG, count: missing }] : []),
+  ];
+  return {
+    compiled,
+    total: compiled + reasons.reduce((n, r) => n + r.count, 0),
+    skipped: reasons,
+  };
 }
 
 /** A baseline nobody can subtract from: bad config, or most files unable to see their imports. */
@@ -195,6 +225,14 @@ function structuralFailure(
     return `${unresolvable} of ${files.length} files cannot resolve their imports at the installed version; compile signal skipped`;
   }
   return undefined;
+}
+
+/** The skip reason as the coverage names it: short, without the counts the message carries. */
+function skipReasonOf(skipped: string): string {
+  if (skipped.startsWith('invalid tsconfig')) return 'invalid tsconfig';
+  if (skipped.includes('cannot resolve their imports'))
+    return 'most files cannot resolve their imports at the installed version';
+  return skipped.split(';')[0] ?? skipped;
 }
 
 interface Overlay {
@@ -549,6 +587,7 @@ export async function compileAgainstTargets(
       diagnostics: [],
       baselineErrors: 0,
       skipped: `invalid tsconfig: ${message}`,
+      coverage: coverageOf(0, 0, { reason: 'invalid tsconfig', count: options.files?.length ?? 0 }),
       unresolvedInTarget: [],
       unresolvedFiles: [],
       linkedDependencies: [],
@@ -589,7 +628,7 @@ export async function compileAgainstTargets(
       new Map(),
     ).program;
   }
-  const files = filesToCheck(repo, repoRef, checked, options.files);
+  const { files, missing } = filesToCheck(repo, repoRef, checked, options.files);
   const baseline = files.flatMap((f) =>
     memoized
       ? baselineErrorsOf(repo, checked, f)
@@ -603,6 +642,7 @@ export async function compileAgainstTargets(
       diagnostics: [],
       baselineErrors: baseline.length,
       skipped,
+      coverage: coverageOf(0, missing, { reason: skipReasonOf(skipped), count: files.length }),
       unresolvedInTarget: [],
       unresolvedFiles: [],
       linkedDependencies: [],
@@ -640,15 +680,19 @@ export async function compileAgainstTargets(
         return `${relative(repo.dir, overlaid.fileName)}:${line + 1}`;
       }),
     );
+    // One compiler option can explain hundreds of diagnostics (the JSX namespace the target no
+    // longer declares): those are anchored at the option, the rest traced to a declaration.
+    const jsx = jsxNamespaceCause(
+      { overlay: program, base: checked },
+      fresh.map(({ d }) => d),
+      repo.dir,
+      targets.map((t) => t.name),
+    );
     const diagnostics: CompileDiagnostic[] = fresh.map(({ d, overlaid }) => {
       const diagnostic = toDiagnostic(d, overlaid, repo.dir);
-      const cause = findCause(
-        { overlay: program, base: checked },
-        d,
-        overlaid,
-        repo.dir,
-        erroredLines,
-      );
+      const cause =
+        (jsx?.explains(d) ? jsx.cause : undefined) ??
+        findCause({ overlay: program, base: checked }, d, overlaid, repo.dir, erroredLines);
       if (cause) diagnostic.cause = cause;
       return diagnostic;
     });
@@ -657,6 +701,7 @@ export async function compileAgainstTargets(
         (a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.column - b.column,
       ),
       baselineErrors: baseline.length,
+      coverage: coverageOf(files.length, missing),
       unresolvedInTarget: [...unresolvedInTarget].sort(),
       unresolvedFiles: [...unresolvedFiles].sort(),
       linkedDependencies: deps.linked,

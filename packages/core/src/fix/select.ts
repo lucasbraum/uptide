@@ -20,7 +20,8 @@ export function selectedFindings(
         )
       )
         continue;
-      if (finding.change.kind === 'cause') {
+      // A cluster's sites are its downstream errors, unless the anchor is the one site to edit.
+      if (finding.change.kind === 'cause' && !finding.anchorOnly) {
         for (const d of finding.downstream ?? [])
           selected.push({
             ...finding,

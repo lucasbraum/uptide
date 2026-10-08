@@ -113,7 +113,7 @@ describe('formatPlan', () => {
         '  next 14.2.0: not analyzed: out of time',
         '  npx uptide list    refresh discovery',
         '',
-        'verified: migration pack · generic: no pack, breaking only if the compiler or the runtime probe confirms it',
+        'verified: migration pack · generic: no pack · in both, breaking only if the compiler, the runtime probe or the pack confirms it',
         'Effort is an estimate from the findings: none (nothing affected), small (rules, or up to 5 sites by hand or agent), medium (up to 25), large (more).',
         '',
       ].join('\n'),

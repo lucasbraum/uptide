@@ -118,6 +118,21 @@ export interface DiagnosticCause {
   line: number;
   /** Why it is to blame, as a clause: "whose type changed from `A` to `B`", "which itself fails to compile against the target", "imported from `x`, which is typed `any` against the target". */
   reason: string;
+  /**
+   * A compiler option, not a declaration (`"jsx": "preserve"` in a tsconfig): the one edit that
+   * resolves the cluster is there, and the diagnostics under it are evidence, not sites to fix.
+   */
+  config?: true;
+}
+
+/** The files Signal B was asked to judge and what became of them: the denominator of a verdict. */
+export interface CompileCoverage {
+  /** Files type-checked against the target. */
+  compiled: number;
+  /** Files that use the package (and the files importing them) the signal was asked about. */
+  total: number;
+  /** Why the rest were not compiled, one entry per reason. */
+  skipped: { reason: string; count: number }[];
 }
 
 /** Signal B: the repo type-checked against the target version. */
@@ -127,6 +142,8 @@ export interface CompileSignal {
   baselineErrors: number;
   /** Why the overlay was not compiled: only a structurally broken baseline (invalid tsconfig, most files unresolvable). */
   skipped?: string;
+  /** How many of the files asked about were type-checked, and why the others were not. */
+  coverage: CompileCoverage;
   /** Bare imports inside the target package's own files that resolved neither there nor in the consumer's node_modules. */
   unresolvedInTarget: string[];
   /** Target declaration files (relative to the target) with an unresolved import; the compiler cannot vouch for symbols declared there. */

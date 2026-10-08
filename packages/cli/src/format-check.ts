@@ -2,6 +2,7 @@ import { basename } from 'node:path';
 import {
   BY,
   type CheckReport,
+  coverageLine,
   isFailure,
   type PackageReport,
   type PlanGroup,
@@ -143,14 +144,12 @@ function rowOf(p: PackageReport, multi: boolean, colors: Colors): Row | undefine
   if (p.installed === p.target && p.findings.length === 0 && p.status === 'safe') return undefined;
   // Out of time or failed: listed once, under "Not analyzed", with how to include them.
   if (p.skipReason === 'TIME_BUDGET' || isFailure(p)) return undefined;
-  // Without a pack, what nothing confirmed is for --details: the first screen acts on evidence.
-  const generic = p.tier === 'generic';
-  const plan = planOf(p).filter((g) => !(generic && g.severity === 'unverified'));
-  const unconfirmed = generic ? sitesOf(planOf(p).filter((g) => g.severity === 'unverified')) : 0;
-  const aside = unconfirmed > 0 ? colors.dim(` · ${unconfirmed} unconfirmed in --details`) : '';
+  // What nothing confirmed is possible impact, in every tier: counted apart, never as breaking.
+  const plan = planOf(p);
   const of = (severity: PlanGroup['severity']): PlanGroup[] =>
     plan.filter((g) => g.severity === severity);
   const [breaking, unverified, deprecated] = [of('breaking'), of('unverified'), of('deprecated')];
+  const aside = '';
   const where =
     multi && p.workspace !== '*' && p.workspace !== '.' ? colors.dim(` (${p.workspace})`) : '';
   const members = p.members ? ` (${plural(p.members.length, 'package')})` : '';
@@ -168,11 +167,11 @@ function rowOf(p: PackageReport, multi: boolean, colors: Colors): Row | undefine
   } else if (breaking.length > 0) {
     const sites = sitesOf(breaking);
     const files = filesOf(breaking);
-    const extra = unverified.length > 0 ? `, ${sitesOf(unverified)} unverified` : '';
+    const extra = unverified.length > 0 ? `, ${sitesOf(unverified)} possible` : '';
     verdict = `${colors.red('✗')} ${sites} breaking${sites > 1 ? ` in ${plural(files, 'file')}` : ''}${extra}${aside}`;
     by = byLine([...breaking, ...unverified]);
   } else if (unverified.length > 0) {
-    verdict = `${colors.magenta('?')} ${sitesOf(unverified)} unverified`;
+    verdict = `${colors.magenta('?')} ${sitesOf(unverified)} possible impact`;
     by = byLine(unverified);
   } else if (deprecated.length > 0) {
     verdict = `${colors.yellow('!')} ${sitesOf(deprecated)} deprecated${aside}`;
@@ -184,8 +183,6 @@ function rowOf(p: PackageReport, multi: boolean, colors: Colors): Row | undefine
   } else if (gaps > 0) {
     // A workspace that imports it was not analyzed: "no impact" would claim more than is known.
     verdict = `${colors.magenta('?')} no impact in ${plural(p.callSitesChecked, 'site')}, ${plural(gaps, 'workspace')} not analyzed${aside}`;
-  } else if (unconfirmed > 0) {
-    verdict = `${colors.green('✓')} nothing confirmed ${colors.dim(`(${plural(p.callSitesChecked, 'call site')})`)}${aside}`;
   } else {
     verdict = `${colors.green('✓')} no impact ${colors.dim(`(${plural(p.callSitesChecked, 'call site')})`)}`;
   }
@@ -219,9 +216,10 @@ function deprecatedNames(groups: PlanGroup[]): string {
     .join(', ')}${names.length > 3 ? ', ...' : ''}`;
 }
 
-/** One line per rule; deprecations are one line for the package. */
+/** One line per rule; possible impact under its own line; deprecations are one line for the package. */
 function sectionLines(row: Row, colors: Colors): string[] {
-  const acting = row.plan.filter((g) => g.severity !== 'deprecated');
+  const acting = row.plan.filter((g) => g.severity === 'breaking');
+  const possible = row.plan.filter((g) => g.severity === 'unverified');
   const deprecated = row.plan.filter((g) => g.severity === 'deprecated');
   const importers = importerNotes(row.p);
   // A peer the target asks for and the repository does not have at that version: the usual
@@ -234,17 +232,22 @@ function sectionLines(row: Row, colors: Colors): string[] {
         ]
       : [];
   });
-  // Every analyzed package says its verdict and what verified it, zero breaking included.
+  // Every analyzed package says its verdict and what verified it, zero breaking included, and
+  // how much of the code that uses it the compiler judged.
   const heading = row.summary
     ? `${colors.bold(row.p.name)}   ${colors.dim(row.summary)}`
     : colors.bold(row.p.name);
+  const coverage = row.p.compile?.coverage
+    ? [colors.dim(`  ${coverageLine(row.p.compile.coverage)}`)]
+    : [];
   if (
     acting.length === 0 &&
+    possible.length === 0 &&
     deprecated.length === 0 &&
     importers.length === 0 &&
     peers.length === 0
   )
-    return row.summary ? [heading] : [];
+    return row.summary ? [heading, ...coverage] : [];
   const scope = (g: PlanGroup): string => {
     if (g.fixes !== g.sites)
       return `${plural(g.fixes, 'fix', 'fixes')}, ${plural(g.sites, 'error')}`;
@@ -255,14 +258,19 @@ function sectionLines(row: Row, colors: Colors): string[] {
   // A package with dozens of distinct changes (a compiler API that was removed) gets its
   // largest ones here and the rest as a count: --details has every one.
   const listed = acting.length > MAX_RULE_LINES ? acting.slice(0, MAX_RULE_LINES - 1) : acting;
-  const titleWidth = Math.max(...listed.map((g) => g.title.length), 0);
-  const scopeWidth = Math.max(...listed.map((g) => scope(g).length), 0);
-  const lines = [heading];
-  for (const g of listed) {
+  // Possible impact gets the lines the breaking ones leave, and at least one.
+  const room = Math.max(1, MAX_RULE_LINES - listed.length);
+  const listedPossible = possible.length > room ? possible.slice(0, room - 1) : possible;
+  const shown = [...listed, ...listedPossible];
+  const titleWidth = Math.max(...shown.map((g) => g.title.length), 0);
+  const scopeWidth = Math.max(...shown.map((g) => scope(g).length), 0);
+  const lines = [heading, ...coverage];
+  const ruleLine = (g: PlanGroup): string => {
     const mark = g.severity === 'breaking' ? colors.red('✗') : colors.magenta('?');
-    lines.push(
-      `  ${mark} ${pad(g.title, titleWidth)}   ${pad(scope(g), scopeWidth)}   ${colors.dim(byLabel(g))}`,
-    );
+    return `  ${mark} ${pad(g.title, titleWidth)}   ${pad(scope(g), scopeWidth)}   ${colors.dim(byLabel(g))}`;
+  };
+  for (const g of listed) {
+    lines.push(ruleLine(g));
     if (g.note) lines.push(colors.dim(`    ${g.note}`));
   }
   if (listed.length < acting.length) {
@@ -272,6 +280,22 @@ function sectionLines(row: Row, colors: Colors): string[] {
         `  … ${plural(rest.length, 'more change')}, ${plural(sitesOf(rest), 'site')} (--details)`,
       ),
     );
+  }
+  // What the declarations changed at a place the code uses, and nothing confirmed breaks
+  // there: listed apart, never counted as breaking.
+  if (possible.length > 0) {
+    lines.push(
+      `  ${colors.magenta('?')} possible impact: ${plural(sitesOf(possible), 'site')} in ${plural(filesOf(possible), 'file')}   ${colors.dim('not confirmed by the compiler or the runtime probe')}`,
+    );
+    for (const g of listedPossible) lines.push(`  ${ruleLine(g)}`);
+    if (listedPossible.length < possible.length) {
+      const rest = possible.slice(listedPossible.length);
+      lines.push(
+        colors.dim(
+          `    … ${plural(rest.length, 'more change')}, ${plural(sitesOf(rest), 'site')} (--details)`,
+        ),
+      );
+    }
   }
   if (deprecated.length > 0) {
     const sites = sitesOf(deprecated);

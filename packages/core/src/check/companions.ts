@@ -2,7 +2,7 @@ import { satisfies } from '../fetch/range.js';
 import type { Manifest } from '../list/evidence.js';
 import { dependencyGroups } from '../list/groups.js';
 import type { ListedDependency } from '../list/list.js';
-import { typedPackageOf, typesPackageOf, typesReleaseFor } from './types-release.js';
+import { typedPackageOf, typesReleaseFor } from './types-release.js';
 import { compareVersions, parseVersion } from './version.js';
 
 /**

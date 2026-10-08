@@ -4,6 +4,7 @@ import { Project, type ResolutionHostFactory, ts } from 'ts-morph';
 import type { RepoDir } from '../../domain/adapter.js';
 import { UptideError } from '../../errors.js';
 import { onReset } from '../../shared-state.js';
+import { repositoryTypescriptMajor, typescriptFiveDefaults } from './legacy-options.js';
 import { type Lockfile, readLockfile } from './lockfile.js';
 import { declaredPaths, workspaceSourceMap } from './workspace-source.js';
 
@@ -115,7 +116,17 @@ export function readInstalled(
     }),
   );
   const lockfile = readLockfile(dir, declared);
-  return { dir, packageJson, lockfile, installed: new Map(lockfile?.installed ?? []) };
+  const installed = new Map(lockfile?.installed ?? []);
+  // A workspace package is declared as `workspace:*`, `link:` or `file:`; what the lockfile
+  // records for it differs by manager (pnpm `link:../x`, Yarn `0.0.0-use.local`, npm nothing).
+  // The declared specifier says what it is, and that is what the rest of the engine reads.
+  for (const [name, spec] of declared)
+    if (
+      /^(workspace|link|file):/.test(spec) &&
+      !/^(workspace|link|file):/.test(installed.get(name) ?? '')
+    )
+      installed.set(name, spec);
+  return { dir, packageJson, lockfile, installed };
 }
 
 /**
@@ -162,12 +173,18 @@ export function loadRepo(cwd: string, rootFiles?: string[]): LoadedRepo {
   let project: Project;
   if (existsSync(tsconfig)) {
     const declared = sourcePaths ? declaredPaths(tsconfig) : { paths: {} };
+    // A repository on TypeScript 5 is read with TypeScript 5's defaults for what its tsconfig
+    // leaves unset (legacy-options.ts); one on TypeScript 6 with the compiler's own.
+    const major = repositoryTypescriptMajor(dir);
+    const legacy =
+      major === undefined || major < 6 ? typescriptFiveDefaults(declaredOptions(tsconfig)) : {};
     project = new Project({
       tsConfigFilePath: tsconfig,
       skipAddingFilesFromTsConfig: rootFiles !== undefined,
       skipFileDependencyResolution: true,
       resolutionHost: formatAwareResolution,
       compilerOptions: {
+        ...legacy,
         noEmit: true,
         skipLibCheck: true,
         ...(sourcePaths ? { paths: { ...declared.paths, ...sourcePaths } } : {}),
@@ -203,7 +220,13 @@ export function loadRepo(cwd: string, rootFiles?: string[]): LoadedRepo {
         ...SYNTHETIC_EXCLUDES.map((e) => `!${join(dir, e)}`),
       ]);
   }
-  if (rootFiles !== undefined) project.addSourceFilesAtPaths(rootFiles);
+  if (rootFiles !== undefined) {
+    project.addSourceFilesAtPaths(rootFiles);
+    // A scoped program still needs what the tsconfig declares globally: the ambient
+    // declaration files it includes (`vite-env.d.ts`, `css.d.ts`, `global.d.ts`) are what
+    // make `*.module.css` imports and `declare global` names resolve. Nothing imports them.
+    if (existsSync(tsconfig)) project.addSourceFilesAtPaths(ambientDeclarations(tsconfig));
+  }
   project.resolveSourceFileDependencies();
   return {
     dir,
@@ -215,6 +238,36 @@ export function loadRepo(cwd: string, rootFiles?: string[]): LoadedRepo {
     includesJs: project.getCompilerOptions().allowJs === true,
     warnings: sources.warnings,
   };
+}
+
+/** The options a tsconfig sets, through its `extends` chain: what is unset gets a default. */
+function declaredOptions(tsconfig: string): ts.CompilerOptions {
+  try {
+    const parsed = ts.readConfigFile(tsconfig, (p) => readFileSync(p, 'utf8'));
+    if (!parsed.config) return {};
+    // The config's path is what the compiler's default type roots are relative to.
+    return ts.parseJsonConfigFileContent(
+      parsed.config,
+      ts.sys,
+      dirname(tsconfig),
+      undefined,
+      tsconfig,
+    ).options;
+  } catch {
+    return {};
+  }
+}
+
+/** The `.d.ts` files a tsconfig includes from the repository itself, never from node_modules. */
+function ambientDeclarations(tsconfig: string): string[] {
+  try {
+    const parsed = ts.readConfigFile(tsconfig, (p) => readFileSync(p, 'utf8'));
+    if (!parsed.config) return [];
+    const { fileNames } = ts.parseJsonConfigFileContent(parsed.config, ts.sys, dirname(tsconfig));
+    return fileNames.filter((f) => /\.d\.[cm]?ts$/.test(f) && !f.includes('/node_modules/'));
+  } catch {
+    return [];
+  }
 }
 
 function readReferences(tsconfig: string): string[] {

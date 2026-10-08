@@ -28,6 +28,8 @@ function quotedNames(message: string): string[] {
 
 /** `${n} errors caused by \`name\` (file:line), <reason>. Fix here first.`: the text the report prints for a cluster. */
 export function describeCluster(count: number, cause: DiagnosticCause): string {
+  if (cause.config)
+    return `${count} error${count === 1 ? '' : 's'} caused by \`${cause.name}\` in ${cause.file}:${cause.line}: ${cause.reason}. One edit there resolves them.`;
   return `${count} error${count === 1 ? '' : 's'} caused by \`${cause.name}\` (${cause.file}:${cause.line}), ${cause.reason}. Fix here first.`;
 }
 
@@ -84,10 +86,12 @@ export function unattributedFindings(
         code: d.code,
         message: d.message.split('\n')[0] ?? d.message,
       })),
+      // A compiler option is fixed once, where it is set: the errors under it are evidence.
+      ...(cause.config ? { anchorOnly: true as const } : {}),
       severity: 'breaking',
       confidence: 1,
-      fixability: 'unknown',
-      reason: UNATTRIBUTED_REASON,
+      fixability: cause.config ? 'assisted' : 'unknown',
+      reason: cause.config ? cause.reason : UNATTRIBUTED_REASON,
     };
   });
   return [...clustered, ...plainFindings(single, meta, surfaceB, unresolvedFiles)];

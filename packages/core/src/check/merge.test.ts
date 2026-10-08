@@ -29,6 +29,7 @@ const usage: Usage = {
 const signal = (diagnostics: CompileSignal['diagnostics']): CompileSignal => ({
   diagnostics,
   baselineErrors: 0,
+  coverage: { compiled: 1, total: 1, skipped: [] },
   unresolvedInTarget: [],
   unresolvedFiles: [],
   linkedDependencies: [],

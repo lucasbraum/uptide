@@ -54,7 +54,7 @@ import { mapWithLimit, mapWithSerialRetry } from './pool.js';
 import { isBehind, rankCandidates } from './rank.js';
 import { groupRootCauses } from './root-cause.js';
 import { runtimeChangeFindings } from './runtime-changes.js';
-import { confirmGeneric, evidenceOf, tierOf } from './tier.js';
+import { confirmBreaking, evidenceOf, tierOf } from './tier.js';
 import { typesPackageOf, typesReleaseFor } from './types-release.js';
 import { unattributedFindings } from './unattributed.js';
 import { verdictOf } from './verdict.js';
@@ -473,7 +473,7 @@ function importerOf(p: PackageReport): Importer {
 
 /** A finding's weight in the counts: an anchor stands for the errors under it, never for itself. */
 export function sitesOf(f: Finding): number {
-  return f.change.kind === 'cause' ? (f.downstream?.length ?? 0) : 1;
+  return f.change.kind === 'cause' && !f.anchorOnly ? (f.downstream?.length ?? 0) : 1;
 }
 
 /**
@@ -595,6 +595,20 @@ export function mergeAcrossWorkspaces(
       },
     };
     if (first.runtime) combined.runtime = first.runtime;
+    // What moves with the package is one plan for the repository, carried by whichever
+    // workspace reports it; the merged entry keeps every companion and conflict named.
+    const companions = [
+      ...new Map(
+        list.flatMap((p) => p.companions ?? []).map((c) => [`${c.name}@${c.from}`, c]),
+      ).values(),
+    ].sort((a, b) => a.name.localeCompare(b.name) || a.from.localeCompare(b.from));
+    const conflicts = [...new Set(list.flatMap((p) => p.companionConflicts ?? []))];
+    if (companions.length > 0) combined.companions = companions;
+    if (conflicts.length > 0) combined.companionConflicts = conflicts;
+    const members = [
+      ...new Map(list.flatMap((p) => p.members ?? []).map((m) => [m.name, m])).values(),
+    ];
+    if (members.length > 1) combined.members = members;
     combined.importers = list.map(importerOf);
     const contexts = list.map((p) => p.planContext).filter((c) => c !== undefined);
     if (contexts.length > 0) {
@@ -603,22 +617,41 @@ export function mergeAcrossWorkspaces(
         evidence: contexts.flatMap((c) => c.evidence ?? []),
       };
     }
-    if (first.compile) {
+    const compiled = list.filter((p) => p.compile !== undefined);
+    const firstCompiled = compiled[0];
+    if (firstCompiled?.compile) {
+      const coverages = compiled.map((p) => p.compile?.coverage).filter((c) => c !== undefined);
+      const skipped = new Map<string, number>();
+      for (const c of coverages)
+        for (const r of c.skipped) skipped.set(r.reason, (skipped.get(r.reason) ?? 0) + r.count);
       combined.compile = {
-        ...first.compile,
+        ...firstCompiled.compile,
+        // Skipped in one workspace, compiled in another: the coverage says how much of each.
+        ...(compiled.some((p) => p.compile?.skipped === undefined) ? { skipped: undefined } : {}),
         baselineErrors: sum((p) => p.compile?.baselineErrors ?? 0),
+        ...(coverages.length > 0
+          ? {
+              coverage: {
+                compiled: coverages.reduce((n, c) => n + c.compiled, 0),
+                total: coverages.reduce((n, c) => n + c.total, 0),
+                workspaces: coverages.reduce((n, c) => n + c.workspaces, 0),
+                skipped: [...skipped].map(([reason, count]) => ({ reason, count })),
+              },
+            }
+          : {}),
         unresolvedInTarget: [...new Set(list.flatMap((p) => p.compile?.unresolvedInTarget ?? []))],
         unresolvedFiles: [...new Set(list.flatMap((p) => p.compile?.unresolvedFiles ?? []))],
         unattributed: list.flatMap((p) =>
           (p.compile?.unattributed ?? []).map((d) => ({ ...d, file: prefixed(p, d.file) })),
         ),
-        ...(list.every((p) => p.compile?.newErrors !== undefined)
+        ...(compiled.every((p) => p.compile?.newErrors !== undefined)
           ? { newErrors: sum((p) => p.compile?.newErrors ?? 0) }
           : {}),
       };
+      if (combined.compile.skipped === undefined) delete combined.compile.skipped;
     }
     // One verdict for the merged entry: its findings and compile summary are the union.
-    if (first.verdict)
+    if (list.some((p) => p.verdict))
       combined.verdict = verdictOf(
         combined,
         list.find((p) => p.verdict?.notVerified)?.verdict?.notVerified,
@@ -1463,9 +1496,11 @@ async function checkGroup(
   // Led by the package asked for, when its companions are in the group: it names the report,
   // and its versions are the upgrade's.
   const plans = ctx.opts.companions ?? {};
-  const leader = prepared.find((p) => plans[p.name] !== undefined && prepared.length > 1);
+  // A package asked for by name carries its plan even where it is analyzed alone: what moves
+  // with it is one decision for the repository, whichever workspace the report comes from.
+  const leader = prepared.find((p) => plans[p.name] !== undefined);
   const plan = leader ? plans[leader.name] : undefined;
-  const name = leader?.name ?? groupName(prepared.map((p) => p.name));
+  const name = leader && prepared.length > 1 ? leader.name : groupName(prepared.map((p) => p.name));
   const notes = prepared.flatMap((p) =>
     prepared.length > 1 ? p.notes.map((n) => `${p.name}: ${n}`) : p.notes,
   );
@@ -1488,7 +1523,8 @@ async function checkGroup(
     installed: (leader?.installedVersion ?? installed[0]) as string,
     latest: (leader?.latest ??
       (prepared.length === 1 ? prepared[0]?.latest : targets.at(-1))) as string,
-    target: (leader?.target ?? targets.at(-1)) as string,
+    target: (leader?.target ??
+      (prepared.length === 1 ? prepared[0]?.target : targets.at(-1))) as string,
     ...(plan?.companions.length ? { companions: plan.companions } : {}),
     ...(plan?.conflicts.length ? { companionConflicts: plan.conflicts } : {}),
     majorsBehind: Math.max(...prepared.map((p) => majorsBehind(p.installedVersion, p.target))),
@@ -1660,6 +1696,7 @@ async function checkGroup(
         unresolvedFiles: signal.unresolvedFiles,
         unattributed: merged.unattributed,
         newErrors: signal.diagnostics.length,
+        coverage: { ...signal.coverage, workspaces: 1 },
       };
       if (signal.skipped) notes.push(signal.skipped);
       else if (signal.baselineErrors > 0)
@@ -1936,7 +1973,8 @@ async function checkGroup(
         // A pack that cannot read its versions adds nothing; the diff findings stand.
       }
     }
-    // Without a pack, only what the compiler or the runtime probe confirms is called breaking.
+    // Breaking means confirmed, in every tier: a type-surface change the compiler, the runtime
+    // probe or the pack did not confirm at the site is possible impact, never counted as breaking.
     const tier = tierOf(
       packsOf(ctx.opts),
       name,
@@ -1947,13 +1985,7 @@ async function checkGroup(
       const p = runtimeOf(f);
       return evidenceOf(f, p?.runtime, p ? loadRootOf(p) : undefined);
     };
-    const confirmed =
-      tier === 'generic'
-        ? confirmGeneric(findings, evidence)
-        : findings.map((f) => {
-            const found = f.severity === 'breaking' ? evidence(f) : undefined;
-            return found ? { ...f, evidence: found } : f;
-          });
+    const confirmed = confirmBreaking(findings, evidence);
     findings.length = 0;
     findings.push(...confirmed);
     // An import the target no longer has: what it exports instead is what a person, or the

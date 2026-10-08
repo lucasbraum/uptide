@@ -24,7 +24,7 @@ export {
   type TruthCase,
   type TruthScore,
 } from './check/truth.js';
-export { type Verdict, verdictOf } from './check/verdict.js';
+export { coverageLine, type Verdict, verdictOf } from './check/verdict.js';
 export { compareVersions, majorsBehind, parseVersion } from './check/version.js';
 export { classify, type UnclassifiedChange } from './diff/classify.js';
 export { diffSurfaces, rawDiff } from './diff/diff.js';

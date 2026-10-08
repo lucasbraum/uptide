@@ -81,6 +81,11 @@ export function mergeSignals(
   };
   const explained = (u: Usage): boolean => usagePaths(u).some((p) => changedPaths.has(p));
   for (const d of signal.diagnostics) {
+    // A diagnostic a compiler option explains belongs to that cause, whatever usage it touches.
+    if (d.cause?.config) {
+      unattributed.push(d);
+      continue;
+    }
     const hit = innermost(merged.filter((u) => contains(u, d) && u.access !== 'import'));
     if (hit) {
       attach(hit, d);
