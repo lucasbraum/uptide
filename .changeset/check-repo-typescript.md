@@ -8,3 +8,7 @@ bundled compiler only when the repository installs none. Errors and their positi
 ones your `tsc` would print: a repository on TypeScript 4.9 is no longer judged by TypeScript
 6's rules. The coverage line says which compiler judged: `compiled 355 of 356 files in 5
 workspaces with the repo's TypeScript 4.9.5`.
+
+A workspace without a tsconfig of its own is now configured by the nearest one above it (a
+monorepo root whose `include` covers the workspace), for its options only; synthetic defaults
+apply only when no tsconfig exists anywhere.
