@@ -452,37 +452,39 @@ function nativeOptions(
   tsc: typeof ts,
   morph: ts.CompilerOptions,
 ): ts.CompilerOptions {
+  // The workspace's own tsconfig, else the one above it (repo.ts), read by this compiler.
+  const config = repo.tsconfig ?? repo.inheritedTsconfig;
   let declared: ts.CompilerOptions | undefined;
-  if (repo.tsconfig) {
+  if (config) {
     try {
-      const parsed = tsc.readConfigFile(repo.tsconfig, (p) => readFileSync(p, 'utf8'));
+      const parsed = tsc.readConfigFile(config, (p) => readFileSync(p, 'utf8'));
       if (parsed.config)
         declared = tsc.parseJsonConfigFileContent(
           parsed.config,
           tsc.sys,
-          dirname(repo.tsconfig),
+          dirname(config),
           undefined,
-          repo.tsconfig,
+          config,
         ).options;
     } catch {
       // Unreadable by this compiler: the synthetic options below, as for no tsconfig at all.
     }
   }
-  if (!declared) {
-    declared = {
+  return {
+    ...(declared ?? {
       target: tsc.ScriptTarget.ES2022,
       module: tsc.ModuleKind.ESNext,
       // `bundler` arrived with TypeScript 5; before it, `node` (Node10, value 2) is the nearest.
       moduleResolution: tsc.ModuleResolutionKind.Bundler ?? (2 as ts.ModuleResolutionKind),
       strict: true,
       allowJs: morph.allowJs ?? false,
-    };
-  }
-  return {
-    ...declared,
+      // The modern defaults the bundled compiler would apply.
+      esModuleInterop: true,
+      allowSyntheticDefaultImports: true,
+    }),
     // Workspace dependencies mapped to their source (repo.ts): the same map, whichever compiler.
     ...(morph.paths ? { paths: morph.paths } : {}),
-    ...(repo.tsconfig ? { configFilePath: repo.tsconfig } : {}),
+    ...(config ? { configFilePath: config } : {}),
   };
 }
 

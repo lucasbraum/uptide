@@ -364,7 +364,10 @@ program. Otherwise a baseline program is built once per workspace with the repos
 compiler, from the ts-morph program's root files and the options that compiler reads from the
 repository's tsconfig (an option a newer compiler dropped or defaults differently is the
 repository's compiler's to read), with the same workspace-source `paths`; the overlay shares
-that baseline instead. The host's resolver is installed both ways the compilers ask
+that baseline instead. A workspace without a tsconfig of its own is configured by the nearest
+one above it (a monorepo root whose `include` covers the workspace: excalidraw-app reads the
+root's `jsx: react-jsx`), for its options only, never its file list; both programs read it,
+and only a repository with no tsconfig anywhere gets synthetic defaults. The host's resolver is installed both ways the compilers ask
 (`resolveModuleNameLiterals` from TypeScript 5, `resolveModuleNames` before it), and the cause
 tracers take the compiler with the programs: node kinds and flags are its, not the bundled
 one's. Which compiler judged is part of the coverage (`compilers`), and the coverage line names
