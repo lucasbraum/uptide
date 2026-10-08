@@ -1,7 +1,7 @@
 import type { ErrorCode } from '../errors.js';
 import type { Change, Severity } from './change.js';
 import type { RuntimeChange, RuntimeLoad } from './runtime.js';
-import type { CompileDiagnostic, Unanalyzed, Usage } from './usage.js';
+import type { CompileCoverage, CompileDiagnostic, Unanalyzed, Usage } from './usage.js';
 
 /** `none`: an additive finding, nothing to change; it counts in callSitesChecked only. */
 export type Fixability = 'mechanical' | 'assisted' | 'manual' | 'unknown' | 'none';
@@ -25,6 +25,11 @@ export interface Finding {
   usage: Usage;
   /** For a `cause` anchor: the errors it explains. The anchor itself is not a call site; these are. */
   downstream?: DownstreamSite[];
+  /**
+   * For a `cause` anchor that is a compiler option (`"jsx"` in a tsconfig): the anchor is the
+   * one site to fix, and `downstream` is the evidence; it counts as one site, not as many.
+   */
+  anchorOnly?: true;
   /**
    * For a `module-format` finding: every `require()` site of the package in this file, the
    * finding's own first. Switching a file to `import()` is one unit of work however many
@@ -161,6 +166,11 @@ export interface PackageReport {
     unattributed: CompileDiagnostic[];
     /** New type errors at the target: every error the upgrade causes, explained or not. */
     newErrors?: number;
+    /**
+     * How many of the files that use the package were type-checked against the target, over
+     * how many workspaces, and why the rest were not: `compiled 12 of 40 files in 2 workspaces`.
+     */
+    coverage?: CompileCoverage & { workspaces: number };
   };
   /**
    * The breaking count and what verified it, for every analyzed package, zero included:
@@ -171,6 +181,8 @@ export interface PackageReport {
     compiledAgainst?: string;
     newErrors?: number;
     notVerified?: string;
+    /** Set when some, not all, of the files were compiled: `compiled 12 of 40 files in 2 workspaces; skipped: ...`. */
+    partlyVerified?: string;
     summary: string;
   };
   /** Signal C: what loading installed and target in a child Node showed, one entry per member. */

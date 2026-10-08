@@ -1,5 +1,5 @@
 import { readFileSync, realpathSync } from 'node:fs';
-import { join, relative, resolve, sep } from 'node:path';
+import { join, posix, relative, resolve, sep } from 'node:path';
 import { typescriptAdapter } from '../adapters/typescript/index.js';
 import { createFsSurfaceCache } from '../cache/fs-surface-cache.js';
 import { diffDirs } from '../diff-package.js';
@@ -54,7 +54,8 @@ import { mapWithLimit, mapWithSerialRetry } from './pool.js';
 import { isBehind, rankCandidates } from './rank.js';
 import { groupRootCauses } from './root-cause.js';
 import { runtimeChangeFindings } from './runtime-changes.js';
-import { confirmGeneric, evidenceOf, tierOf } from './tier.js';
+import { confirmBreaking, evidenceOf, tierOf } from './tier.js';
+import { typesPackageOf, typesReleaseFor } from './types-release.js';
 import { unattributedFindings } from './unattributed.js';
 import { verdictOf } from './verdict.js';
 import { compareVersions, majorsBehind, parseVersion } from './version.js';
@@ -472,7 +473,7 @@ function importerOf(p: PackageReport): Importer {
 
 /** A finding's weight in the counts: an anchor stands for the errors under it, never for itself. */
 export function sitesOf(f: Finding): number {
-  return f.change.kind === 'cause' ? (f.downstream?.length ?? 0) : 1;
+  return f.change.kind === 'cause' && !f.anchorOnly ? (f.downstream?.length ?? 0) : 1;
 }
 
 /**
@@ -546,8 +547,10 @@ export function mergeAcrossWorkspaces(
   for (const list of groups.values()) {
     const catalog = list.some((p) => catalogByWorkspace[p.workspace]?.includes(p.name));
     if (list.length < 2 && !catalog) continue;
+    // A cause in another workspace's source is reported relative to this one (`../editor/x.ts`):
+    // normalized, it is the repository path.
     const prefixed = (p: PackageReport, file: string): string =>
-      p.workspace === '.' ? file : `${p.workspace}/${file}`;
+      posix.normalize(p.workspace === '.' ? file : `${p.workspace}/${file}`);
     const first = list[0] as PackageReport;
     const sum = (pick: (p: PackageReport) => number): number =>
       list.reduce((n, p) => n + pick(p), 0);
@@ -594,6 +597,20 @@ export function mergeAcrossWorkspaces(
       },
     };
     if (first.runtime) combined.runtime = first.runtime;
+    // What moves with the package is one plan for the repository, carried by whichever
+    // workspace reports it; the merged entry keeps every companion and conflict named.
+    const companions = [
+      ...new Map(
+        list.flatMap((p) => p.companions ?? []).map((c) => [`${c.name}@${c.from}`, c]),
+      ).values(),
+    ].sort((a, b) => a.name.localeCompare(b.name) || a.from.localeCompare(b.from));
+    const conflicts = [...new Set(list.flatMap((p) => p.companionConflicts ?? []))];
+    if (companions.length > 0) combined.companions = companions;
+    if (conflicts.length > 0) combined.companionConflicts = conflicts;
+    const members = [
+      ...new Map(list.flatMap((p) => p.members ?? []).map((m) => [m.name, m])).values(),
+    ];
+    if (members.length > 1) combined.members = members;
     combined.importers = list.map(importerOf);
     const contexts = list.map((p) => p.planContext).filter((c) => c !== undefined);
     if (contexts.length > 0) {
@@ -602,22 +619,41 @@ export function mergeAcrossWorkspaces(
         evidence: contexts.flatMap((c) => c.evidence ?? []),
       };
     }
-    if (first.compile) {
+    const compiled = list.filter((p) => p.compile !== undefined);
+    const firstCompiled = compiled[0];
+    if (firstCompiled?.compile) {
+      const coverages = compiled.map((p) => p.compile?.coverage).filter((c) => c !== undefined);
+      const skipped = new Map<string, number>();
+      for (const c of coverages)
+        for (const r of c.skipped) skipped.set(r.reason, (skipped.get(r.reason) ?? 0) + r.count);
       combined.compile = {
-        ...first.compile,
+        ...firstCompiled.compile,
+        // Skipped in one workspace, compiled in another: the coverage says how much of each.
+        ...(compiled.some((p) => p.compile?.skipped === undefined) ? { skipped: undefined } : {}),
         baselineErrors: sum((p) => p.compile?.baselineErrors ?? 0),
+        ...(coverages.length > 0
+          ? {
+              coverage: {
+                compiled: coverages.reduce((n, c) => n + c.compiled, 0),
+                total: coverages.reduce((n, c) => n + c.total, 0),
+                workspaces: coverages.reduce((n, c) => n + c.workspaces, 0),
+                skipped: [...skipped].map(([reason, count]) => ({ reason, count })),
+              },
+            }
+          : {}),
         unresolvedInTarget: [...new Set(list.flatMap((p) => p.compile?.unresolvedInTarget ?? []))],
         unresolvedFiles: [...new Set(list.flatMap((p) => p.compile?.unresolvedFiles ?? []))],
         unattributed: list.flatMap((p) =>
           (p.compile?.unattributed ?? []).map((d) => ({ ...d, file: prefixed(p, d.file) })),
         ),
-        ...(list.every((p) => p.compile?.newErrors !== undefined)
+        ...(compiled.every((p) => p.compile?.newErrors !== undefined)
           ? { newErrors: sum((p) => p.compile?.newErrors ?? 0) }
           : {}),
       };
+      if (combined.compile.skipped === undefined) delete combined.compile.skipped;
     }
     // One verdict for the merged entry: its findings and compile summary are the union.
-    if (first.verdict)
+    if (list.some((p) => p.verdict))
       combined.verdict = verdictOf(
         combined,
         list.find((p) => p.verdict?.notVerified)?.verdict?.notVerified,
@@ -775,7 +811,11 @@ async function checkWorkspace(ctx: Ctx, job: WorkspaceJob): Promise<PackageRepor
   }
   {
     const dir = resolve(opts.cwd, workspace);
-    const repo: RepoDir = { dir, ...(job.rootFiles ? { rootFiles: job.rootFiles } : {}) };
+    const repo: RepoDir = {
+      dir,
+      root: resolve(opts.cwd),
+      ...(job.rootFiles ? { rootFiles: job.rootFiles } : {}),
+    };
     const installed = new Map(Object.entries(installedByWorkspace[workspace] ?? {}));
     // Another workspace that declares the dependency itself answers for its own files, whether
     // nested under this one (the root's include) or pulled in through a project reference.
@@ -1011,8 +1051,11 @@ async function companionPlans(
     const target =
       opts.targets?.[lead] ?? (await fetcher.resolve(lead, 'latest').catch(() => undefined));
     if (!target) continue;
+    // Every workspace's dependencies: a companion may be declared above the workspace that
+    // declares the lead (`@types/react` at the root, hoisted for the app that has `react`);
+    // `companionsOf` decides which of them a workspace of the lead can see.
     const installed = new Map<string, InstalledDependency>();
-    for (const workspace of declaring)
+    for (const workspace of workspaces)
       for (const [name, version] of Object.entries(installedByWorkspace[workspace] ?? {})) {
         if (linked(version)) continue;
         const known = installed.get(`${name}@${version}`);
@@ -1020,12 +1063,17 @@ async function companionPlans(
           known.workspaces.push(workspace);
           continue;
         }
-        const dir = installedPackageDirOf(
-          adapter,
-          { dir: resolve(opts.cwd, workspace) },
-          name,
-          version,
-        )?.dir;
+        // Read from disk as Node would resolve it: loading a program for every workspace
+        // just to find a manifest is what a 28-workspace repository cannot afford.
+        const cheap = (
+          adapter as {
+            installedPackageDirCheap?: (repo: RepoDir, pkg: string) => string | undefined;
+          }
+        ).installedPackageDirCheap;
+        const dir = cheap
+          ? cheap({ dir: resolve(opts.cwd, workspace) }, name)
+          : installedPackageDirOf(adapter, { dir: resolve(opts.cwd, workspace) }, name, version)
+              ?.dir;
         let manifest = {};
         try {
           if (dir) manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
@@ -1294,7 +1342,7 @@ async function prepare(
   const nodeTypes = installedPackageDirOf(ctx.adapter, repo, '@types/node', '')?.dir;
   if (installedDir && nodeTypes) installedDir.types = [nodeTypes];
   // Typed through DefinitelyTyped: the surface to diff is @types/<name>'s, at the version matching the target's major.
-  const typesName = `@types/${name.startsWith('@') ? name.slice(1).replace('/', '__') : name}`;
+  const typesName = typesPackageOf(name);
   const typesDir = installedPackageDirOf(ctx.adapter, repo, typesName, '');
   let types: Prepared['types'];
   let runtimeDir: PackageDir | undefined;
@@ -1302,17 +1350,14 @@ async function prepare(
     const typesInstalled = readManifest(typesDir.dir)?.version ?? '0.0.0';
     const major = parseVersion(target)?.major;
     const published = (await ctx.fetcher.versions?.(typesName).catch(() => [])) ?? [];
-    // The @types release of the target's major; never below what is installed (@types/passport 1.x
-    // types passport 0.x), else the latest release.
-    const sameMajor = major === undefined ? undefined : maxSatisfying(published, `${major}.x`);
-    const latestTypes = published.at(-1);
+    // The @types release that types the target (its major.minor, else its major; never below
+    // what is installed: @types/passport 1.x types passport 0.x), else the latest release. A
+    // companion plan that moves the types package names the release outright.
     const typesTarget =
-      sameMajor !== undefined && compareVersions(sameMajor, typesInstalled) >= 0
-        ? sameMajor
-        : latestTypes !== undefined && compareVersions(latestTypes, typesInstalled) >= 0
-          ? latestTypes
-          : typesInstalled;
-    if (typesTarget !== sameMajor && published.length > 0)
+      ctx.opts.targets?.[typesName] ??
+      typesReleaseFor(published, target, typesInstalled) ??
+      typesInstalled;
+    if (major !== undefined && parseVersion(typesTarget)?.major !== major && published.length > 0)
       notes.push(
         `${typesName} has no ${major}.x release above ${typesInstalled}; diffed against ${typesTarget}`,
       );
@@ -1462,9 +1507,11 @@ async function checkGroup(
   // Led by the package asked for, when its companions are in the group: it names the report,
   // and its versions are the upgrade's.
   const plans = ctx.opts.companions ?? {};
-  const leader = prepared.find((p) => plans[p.name] !== undefined && prepared.length > 1);
+  // A package asked for by name carries its plan even where it is analyzed alone: what moves
+  // with it is one decision for the repository, whichever workspace the report comes from.
+  const leader = prepared.find((p) => plans[p.name] !== undefined);
   const plan = leader ? plans[leader.name] : undefined;
-  const name = leader?.name ?? groupName(prepared.map((p) => p.name));
+  const name = leader && prepared.length > 1 ? leader.name : groupName(prepared.map((p) => p.name));
   const notes = prepared.flatMap((p) =>
     prepared.length > 1 ? p.notes.map((n) => `${p.name}: ${n}`) : p.notes,
   );
@@ -1487,7 +1534,8 @@ async function checkGroup(
     installed: (leader?.installedVersion ?? installed[0]) as string,
     latest: (leader?.latest ??
       (prepared.length === 1 ? prepared[0]?.latest : targets.at(-1))) as string,
-    target: (leader?.target ?? targets.at(-1)) as string,
+    target: (leader?.target ??
+      (prepared.length === 1 ? prepared[0]?.target : targets.at(-1))) as string,
     ...(plan?.companions.length ? { companions: plan.companions } : {}),
     ...(plan?.conflicts.length ? { companionConflicts: plan.conflicts } : {}),
     majorsBehind: Math.max(...prepared.map((p) => majorsBehind(p.installedVersion, p.target))),
@@ -1659,6 +1707,7 @@ async function checkGroup(
         unresolvedFiles: signal.unresolvedFiles,
         unattributed: merged.unattributed,
         newErrors: signal.diagnostics.length,
+        coverage: { ...signal.coverage, workspaces: 1 },
       };
       if (signal.skipped) notes.push(signal.skipped);
       else if (signal.baselineErrors > 0)
@@ -1935,7 +1984,8 @@ async function checkGroup(
         // A pack that cannot read its versions adds nothing; the diff findings stand.
       }
     }
-    // Without a pack, only what the compiler or the runtime probe confirms is called breaking.
+    // Breaking means confirmed, in every tier: a type-surface change the compiler, the runtime
+    // probe or the pack did not confirm at the site is possible impact, never counted as breaking.
     const tier = tierOf(
       packsOf(ctx.opts),
       name,
@@ -1946,13 +1996,7 @@ async function checkGroup(
       const p = runtimeOf(f);
       return evidenceOf(f, p?.runtime, p ? loadRootOf(p) : undefined);
     };
-    const confirmed =
-      tier === 'generic'
-        ? confirmGeneric(findings, evidence)
-        : findings.map((f) => {
-            const found = f.severity === 'breaking' ? evidence(f) : undefined;
-            return found ? { ...f, evidence: found } : f;
-          });
+    const confirmed = confirmBreaking(findings, evidence);
     findings.length = 0;
     findings.push(...confirmed);
     // An import the target no longer has: what it exports instead is what a person, or the

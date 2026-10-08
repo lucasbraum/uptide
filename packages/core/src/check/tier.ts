@@ -4,7 +4,7 @@ import { runtimeConfirms } from './file-kind.js';
 
 /** The difference, in one line, wherever a tier is shown. */
 export const TIER_LEGEND =
-  'verified: migration pack · generic: no pack, breaking only if the compiler or the runtime probe confirms it';
+  'verified: migration pack · generic: no pack · in both, breaking only if the compiler, the runtime probe or the pack confirms it';
 
 /**
  * `verified`: a migration pack covers this upgrade (rules, a guide, ground truth it is scored
@@ -56,11 +56,12 @@ export function evidenceOf(
 }
 
 /**
- * The generic tier's rule: a finding is breaking only with evidence. The rest is kept, as
- * `unverified`, for `--details`: the declarations changed at a place the code uses, and
- * nothing confirmed that the code breaks. The verified tier is never passed through here.
+ * Breaking means confirmed, in every tier: a finding is breaking only with evidence. The rest
+ * is kept as `unverified`, the "possible impact" a report lists apart: the declarations
+ * changed at a place the code uses, and nothing confirmed that the code breaks there. A pack's
+ * own findings carry their evidence (`pack`); its rules claim compiler-confirmed sites as before.
  */
-export function confirmGeneric(
+export function confirmBreaking(
   findings: Finding[],
   evidence: (f: Finding) => Finding['evidence'],
 ): Finding[] {

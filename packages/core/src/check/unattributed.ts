@@ -1,3 +1,4 @@
+import { posix } from 'node:path';
 import type { Change } from '../domain/change.js';
 import type { Finding } from '../domain/report.js';
 import type { ApiSurface } from '../domain/surface.js';
@@ -28,6 +29,8 @@ function quotedNames(message: string): string[] {
 
 /** `${n} errors caused by \`name\` (file:line), <reason>. Fix here first.`: the text the report prints for a cluster. */
 export function describeCluster(count: number, cause: DiagnosticCause): string {
+  if (cause.config || cause.anchorOnly)
+    return `${count} error${count === 1 ? '' : 's'} caused by \`${cause.name}\` in ${cause.file}:${cause.line}: ${cause.reason}. One edit there resolves them.`;
   return `${count} error${count === 1 ? '' : 's'} caused by \`${cause.name}\` (${cause.file}:${cause.line}), ${cause.reason}. Fix here first.`;
 }
 
@@ -73,21 +76,27 @@ export function unattributedFindings(
       source: 'types',
       confidence: 1,
       evidence: 'checker',
-      notes: describeCluster(group.length, { ...cause, file: `${filePrefix}${cause.file}` }),
+      notes: describeCluster(group.length, {
+        ...cause,
+        file: posix.normalize(`${filePrefix}${cause.file}`),
+      }),
     };
     return {
       change,
       usage,
       downstream: group.map((d) => ({
-        file: `${filePrefix}${d.file}`,
+        file: posix.normalize(`${filePrefix}${d.file}`),
         line: d.line,
         code: d.code,
         message: d.message.split('\n')[0] ?? d.message,
       })),
+      // A cause that is itself the one edit (a compiler option, a parameter's type) is the
+      // site; the errors under it are evidence.
+      ...(cause.anchorOnly || cause.config ? { anchorOnly: true as const } : {}),
       severity: 'breaking',
       confidence: 1,
-      fixability: 'unknown',
-      reason: UNATTRIBUTED_REASON,
+      fixability: cause.anchorOnly || cause.config ? 'assisted' : 'unknown',
+      reason: cause.anchorOnly || cause.config ? cause.reason : UNATTRIBUTED_REASON,
     };
   });
   return [...clustered, ...plainFindings(single, meta, surfaceB, unresolvedFiles)];

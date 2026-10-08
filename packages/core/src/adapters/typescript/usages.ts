@@ -163,11 +163,12 @@ export function resolvePackageDir(repo: LoadedRepo, pkg: string): string | undef
     repo.project.getCompilerOptions(),
     repo.project.getModuleResolutionHost(),
   ).resolvedModule;
-  // Unresolved and not on disk under node_modules: not installed. Climbing from a missing
-  // directory would land on the repository's own package.json and call it the package.
-  const fallback = join(repo.dir, 'node_modules', pkg);
-  if (!resolved && !existsSync(join(fallback, 'package.json'))) return undefined;
-  let dir = resolved ? dirname(resolved.resolvedFileName) : fallback;
+  // Unresolved and not on disk under a node_modules Node would search: not installed.
+  // Climbing from a missing directory would land on the repository's own package.json and
+  // call it the package.
+  const fallback = hoistedPackageDir(repo.dir, pkg);
+  if (!resolved && fallback === undefined) return undefined;
+  let dir = resolved ? dirname(resolved.resolvedFileName) : (fallback as string);
   for (;;) {
     const pj = join(dir, 'package.json');
     if (existsSync(pj)) {
@@ -179,10 +180,23 @@ export function resolvePackageDir(repo: LoadedRepo, pkg: string): string | undef
       }
     }
     const parent = dirname(dir);
-    // Resolved to another package's declarations (@types/express for 'express'): the runtime package is under node_modules.
-    if (parent === dir)
-      return existsSync(join(fallback, 'package.json')) ? realpathSync(fallback) : undefined;
+    // Resolved to another package's declarations (@types/express for 'express'): the runtime
+    // package is under a node_modules Node would search from the workspace.
+    if (parent === dir) return fallback === undefined ? undefined : realpathSync(fallback);
     dir = parent;
+  }
+}
+
+/**
+ * `<dir>/node_modules/<pkg>` for the workspace or the nearest ancestor that has it: what Node
+ * resolves from the workspace. A hoisting installer (yarn classic, npm) keeps one copy at the
+ * repository root, which a workspace that only peer-depends on the package still sees.
+ */
+export function hoistedPackageDir(from: string, pkg: string): string | undefined {
+  for (let dir = from; ; dir = dirname(dir)) {
+    const candidate = join(dir, 'node_modules', pkg);
+    if (existsSync(join(candidate, 'package.json'))) return candidate;
+    if (dirname(dir) === dir) return undefined;
   }
 }
 

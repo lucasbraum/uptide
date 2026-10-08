@@ -405,6 +405,7 @@ describe('span-level confirmation', () => {
         },
       ],
       baselineErrors: 0,
+      coverage: { compiled: 1, total: 1, skipped: [] },
       unresolvedInTarget: [],
       unresolvedFiles: [],
       linkedDependencies: [],

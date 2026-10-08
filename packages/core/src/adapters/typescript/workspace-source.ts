@@ -102,15 +102,21 @@ function readdirSafe(dir: string): string[] {
   }
 }
 
-/** The dependency's directory: the symlink under node_modules, or the link target itself. */
+/**
+ * The dependency's directory: the symlink under the workspace's node_modules or an ancestor's
+ * (Yarn and npm hoist workspace links to the root), or the link target itself.
+ */
 function linkedDir(repoDir: string, name: string, specifier: string): string | undefined {
-  const viaNodeModules = join(repoDir, 'node_modules', name);
-  if (existsSync(viaNodeModules)) {
-    try {
-      return realpathSync(viaNodeModules);
-    } catch {
-      // dangling link
+  for (let dir = repoDir; ; dir = dirname(dir)) {
+    const viaNodeModules = join(dir, 'node_modules', name);
+    if (existsSync(viaNodeModules)) {
+      try {
+        return realpathSync(viaNodeModules);
+      } catch {
+        // dangling link
+      }
     }
+    if (dirname(dir) === dir) break;
   }
   const m = /^(?:link|file):(.+)$/.exec(specifier);
   if (m) {
@@ -120,22 +126,42 @@ function linkedDir(repoDir: string, name: string, specifier: string): string | u
   return undefined;
 }
 
+/**
+ * The map covers the workspace's own linked dependencies and, through them, theirs: a source
+ * entry of `@tldraw/editor` re-exports from `@tldraw/utils`, which must map to source too or
+ * every name that passes through it is missing. Each package is visited once.
+ */
 export function workspaceSourceMap(
   repoDir: string,
   installed: Map<string, string>,
 ): WorkspaceSourceMap {
   const paths: Record<string, string[]> = {};
   const warnings: string[] = [];
-  for (const [name, specifier] of installed) {
-    if (!LINK.test(specifier)) continue;
-    const depDir = linkedDir(repoDir, name, specifier);
+  const queue: { from: string; name: string; specifier: string }[] = [...installed]
+    .filter(([, specifier]) => LINK.test(specifier))
+    .map(([name, specifier]) => ({ from: repoDir, name, specifier }));
+  const seen = new Set<string>();
+  for (let next = queue.shift(); next; next = queue.shift()) {
+    const { from, name, specifier } = next;
+    if (seen.has(name)) continue;
+    seen.add(name);
+    const depDir = linkedDir(from, name, specifier);
     if (!depDir) continue;
-    let manifest: Manifest;
+    let manifest: Manifest & {
+      dependencies?: Record<string, string>;
+      peerDependencies?: Record<string, string>;
+    };
     try {
-      manifest = JSON.parse(readFileSync(join(depDir, 'package.json'), 'utf8')) as Manifest;
+      manifest = JSON.parse(readFileSync(join(depDir, 'package.json'), 'utf8')) as typeof manifest;
     } catch {
       continue;
     }
+    for (const [dep, range] of Object.entries({
+      ...manifest.peerDependencies,
+      ...manifest.dependencies,
+    }))
+      if (LINK.test(range) && !seen.has(dep))
+        queue.push({ from: depDir, name: dep, specifier: range });
     let mapped = 0;
     let unmapped: string | undefined;
     for (const [subpath, distFile] of typesTargets(manifest)) {

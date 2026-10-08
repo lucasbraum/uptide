@@ -149,3 +149,115 @@ describe('companionsOf, a member that already agrees', () => {
     expect(plan).toEqual({ companions: [], conflicts: [] });
   });
 });
+
+describe('companionsOf, react 18 → 19', () => {
+  /** The registry as the upgrade sees it: react-dom peer-requires react at its own version, the types track minors. */
+  const react: Record<string, Versions> = {
+    react: { '18.2.0': {}, '18.3.1': {}, '19.0.0': {}, '19.2.1': {}, '19.3.0': {} },
+    'react-dom': {
+      '18.2.0': { dependencies: { scheduler: '^0.23.0' }, peerDependencies: { react: '^18.2.0' } },
+      '18.3.1': { dependencies: { scheduler: '^0.23.2' }, peerDependencies: { react: '^18.3.1' } },
+      '19.0.0': { dependencies: { scheduler: '0.25.0' }, peerDependencies: { react: '^19.0.0' } },
+      '19.2.1': { dependencies: { scheduler: '0.27.0' }, peerDependencies: { react: '^19.2.1' } },
+      '19.3.0': { dependencies: { scheduler: '0.28.0' }, peerDependencies: { react: '^19.3.0' } },
+    },
+    '@types/react': {
+      '18.2.0': { dependencies: { csstype: '^3.0.2' } },
+      '18.3.31': { dependencies: { csstype: '^3.0.2' } },
+      '19.0.10': { dependencies: { csstype: '^3.0.2' } },
+      '19.0.14': { dependencies: { csstype: '^3.0.2' } },
+      '19.2.7': { dependencies: { csstype: '^3.0.2' } },
+      '19.3.0': { dependencies: { csstype: '^3.0.2' } },
+    },
+    '@types/react-dom': {
+      '18.2.0': { dependencies: { '@types/react': '*' } },
+      '19.0.4': { peerDependencies: { '@types/react': '^19.0.0' } },
+      '19.2.3': { peerDependencies: { '@types/react': '^19.0.0' } },
+    },
+    scheduler: { '0.23.0': {}, '0.25.0': {} },
+  };
+  const manifests = async (name: string) => react[name] ?? {};
+  const installed = (name: string, version: string, workspaces: string[]): InstalledDependency => ({
+    name,
+    version,
+    manifest: { name, version, ...react[name]?.[version] },
+    workspaces,
+  });
+
+  it('moves react-dom, @types/react and @types/react-dom with react, the types from the root', async () => {
+    // excalidraw: the app declares react and react-dom, the root declares the types for everyone.
+    const plan = await companionsOf({
+      name: 'react',
+      target: '19.0.0',
+      installed: [
+        installed('react', '18.2.0', ['excalidraw-app']),
+        installed('react-dom', '18.2.0', ['excalidraw-app']),
+        installed('@types/react', '18.2.0', ['.']),
+        installed('@types/react-dom', '18.2.0', ['.']),
+        installed('scheduler', '0.23.0', ['excalidraw-app']),
+      ],
+      manifests,
+    });
+    expect(plan.conflicts).toEqual([]);
+    expect(plan.companions).toEqual([
+      {
+        name: '@types/react',
+        from: '18.2.0',
+        to: '19.0.14',
+        reason: '@types/react 19.0.14 types react 19.0.0',
+      },
+      {
+        name: '@types/react-dom',
+        from: '18.2.0',
+        to: '19.0.4',
+        reason: '@types/react-dom 19.0.4 types react-dom 19.0.0',
+      },
+      {
+        name: 'react-dom',
+        from: '18.2.0',
+        to: '19.0.0',
+        reason: 'react-dom 19.0.0 is released with react 19.0.0 (peer ^19.0.0)',
+      },
+    ]);
+    expect(plan.reason).toBe('peer link, types for react, react-dom');
+  });
+
+  it('moves a lockstep companion even when its installed copy accepts the target', async () => {
+    const plan = await companionsOf({
+      name: 'react',
+      target: '19.2.1',
+      installed: [
+        installed('react', '18.3.1', ['.']),
+        {
+          ...installed('react-dom', '18.3.1', ['.']),
+          manifest: { peerDependencies: { react: '^18.3.1 || ^19.0.0' } },
+        },
+        installed('@types/react', '18.3.31', ['.']),
+      ],
+      manifests: async (name) =>
+        name === 'react-dom'
+          ? {
+              ...react['react-dom'],
+              '18.3.1': { peerDependencies: { react: '^18.3.1 || ^19.0.0' } },
+            }
+          : manifests(name),
+    });
+    expect(plan.companions.map((c) => `${c.name} ${c.to}`)).toEqual([
+      '@types/react 19.2.7',
+      'react-dom 19.2.1',
+    ]);
+  });
+
+  it('leaves a types package declared in an unrelated workspace alone', async () => {
+    const plan = await companionsOf({
+      name: 'react',
+      target: '19.0.0',
+      installed: [
+        installed('react', '18.2.0', ['apps/web']),
+        installed('@types/react', '18.2.0', ['apps/docs']),
+      ],
+      manifests,
+    });
+    expect(plan).toEqual({ companions: [], conflicts: [] });
+  });
+});

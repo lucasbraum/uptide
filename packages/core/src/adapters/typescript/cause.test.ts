@@ -80,4 +80,51 @@ describe('root cause guard', () => {
       reason: 'imported from `widget`, which is typed `any` against the target',
     });
   });
+
+  it('anchors argument mismatches at a repository parameter when several call sites trip it', async () => {
+    const dir = consumerWith(
+      'param.ts',
+      [
+        "import { boxed, type Box } from 'widget';",
+        'export function use(b: Box<number>): number {',
+        '  return b.a;',
+        '}',
+        'export const first = use(boxed());',
+        'export const second = use(boxed());',
+        '',
+      ].join('\n'),
+    );
+    const signal = await compileAgainstTarget({ dir }, 'widget', join(DEPS, 'widget-v3'));
+    const mismatches = signal.diagnostics.filter(
+      (d) => d.file === 'src/param.ts' && d.code === 2345,
+    );
+    expect(mismatches.map((d) => d.line)).toEqual([5, 6]);
+    for (const d of mismatches)
+      expect(d.cause).toEqual({
+        name: 'b',
+        file: 'src/param.ts',
+        line: 2,
+        reason:
+          "whose parameter `b: Box<number>` no longer accepts what the target gives it; widen the parameter's type there",
+        anchorOnly: true,
+      });
+  });
+
+  it('leaves a parameter one site trips to that site', async () => {
+    const dir = consumerWith(
+      'single.ts',
+      [
+        "import { boxed, type Box } from 'widget';",
+        'export function use(b: Box<number>): number {',
+        '  return b.a;',
+        '}',
+        'export const only = use(boxed());',
+        '',
+      ].join('\n'),
+    );
+    const signal = await compileAgainstTarget({ dir }, 'widget', join(DEPS, 'widget-v3'));
+    const at5 = signal.diagnostics.find((d) => d.file === 'src/single.ts' && d.line === 5);
+    expect(at5?.code).toBe(2345);
+    expect(at5?.cause?.anchorOnly).toBeUndefined();
+  });
 });

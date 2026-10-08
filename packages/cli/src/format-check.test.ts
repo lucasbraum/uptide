@@ -364,21 +364,64 @@ describe('tiers, the time budget and failures on the first screen', () => {
     expect(formatCheck(report([verified]), { color: false })).not.toContain('generic: no pack');
   });
 
-  it('keeps what nothing confirmed off the first screen of a generic package', () => {
+  it('lists what nothing confirmed as possible impact, apart from the breaking count, in every tier', () => {
     const out = formatCheck(report([generic]), { color: false });
-    expect(out).toContain('✗ 1 breaking · 1 unconfirmed in --details');
-    expect(out).not.toContain('? ');
+    expect(out).toContain('✗ 1 breaking, 1 possible');
+    expect(out).toContain(
+      '? possible impact: 1 site in 1 file   the types changed where this code uses them; nothing confirmed that it breaks, so these are not counted as breaking',
+    );
+    expect(out).toMatch(/\n {4}\? sharp\.cache removed +image\.ts:4/);
     expect(out).not.toContain('unverified');
     const none = formatCheck(report([{ ...generic, status: 'safe', findings: [unconfirmed] }]), {
       color: false,
     });
-    expect(none).toContain('✓ nothing confirmed (12 call sites) · 1 unconfirmed in --details');
-    // The verified tier still shows what it could not verify.
+    expect(none).toContain('? 1 possible impact');
+    expect(none).not.toContain('✓');
+    // The verified tier lists it the same way: breaking means confirmed in both.
     const kept = formatCheck(
       report([{ ...generic, name: 'zod', tier: 'verified', findings: [unconfirmed] }]),
       { color: false },
     );
-    expect(kept).toContain('? 1 unverified');
+    expect(kept).toContain('? 1 possible impact');
+    expect(kept).toContain('? possible impact: 1 site in 1 file');
+  });
+
+  it('prints how much of the code the compiler judged under every analyzed package', () => {
+    const covered = pkg({
+      name: 'zod',
+      tier: 'verified',
+      status: 'safe',
+      compile: {
+        baselineErrors: 0,
+        unresolvedInTarget: [],
+        unresolvedFiles: [],
+        unattributed: [],
+        newErrors: 0,
+        coverage: {
+          compiled: 12,
+          total: 40,
+          workspaces: 2,
+          skipped: [{ reason: 'not in the workspace tsconfig', count: 28 }],
+        },
+      },
+    });
+    const out = formatCheck(report([covered]), { color: false });
+    expect(out).toContain(
+      'zod   0 breaking · types partly verified: compiled 12 of 40 files in 2 workspaces; skipped: not in the workspace tsconfig (28)',
+    );
+    expect(out).toContain(
+      '\n  compiled 12 of 40 files in 2 workspaces; skipped: not in the workspace tsconfig (28)',
+    );
+    const full = {
+      ...covered,
+      compile: {
+        ...covered.compile,
+        coverage: { compiled: 40, total: 40, workspaces: 2, skipped: [] },
+      },
+    } as PackageReport;
+    const clean = formatCheck(report([full]), { color: false });
+    expect(clean).toContain('zod   0 breaking · compiled against 5.3.0: 0 new type errors');
+    expect(clean).toContain('\n  compiled 40 of 40 files in 2 workspaces');
   });
 
   it('folds many no-impact upgrades into one line', () => {

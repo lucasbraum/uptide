@@ -93,6 +93,21 @@ and the range style restored after, so `^4.0.1` stays at the 4.0.1 the target pi
 lockfile may change inside any of their subtrees and nowhere else. A conflict stops `fix`
 before it writes anything.
 
+Two links `list` does not draw are added for the plan. `@types/<pkg>` moves with `<pkg>` by
+name (nothing in its manifest says so), to the release that types the target: the newest at
+the target's major.minor, else at its major, else the newest there is, never below what is
+installed (`src/check/types-release.ts`; `prepare` diffs the types package at that version).
+A package whose release at the target's own version asks for the target (react-dom 19.0.0
+peer-requires react ^19.0.0) is released in lockstep and moves to that version, even when the
+installed copy's range would accept the target. The closure is transitive and companions can
+move with companions: `@types/react-dom` with `react-dom`, which moves with `react`; a types
+package waits for the package it types before its own manifest may place it. Every workspace's
+dependencies are candidates, since a hoisting installer keeps the root's `@types/react` for the
+app that declares `react`; a candidate must be visible from a workspace of the package it
+follows (the same one, or an ancestor). `check react` 18 → 19 moves react-dom, @types/react
+and @types/react-dom together; the plan is carried by every report of the package, alone or
+leading its group, and the merged entry keeps every companion.
+
 ### One dependency, one decision
 
 A dependency at the same installed version and target in several workspaces is one entry
@@ -231,10 +246,27 @@ v1 and berry, bun's text lockfile), never from `node_modules` alone. The lockfil
 workspace root above the package being checked; the importer read is that package's
 (`importers[<rel>]` for pnpm, `packages[<rel>/node_modules/<name>]` before the hoisted
 entry for npm, the declared range's entry for yarn, the workspace's nested key for bun),
-so two workspace packages on different versions of the same dependency are read correctly. The
+so two workspace packages on different versions of the same dependency are read correctly. A
+dependency declared `workspace:`, `link:` or `file:` is recorded under that specifier whatever
+the lockfile says for it (Yarn writes `0.0.0-use.local`, npm nothing), so the source mapping
+below and the `workspace` status read it the same way under every manager. The
 ts-morph project comes from the repo's `tsconfig.json` (its `paths`, `include`, and
 project references one level down) or, without one, from `**/*.ts,tsx` minus
-`node_modules`, `dist` and `build`. Nothing in the repository is executed.
+`node_modules`, `dist` and `build`. A scoped program (the files that use one package) also
+holds the ambient `.d.ts` files the tsconfig includes (`vite-env.d.ts`, `css.d.ts`): nothing
+imports them, and without them `*.module.css` imports and `declare global` names fail.
+Nothing in the repository is executed.
+
+The compiler bundled with ts-morph is TypeScript 6, whose defaults for an option a tsconfig
+leaves unset differ from TypeScript 5's: `strict` on, no automatic `@types` inclusion, a
+modern `target`, `module` and resolution, `esModuleInterop` on. A repository on TypeScript 5
+(or with none installed) is read with TypeScript 5's defaults made explicit
+(`src/adapters/typescript/legacy-options.ts`: target ES5, module and resolution derived from
+it, interop off, strict off, every `@types/*` package of the type roots), so a scoped program
+reports what the repository's own compiler would; a repository on TypeScript 6 keeps the
+compiler's own. A package's `main` pointing at a `.ts` source is not resolved from
+`node_modules` by the bundled compiler either, which is one more reason workspace
+dependencies are mapped to their source.
 
 ### Signal A (`src/adapters/typescript/usages.ts`)
 
@@ -319,6 +351,15 @@ is counted in `unresolvedInTarget`, and is shown as one warning ("N unresolved m
 inside pkg@ver, results may be incomplete"). Those never become findings: with
 `skipLibCheck` an unresolved import inside a declaration file makes the type `any`,
 which hides errors rather than inventing them.
+
+Every compile says what it covered (`CompileSignal.coverage`): the files it was asked about
+(the package's usage files and the files importing them, per workspace) and how many it
+type-checked, with a reason for each file it did not: outside the workspace's tsconfig, a
+workspace whose baseline is structurally broken, an invalid tsconfig. Merged across
+workspaces into `PackageReport.compile.coverage` (`compiled 355 of 356 files in 5
+workspaces; skipped: ...`), it is printed under every analyzed package, and a package whose
+files were not all compiled gets the verdict "types partly verified" with that line instead
+of "compiled against <version>" (`src/check/verdict.ts`).
 
 Cost is proportional to the package, not the repository. The overlay is a raw compiler
 `Program` that shares the baseline's parsed and bound source files and its module
@@ -491,8 +532,40 @@ becomes `info`: "diff says X but your code compiles against the target", confide
 never listed, never counted. If the symbol's declaration file in the target has an
 unresolved import, the compiler's silence proves nothing there and the finding is
 `unverified` instead: shown in its own section, not counted as breaking. Deprecations are
-untouched. Without Signal B (`--no-compile`, or a skipped overlay) verdicts stand and the
-package carries the note "unverified: compile check skipped".
+untouched.
+
+Breaking means confirmed, in every tier (`src/check/tier.ts`, `confirmBreaking`). A finding
+stays breaking only with evidence: the compiler rejects the site, the runtime probe saw the
+export go, a `require()` of an ESM-only target, the import of a name the target no longer
+exports, or a migration pack found it in the code. A type-surface change the declaration
+diff reports at a site nothing confirmed, in a file the compile did not reach as much as in
+one it did, is `unverified`: the "possible impact" a report lists apart and never counts as
+breaking. Packs keep their rules, and their breaking findings follow the same rule: a rule
+claims the compiler-confirmed sites it matches, and a pack's own `detect` sites carry their
+evidence. Without Signal B (`--no-compile`, or a skipped overlay) nothing is confirmed, every
+surface change is possible impact, and the package carries the note "unverified: compile
+check skipped".
+
+A root cause can be a compiler option (`src/adapters/typescript/config-cause.ts`). The
+target removes the global `JSX` namespace (@types/react 19); a workspace whose `jsx` is
+`preserve` or `react` and names no `jsxImportSource` reads JSX element types from that
+namespace, so every element in every file errors (TS7026, TS2602) with one fix. Those
+diagnostics are anchored at the `jsx` line of the tsconfig that sets it (through `extends`),
+as one `cause` finding marked `anchorOnly`: it counts as one site, the plan and `fix` list
+the tsconfig, the diagnostics are its `downstream` evidence, and a pack rule claims the
+anchor when it claims most of the errors under it (`ruleFor`). A `JSX.Element` written in
+code is still a site of its own.
+
+A root cause can be a repository parameter (`parameterCause` in `cause.ts`). A mismatch the
+compiler reports at an argument (TS2345) or a JSX attribute (TS2322) whose parameter or prop
+is declared in the repository with a type that names something from outside it
+(`usePassThroughWheelEvents(ref: RefObject<HTMLElement>)`, rejected at eleven call sites once
+the target's `useRef` returns `RefObject<HTMLElement | null>`) is anchored at the parameter,
+`anchorOnly`, when at least two sites trip it: the one edit is the parameter's type, as the
+migration guides say, and the call sites are evidence. The parameter may sit in another
+workspace whose source the program maps (`packages/editor` for a call in `packages/tldraw`);
+its path is the repository's. A parameter one site trips is left to
+that site, which may as well be the argument's.
 
 A diagnostic confirms exactly one usage: the innermost whose span contains the
 diagnostic's start. `z.string().trim().url()` is three usages on one line, and an error

@@ -117,3 +117,56 @@ describe('root-cause clusters', () => {
     expect(out[1]?.change.path).toBe('TS2339');
   });
 });
+
+describe('a compiler option as the cause', () => {
+  it('anchors the diagnostics at the option, as one site with the errors as evidence', () => {
+    const cause = {
+      name: 'jsx',
+      file: 'tsconfig.json',
+      line: 4,
+      reason:
+        '"jsx": "preserve" reads the global JSX namespace, which @types/react no longer declares',
+      config: true as const,
+    };
+    const findings = unattributedFindings(
+      [
+        diag({
+          file: 'src/App.tsx',
+          line: 3,
+          code: 7026,
+          message: 'JSX element implicitly has type any',
+          cause,
+        }),
+        diag({
+          file: 'src/Nav.tsx',
+          line: 8,
+          code: 7026,
+          message: 'JSX element implicitly has type any',
+          cause,
+        }),
+        diag({}),
+      ],
+      meta,
+      surface,
+      [],
+      'apps/web/',
+    );
+    expect(findings).toHaveLength(2);
+    const [anchor] = findings;
+    expect(anchor).toMatchObject({
+      anchorOnly: true,
+      severity: 'breaking',
+      fixability: 'assisted',
+      reason: cause.reason,
+      change: { kind: 'cause', path: 'cause:jsx' },
+      usage: { file: 'tsconfig.json', line: 4 },
+    });
+    expect(anchor?.downstream?.map((d) => d.file)).toEqual([
+      'apps/web/src/App.tsx',
+      'apps/web/src/Nav.tsx',
+    ]);
+    expect(anchor?.change.notes).toBe(
+      `2 errors caused by \`jsx\` in apps/web/tsconfig.json:4: ${cause.reason}. One edit there resolves them.`,
+    );
+  });
+});

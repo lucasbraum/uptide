@@ -206,14 +206,27 @@ export function ruleFor<R extends MigrationRule & { message?: RegExp }>(
   rules: readonly R[],
   finding: Finding,
 ): R | undefined {
-  return (
-    rules.find((r) => r.id === finding.rule) ??
-    rules.find(
-      (r) =>
-        r.kinds.includes(finding.change.kind) &&
-        r.symbols.test(finding.change.path) &&
-        (!r.message || r.message.test(finding.usage.compileError ?? '')),
-    )
+  const set = rules.find((r) => r.id === finding.rule);
+  if (set) return set;
+  // A root-cause anchor is claimed by the rule that claims the errors under it: the one most
+  // of them match, from their codes and messages.
+  if (finding.change.kind === 'cause' && finding.downstream?.length) {
+    const votes = new Map<R, number>();
+    for (const d of finding.downstream.slice(0, 200)) {
+      const rule = ruleFor(rules, {
+        ...finding,
+        change: { ...finding.change, kind: 'type', path: `TS${d.code}` },
+        usage: { ...finding.usage, compileError: d.message, compileCode: d.code },
+      });
+      if (rule) votes.set(rule, (votes.get(rule) ?? 0) + 1);
+    }
+    return [...votes].sort((a, b) => b[1] - a[1])[0]?.[0];
+  }
+  return rules.find(
+    (r) =>
+      r.kinds.includes(finding.change.kind) &&
+      r.symbols.test(finding.change.path) &&
+      (!r.message || r.message.test(finding.usage.compileError ?? '')),
   );
 }
 

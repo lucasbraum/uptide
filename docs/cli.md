@@ -91,16 +91,39 @@ or incomplete analysis. A failing package/workspace does not erase successful re
 Every row says `verified` or `generic`. Verified: a migration pack covers the upgrade, and
 its ground truth from at least two public repositories has no false positive among breaking
 findings ([docs/packs.md](packs.md)). A pack that has not met that bar yet is a candidate and
-the row says generic. Generic: no verified pack; a finding is breaking only with evidence, which `--details` names under
-each site:
+the row says generic. Generic: no verified pack. In both tiers a finding is breaking only
+with evidence, which `--details` names under each site:
 
 - your code does not compile against the target at that site;
 - the runtime probe loaded the target and the export is gone or changed;
 - a `require()` of a package whose target is ESM-only;
-- the import of a name the target no longer exports.
+- the import of a name the target no longer exports;
+- a migration pack found it in the code (verified tier).
 
-Everything else the declaration diff suggests is listed as unverified in `--details` and
-counted on the first screen only as "N unconfirmed".
+Everything else the declaration diff suggests is possible impact: the row counts it apart
+(`✗ 3 breaking, 17 possible`), the package lists it under "possible impact: N sites in M
+files, not confirmed by the compiler or the runtime probe", and `--details` has every site.
+It is never counted as breaking.
+
+### Coverage
+
+Under every analyzed package, one line says how much of the code that uses it the compiler
+judged: `compiled 355 of 356 files in 5 workspaces; skipped: most files cannot resolve their
+imports at the installed version (1)`. The files are the ones that import the package and the
+ones importing those, per workspace, each compiled under its own tsconfig; a skipped one
+says why (not in the workspace tsconfig, a workspace whose baseline cannot resolve its
+imports, an invalid tsconfig). When not every file was compiled, the verdict says `types
+partly verified: compiled N of M files ...` instead of `compiled against <version>`: a clean
+result only covers what was compiled.
+
+A root cause that is a compiler option is one site. When the target drops the global `JSX`
+namespace and the workspace's `"jsx": "preserve"` (or `"react"`) reads JSX element types
+from it, every element in every file errors with one fix: `check` reports one finding at the
+`jsx` line of the tsconfig that sets it (`"jsxImportSource": "react"` resolves it), with the
+diagnostics as evidence, and `--details` shows a few of them. A repository parameter that
+several call sites trip over (a hook typed `RefObject<HTMLElement>` once `useRef` returns
+`RefObject<HTMLElement | null>`) is reported the same way: one finding at the parameter, with
+the call sites as evidence.
 
 ### Partial results
 

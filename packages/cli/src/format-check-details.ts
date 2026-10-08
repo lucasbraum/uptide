@@ -14,6 +14,8 @@ export interface DetailOptions {
 }
 
 const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
+/** Errors shown under a compiler-option cause: enough to see the shape, not the thousand of them. */
+const EVIDENCE_SITES = 8;
 
 function describeChange(f: Finding): string {
   const c = f.change;
@@ -90,6 +92,24 @@ function siteLines(
   return findings.flatMap((f) => {
     if (f.change.kind !== 'cause') return findingLines(f, mark, colors, tint);
     const sites = f.downstream ?? [];
+    // A compiler option is one site; the errors under it are evidence, a few of them shown.
+    if (f.anchorOnly) {
+      const shown = sites.slice(0, EVIDENCE_SITES);
+      return [
+        `  ${tint(mark)} ${f.usage.file}:${f.usage.line}  \`${f.change.path.replace(/^cause:/, '')}\``,
+        `      ${f.reason}`,
+        colors.dim(
+          `      evidence: ${plural(sites.length, 'error')} at the target${shown.length ? ', for example' : ''}`,
+        ),
+        ...shown.map((site) =>
+          colors.dim(`        ${site.file}:${site.line}  TS${site.code}: ${site.message}`),
+        ),
+        ...(sites.length > shown.length
+          ? [colors.dim(`        … and ${sites.length - shown.length} more`)]
+          : []),
+        ...(f.details ?? []).map((detail) => colors.dim(`      ${detail}`)),
+      ];
+    }
     return [
       `  ${tint(mark)} ${f.reason} (${plural(sites.length, 'site')})`,
       ...sites.flatMap((site) => [
