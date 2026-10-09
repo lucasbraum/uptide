@@ -51,6 +51,7 @@ verified with two or more public repositories and no false positive. The contrac
 | Package | Range | Precision | Recall | Ground-truth repositories | Status |
 | --- | --- | ---: | ---: | --- | --- |
 | `ai` | 6.x → 7.x | 100% | 36% | vercel/chatbot, miurla/morphic | verified |
+| `react` | 18.x → 19.x | 100% | 69% | excalidraw/excalidraw, tldraw/tldraw | verified |
 | `stripe` | 14 and newer | 100% | 90% | unkeyed/unkey, nextjs/saas-starter | verified |
 | `zod` | 3.x → 4.x | 100% | 71% | ugurkocde/AwesomeIntune, howardyang2009/PATH, band-ai/band-sdk-typescript | verified |
 <!-- packs:end -->

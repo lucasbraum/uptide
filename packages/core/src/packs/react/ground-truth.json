@@ -1,0 +1,725 @@
+{
+  "$comment": "Ground truth for the react pack (docs/packs.md, \"Ground truth\"). Each public repository is pinned at the commit before its own React 18 to 19 upgrade. Expected findings come from two sources that are not Uptide, drafted by pnpm packs:truth and read by hand: the diagnostics the repository's TypeScript reports with react, react-dom, @types/react and @types/react-dom at the upgrade's versions linked in and not without them (errors and deprecations), and the lines the upgrade commit changed for react (one site per construct). Left out on purpose: comment-only and insertion-only lines, imports that follow a site, changes for other packages (vitest, testing-library, TypeScript target types, setTimeout typings), tldraw's casts of spread menu-item props and docs code.tsx lines that stayed valid, and excalidraw's forwardRef to ref-prop rewrite of DebugCanvas, which React 19 does not require. Rules are assigned from each site's code and text; the JSX element diagnostics of apps/dotcom/client (1745 of them) have one cause, the \"jsx\" setting of its tsconfig, and are one expected site there, at the line the upgrade changed; a JSX.Element written in code stays a site of its own.",
+  "package": "react",
+  "repos": [
+    {
+      "repo": "excalidraw/excalidraw",
+      "commit": "9ee0b8ffcbd3664a47748a93262860321a203821",
+      "migration": "https://github.com/excalidraw/excalidraw/commit/31e8476c78aca31df1342dc26903e42301d2c3fd",
+      "from": "18.2.0",
+      "to": "19.0.0",
+      "with": {
+        "react-dom": "19.0.0",
+        "@types/react": "19.0.10",
+        "@types/react-dom": "19.0.4"
+      },
+      "why": "Excalidraw: a React 18 canvas editor with a library package, an app and tests; forwardRef components, RefObject props, global JSX types and ReactDOM.unmountComponentAtNode in tests",
+      "findings": [
+        {
+          "file": "dev-docs/src/components/Homepage/index.tsx",
+          "line": 1,
+          "rule": "generic"
+        },
+        {
+          "file": "dev-docs/src/pages/index.tsx",
+          "line": 1,
+          "rule": "generic"
+        },
+        {
+          "file": "examples/excalidraw/with-nextjs/src/app/page.tsx",
+          "line": 19,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "excalidraw-app/collab/CollabError.tsx",
+          "line": 22,
+          "rule": "use-ref-argument"
+        },
+        {
+          "file": "packages/excalidraw/components/Actions.tsx",
+          "line": 410,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "packages/excalidraw/components/App.tsx",
+          "line": 1259,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "packages/excalidraw/components/App.tsx",
+          "line": 1773,
+          "rule": "ref-object-nullable"
+        },
+        {
+          "file": "packages/excalidraw/components/ButtonIcon.tsx",
+          "line": 32,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "packages/excalidraw/components/ButtonIconCycle.tsx",
+          "line": 23,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "packages/excalidraw/components/ButtonIconSelect.tsx",
+          "line": 40,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "packages/excalidraw/components/DefaultSidebar.tsx",
+          "line": 102,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "packages/excalidraw/components/EyeDropper.tsx",
+          "line": 210,
+          "rule": "ref-object-nullable"
+        },
+        {
+          "file": "packages/excalidraw/components/FontPicker/FontPickerList.tsx",
+          "line": 159,
+          "rule": "ref-object-nullable"
+        },
+        {
+          "file": "packages/excalidraw/components/FontPicker/keyboardNavHandlers.ts",
+          "line": 7,
+          "rule": "ref-object-nullable",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "packages/excalidraw/components/HelpDialog.tsx",
+          "line": 109,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "packages/excalidraw/components/IconPicker.tsx",
+          "line": 117,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "packages/excalidraw/components/IconPicker.tsx",
+          "line": 221,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "packages/excalidraw/components/JSONExportDialog.tsx",
+          "line": 45,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "packages/excalidraw/components/LayerUI.tsx",
+          "line": 197,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "packages/excalidraw/components/LayerUI.tsx",
+          "line": 198,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "packages/excalidraw/components/LayerUI.tsx",
+          "line": 253,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "packages/excalidraw/components/LayerUI.tsx",
+          "line": 332,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "packages/excalidraw/components/LayerUI.tsx",
+          "line": 352,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "packages/excalidraw/components/LayerUI.tsx",
+          "line": 492,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "packages/excalidraw/components/LayerUI.tsx",
+          "line": 538,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "packages/excalidraw/components/LibraryMenuItems.tsx",
+          "line": 63,
+          "rule": "ref-object-nullable"
+        },
+        {
+          "file": "packages/excalidraw/components/MagicButton.tsx",
+          "line": 35,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "packages/excalidraw/components/MobileMenu.tsx",
+          "line": 76,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "packages/excalidraw/components/MobileMenu.tsx",
+          "line": 80,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "packages/excalidraw/components/MobileMenu.tsx",
+          "line": 96,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "packages/excalidraw/components/MobileMenu.tsx",
+          "line": 139,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "packages/excalidraw/components/MobileMenu.tsx",
+          "line": 146,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "packages/excalidraw/components/Sidebar/Sidebar.tsx",
+          "line": 104,
+          "rule": "ref-object-nullable"
+        },
+        {
+          "file": "packages/excalidraw/components/Sidebar/SidebarTrigger.tsx",
+          "line": 39,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "packages/excalidraw/components/Stack.tsx",
+          "line": 13,
+          "rule": "ref-object-nullable",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "packages/excalidraw/components/Stack.tsx",
+          "line": 17,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "packages/excalidraw/components/Stack.tsx",
+          "line": 39,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "packages/excalidraw/components/Stats/index.tsx",
+          "line": 188,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "packages/excalidraw/components/TTDDialog/MermaidToExcalidraw.tsx",
+          "line": 52,
+          "rule": "ref-object-nullable"
+        },
+        {
+          "file": "packages/excalidraw/components/TTDDialog/MermaidToExcalidraw.tsx",
+          "line": 123,
+          "rule": "ref-object-nullable"
+        },
+        {
+          "file": "packages/excalidraw/components/TTDDialog/TTDDialog.tsx",
+          "line": 171,
+          "rule": "ref-object-nullable"
+        },
+        {
+          "file": "packages/excalidraw/components/TTDDialog/TTDDialog.tsx",
+          "line": 382,
+          "rule": "ref-object-nullable"
+        },
+        {
+          "file": "packages/excalidraw/components/TTDDialog/TTDDialogOutput.tsx",
+          "line": 16,
+          "rule": "ref-object-nullable",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "packages/excalidraw/components/TTDDialog/common.ts",
+          "line": 15,
+          "rule": "ref-object-nullable",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "packages/excalidraw/components/TTDDialog/common.ts",
+          "line": 43,
+          "rule": "ref-object-nullable",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "packages/excalidraw/components/TTDDialog/common.ts",
+          "line": 47,
+          "rule": "mutable-ref-object"
+        },
+        {
+          "file": "packages/excalidraw/components/TTDDialog/common.ts",
+          "line": 137,
+          "rule": "mutable-ref-object"
+        },
+        {
+          "file": "packages/excalidraw/components/canvases/InteractiveCanvas.tsx",
+          "line": 20,
+          "rule": "ref-object-nullable",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "packages/excalidraw/components/dropdownMenu/DropdownMenuContent.tsx",
+          "line": 33,
+          "rule": "ref-object-nullable"
+        },
+        {
+          "file": "packages/excalidraw/components/dropdownMenu/DropdownMenuItemContent.tsx",
+          "line": 17,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "packages/excalidraw/components/footer/Footer.tsx",
+          "line": 73,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "packages/excalidraw/components/footer/Footer.tsx",
+          "line": 80,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "packages/excalidraw/components/welcome-screen/WelcomeScreen.Center.tsx",
+          "line": 22,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "packages/excalidraw/element/flowchart.test.tsx",
+          "line": 9,
+          "rule": "removed-react-dom"
+        },
+        {
+          "file": "packages/excalidraw/element/textWysiwyg.test.tsx",
+          "line": 25,
+          "rule": "removed-react-dom"
+        },
+        {
+          "file": "packages/excalidraw/hooks/useOutsideClick.ts",
+          "line": 5,
+          "rule": "ref-object-nullable",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "packages/excalidraw/hooks/useScrollPosition.ts",
+          "line": 8,
+          "rule": "ref-object-nullable",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "packages/excalidraw/tests/App.test.tsx",
+          "line": 15,
+          "rule": "removed-react-dom"
+        },
+        {
+          "file": "packages/excalidraw/tests/align.test.tsx",
+          "line": 58,
+          "rule": "removed-react-dom"
+        },
+        {
+          "file": "packages/excalidraw/tests/clipboard.test.tsx",
+          "line": 66,
+          "rule": "removed-react-dom"
+        },
+        {
+          "file": "packages/excalidraw/tests/contextmenu.test.tsx",
+          "line": 42,
+          "rule": "removed-react-dom"
+        },
+        {
+          "file": "packages/excalidraw/tests/cropElement.test.tsx",
+          "line": 20,
+          "rule": "removed-react-dom"
+        },
+        {
+          "file": "packages/excalidraw/tests/dragCreate.test.tsx",
+          "line": 18,
+          "rule": "removed-react-dom"
+        },
+        {
+          "file": "packages/excalidraw/tests/elementLocking.test.tsx",
+          "line": 12,
+          "rule": "removed-react-dom"
+        },
+        {
+          "file": "packages/excalidraw/tests/flip.test.tsx",
+          "line": 47,
+          "rule": "removed-react-dom"
+        },
+        {
+          "file": "packages/excalidraw/tests/linearElementEditor.test.tsx",
+          "line": 47,
+          "rule": "removed-react-dom"
+        },
+        {
+          "file": "packages/excalidraw/tests/move.test.tsx",
+          "line": 20,
+          "rule": "removed-react-dom"
+        },
+        {
+          "file": "packages/excalidraw/tests/multiPointCreate.test.tsx",
+          "line": 18,
+          "rule": "removed-react-dom"
+        },
+        {
+          "file": "packages/excalidraw/tests/regressionTests.test.tsx",
+          "line": 47,
+          "rule": "removed-react-dom"
+        },
+        {
+          "file": "packages/excalidraw/tests/resize.test.tsx",
+          "line": 24,
+          "rule": "removed-react-dom"
+        },
+        {
+          "file": "packages/excalidraw/tests/rotate.test.tsx",
+          "line": 9,
+          "rule": "removed-react-dom"
+        },
+        {
+          "file": "packages/excalidraw/tests/selection.test.tsx",
+          "line": 21,
+          "rule": "removed-react-dom"
+        },
+        {
+          "file": "packages/excalidraw/tests/zindex.test.tsx",
+          "line": 23,
+          "rule": "removed-react-dom"
+        }
+      ]
+    },
+    {
+      "repo": "tldraw/tldraw",
+      "commit": "5957867a9c5c205a0b0c3665be443138b8014a79",
+      "migration": "https://github.com/tldraw/tldraw/commit/f7c148187c8113aa102592e07d87b7877a937623",
+      "from": "18.3.1",
+      "to": "19.2.1",
+      "with": {
+        "react-dom": "19.2.1",
+        "@types/react": "19.2.7",
+        "@types/react-dom": "19.2.3"
+      },
+      "why": "tldraw: a React 18 SDK monorepo with an app, docs and templates; RefObject hooks, useRef without an argument, element.props typed unknown, JSX types",
+      "findings": [
+        {
+          "file": "apps/docs/components/content/code.tsx",
+          "line": 118,
+          "rule": "element-props-unknown"
+        },
+        {
+          "file": "apps/docs/components/content/code.tsx",
+          "line": 124,
+          "rule": "element-props-unknown"
+        },
+        {
+          "file": "apps/docs/components/content/code.tsx",
+          "line": 125,
+          "rule": "element-props-unknown"
+        },
+        {
+          "file": "apps/docs/components/content/code.tsx",
+          "line": 131,
+          "rule": "element-props-unknown"
+        },
+        {
+          "file": "apps/docs/components/content/code.tsx",
+          "line": 132,
+          "rule": "element-props-unknown"
+        },
+        {
+          "file": "apps/docs/components/content/code.tsx",
+          "line": 170,
+          "rule": "element-props-unknown"
+        },
+        {
+          "file": "apps/docs/components/content/copy-button.tsx",
+          "line": 10,
+          "rule": "ref-object-nullable",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "apps/docs/components/content/pre.tsx",
+          "line": 29,
+          "rule": "ref-object-nullable"
+        },
+        {
+          "file": "apps/dotcom/client/src/fairy/Fairy.tsx",
+          "line": 99,
+          "rule": "ref-object-nullable",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "apps/dotcom/client/src/fairy/Fairy.tsx",
+          "line": 366,
+          "rule": "ref-object-nullable"
+        },
+        {
+          "file": "apps/dotcom/client/src/fairy/fairy-ui/manual/FairyManualPanel.tsx",
+          "line": 22,
+          "rule": "ref-object-nullable",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "apps/dotcom/client/src/fairy/fairy-ui/manual/FairyManualPanel.tsx",
+          "line": 29,
+          "rule": "ref-object-nullable"
+        },
+        {
+          "file": "apps/dotcom/client/src/fairy/fairy-ui/manual/FairyManualPanel.tsx",
+          "line": 30,
+          "rule": "ref-object-nullable"
+        },
+        {
+          "file": "apps/dotcom/client/src/fairy/fairy-ui/manual/FairyManualPanel.tsx",
+          "line": 31,
+          "rule": "ref-object-nullable"
+        },
+        {
+          "file": "apps/dotcom/client/src/fairy/fairy-ui/manual/FairyManualPanel.tsx",
+          "line": 52,
+          "rule": "ref-object-nullable",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "apps/dotcom/client/src/fairy/fairy-ui/manual/FairyManualPanel.tsx",
+          "line": 64,
+          "rule": "ref-object-nullable"
+        },
+        {
+          "file": "apps/dotcom/client/src/fairy/fairy-ui/manual/FairyManualPanel.tsx",
+          "line": 83,
+          "rule": "ref-object-nullable"
+        },
+        {
+          "file": "apps/dotcom/client/src/fairy/fairy-ui/manual/FairyManualPanel.tsx",
+          "line": 286,
+          "rule": "ref-object-nullable"
+        },
+        {
+          "file": "apps/dotcom/client/src/pages/admin.tsx",
+          "line": 222,
+          "rule": "ref-object-nullable"
+        },
+        {
+          "file": "apps/dotcom/client/src/pages/admin.tsx",
+          "line": 1032,
+          "rule": "ref-object-nullable",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "apps/dotcom/client/tsconfig.json",
+          "line": 15,
+          "rule": "global-jsx-namespace",
+          "note": "one cause for 1745 JSX element diagnostics in this app: with \"jsx\": \"preserve\" and no \"jsxImportSource\", element types resolve through the global JSX namespace and the UMD React namespace, which the second copy of @types/react (18.3.23, kept for a dependency pinned to 16 || 17 || 18) and @types/react 19 both declare; the upgrade added \"jsxImportSource\": \"react\" here, which reads them from react/jsx-runtime"
+        },
+        {
+          "file": "apps/examples/src/ExampleWrapper.tsx",
+          "line": 111,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "packages/editor/src/lib/components/ErrorBoundary.tsx",
+          "line": 15,
+          "rule": "props-with-ref"
+        },
+        {
+          "file": "packages/editor/src/lib/components/default-components/DefaultBrush.tsx",
+          "line": 18,
+          "rule": "ref-object-nullable"
+        },
+        {
+          "file": "packages/editor/src/lib/components/default-components/DefaultCanvas.tsx",
+          "line": 46,
+          "rule": "ref-object-nullable"
+        },
+        {
+          "file": "packages/editor/src/lib/components/default-components/DefaultCanvas.tsx",
+          "line": 50,
+          "rule": "ref-object-nullable"
+        },
+        {
+          "file": "packages/editor/src/lib/components/default-components/DefaultCanvas.tsx",
+          "line": 51,
+          "rule": "ref-object-nullable"
+        },
+        {
+          "file": "packages/editor/src/lib/components/default-components/DefaultCollaboratorHint.tsx",
+          "line": 33,
+          "rule": "ref-object-nullable"
+        },
+        {
+          "file": "packages/editor/src/lib/components/default-components/DefaultCursor.tsx",
+          "line": 28,
+          "rule": "ref-object-nullable"
+        },
+        {
+          "file": "packages/editor/src/lib/components/default-components/DefaultSelectionBackground.tsx",
+          "line": 15,
+          "rule": "ref-object-nullable"
+        },
+        {
+          "file": "packages/editor/src/lib/components/default-components/DefaultSelectionForeground.tsx",
+          "line": 27,
+          "rule": "ref-object-nullable"
+        },
+        {
+          "file": "packages/editor/src/lib/hooks/useEvent.tsx",
+          "line": 30,
+          "rule": "use-ref-argument"
+        },
+        {
+          "file": "packages/editor/src/lib/hooks/useFixSafariDoubleTapZoomPencilEvents.ts",
+          "line": 12,
+          "rule": "ref-object-nullable",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "packages/editor/src/lib/hooks/useGestureEvents.ts",
+          "line": 78,
+          "rule": "ref-object-nullable",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "packages/editor/src/lib/hooks/usePassThroughMouseOverEvents.ts",
+          "line": 7,
+          "rule": "ref-object-nullable",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "packages/editor/src/lib/hooks/usePassThroughWheelEvents.ts",
+          "line": 7,
+          "rule": "ref-object-nullable",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "packages/editor/src/lib/hooks/useScreenBounds.ts",
+          "line": 5,
+          "rule": "ref-object-nullable",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "packages/editor/src/lib/hooks/useTransform.ts",
+          "line": 6,
+          "rule": "ref-object-nullable",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "packages/editor/src/lib/license/Watermark.tsx",
+          "line": 49,
+          "rule": "ref-object-nullable"
+        },
+        {
+          "file": "packages/editor/src/lib/license/Watermark.tsx",
+          "line": 97,
+          "rule": "ref-object-nullable"
+        },
+        {
+          "file": "packages/tldraw/src/lib/ui/components/CursorChatBubble.tsx",
+          "line": 49,
+          "rule": "ref-object-nullable",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "packages/tldraw/src/lib/ui/components/CursorChatBubble.tsx",
+          "line": 80,
+          "rule": "ref-object-nullable"
+        },
+        {
+          "file": "packages/tldraw/src/lib/ui/components/CursorChatBubble.tsx",
+          "line": 108,
+          "rule": "ref-object-nullable"
+        },
+        {
+          "file": "packages/tldraw/src/lib/ui/components/HelperButtons/StopFollowing.tsx",
+          "line": 16,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "packages/tldraw/src/lib/ui/components/Minimap/DefaultMinimap.tsx",
+          "line": 27,
+          "rule": "use-ref-argument"
+        },
+        {
+          "file": "packages/tldraw/src/lib/ui/components/PageMenu/PageItemInput.tsx",
+          "line": 51,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "packages/tldraw/src/lib/ui/components/PageMenu/PageItemInput.tsx",
+          "line": 51,
+          "rule": "ref-callback-return",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "packages/tldraw/src/lib/ui/components/Toolbar/DefaultImageToolbar.tsx",
+          "line": 66,
+          "rule": "use-ref-argument"
+        },
+        {
+          "file": "packages/tldraw/src/lib/ui/components/Toolbar/DefaultRichTextToolbar.tsx",
+          "line": 41,
+          "rule": "use-ref-argument"
+        },
+        {
+          "file": "packages/tldraw/src/lib/ui/components/primitives/TldrawUiContextualToolbar.tsx",
+          "line": 55,
+          "rule": "ref-object-nullable",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "packages/tldraw/src/lib/ui/components/primitives/TldrawUiContextualToolbar.tsx",
+          "line": 108,
+          "rule": "generic"
+        },
+        {
+          "file": "packages/tldraw/src/lib/ui/components/primitives/TldrawUiTooltip.tsx",
+          "line": 414,
+          "rule": "element-props-unknown"
+        },
+        {
+          "file": "packages/tldraw/src/lib/ui/components/primitives/TldrawUiTooltip.tsx",
+          "line": 430,
+          "rule": "element-props-unknown"
+        },
+        {
+          "file": "packages/tldraw/src/lib/ui/components/primitives/TldrawUiTooltip.tsx",
+          "line": 440,
+          "rule": "element-props-unknown"
+        },
+        {
+          "file": "packages/tldraw/src/lib/ui/components/primitives/TldrawUiTooltip.tsx",
+          "line": 456,
+          "rule": "element-props-unknown"
+        },
+        {
+          "file": "packages/tldraw/src/lib/ui/components/primitives/TldrawUiTooltip.tsx",
+          "line": 466,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "packages/tldraw/src/lib/ui/components/primitives/menus/TldrawUiMenuActionCheckboxItem.tsx",
+          "line": 20,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "packages/tldraw/src/lib/ui/components/primitives/menus/TldrawUiMenuActionItem.tsx",
+          "line": 14,
+          "rule": "global-jsx-namespace"
+        },
+        {
+          "file": "templates/agent/client/components/ChatInput.tsx",
+          "line": 18,
+          "rule": "ref-object-nullable",
+          "note": "changed by the upgrade"
+        },
+        {
+          "file": "templates/agent/client/components/ChatPanel.tsx",
+          "line": 76,
+          "rule": "ref-object-nullable"
+        }
+      ]
+    }
+  ]
+}

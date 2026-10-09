@@ -17,6 +17,8 @@ jobs:
     name: Pack test
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -55,6 +57,9 @@ jobs:
           path: ~/.cache/uptide
           key: packs-${{ runner.os }}-${{ hashFiles('packages/core/src/packs/*/ground-truth.json') }}
           restore-keys: packs-${{ runner.os }}-
+      # Ground-truth repositories that pin Yarn Berry via packageManager (tldraw) install with it.
+      - if: steps.scope.outputs.run == 'true'
+        run: corepack enable
       - name: uptide pack test
         if: steps.scope.outputs.run == 'true'
         run: |

@@ -597,7 +597,7 @@ it('refuses generic no-key fixes and unsafe config before creating any clone or 
   const before = snapshot(root);
   const clones = existsSync(runsRoot()) ? readdirSync(runsRoot()) : [];
   try {
-    await expect(isolatedFix({ cwd: root, only: 'react' }, services)).rejects.toMatchObject({
+    await expect(isolatedFix({ cwd: root, only: 'vitest' }, services)).rejects.toMatchObject({
       code: 'NO_FIXER',
     });
     expect(snapshot(root)).toEqual(before);

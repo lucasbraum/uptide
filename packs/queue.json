@@ -9,7 +9,7 @@
       "from": ">=18 <19",
       "to": ">=19 <20",
       "why": "declared directly in 48 of 52 sample repositories, 17 of them on an older major; 1645 breaking API changes, 739 distinct (701 removed or renamed, 38 change shapes) from 18.3.1 to 19.3.0 (@types/react 18.3.31 → 19.3.0); upgraded with @types/react, @types/react-dom, react-dom, react-is (released in lockstep, types for react)",
-      "status": "todo",
+      "status": "verified",
       "repos": 48,
       "reposBehind": 17,
       "weeklyDownloads": 0,
