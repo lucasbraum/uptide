@@ -195,7 +195,10 @@ function rowOf(p: PackageReport, multi: boolean, colors: Colors): Row | undefine
     by,
     plan,
     quiet:
-      plan.length === 0 && gaps === 0 && !['no-types', 'skipped', 'unknown'].includes(p.status),
+      plan.length === 0 &&
+      gaps === 0 &&
+      !p.peerConflicts?.length &&
+      !['no-types', 'skipped', 'unknown'].includes(p.status),
     ...(verdictLine(p) ? { summary: verdictLine(p) } : {}),
   };
 }
@@ -313,6 +316,11 @@ function sectionLines(row: Row, colors: Colors): string[] {
     );
   for (const conflict of row.p.companionConflicts ?? [])
     lines.push(`  ${colors.red('✗')} ${conflict}: no consistent upgrade`);
+  // Left in place, as the repository's own upgrade may leave it: possible impact, never breaking.
+  for (const conflict of row.p.peerConflicts ?? [])
+    lines.push(
+      `  ${colors.magenta('?')} possible impact, peer conflict: ${conflict}   ${colors.dim('left where it is, not compiled at another version, not counted as breaking')}`,
+    );
   // An importer the manifest does not show, or one the analysis could not reach: the reader
   // decides whether the sites above are all of them.
   for (const note of importers) lines.push(`  ${colors.yellow('⚠')} ${note}`);

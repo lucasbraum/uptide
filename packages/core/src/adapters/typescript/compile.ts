@@ -1,4 +1,12 @@
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+} from 'node:fs';
 import { builtinModules } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
@@ -13,7 +21,7 @@ import type {
 import { satisfies } from '../../fetch/range.js';
 import { onReset } from '../../shared-state.js';
 import { findCause, parameterCause } from './cause.js';
-import { type Compiler, repositoryCompiler } from './compiler.js';
+import { type Compiler, repositoryCompiler, unresolvedConfig } from './compiler.js';
 import { jsxNamespaceCause } from './config-cause.js';
 import { type LoadedRepo, loadedRepo, ownsFile } from './repo.js';
 import {
@@ -200,6 +208,28 @@ function filesToCheck(
 }
 
 const NOT_IN_TSCONFIG = 'not in the workspace tsconfig';
+
+const nestedConfigs = new Map<string, string | undefined>();
+onReset(() => nestedConfigs.clear());
+
+/**
+ * The unresolvable tsconfig that governs a file, when it sits in a project nested below the
+ * workspace (the nearest `tsconfig.json` above it, short of the workspace's own).
+ */
+function nestedUnresolvedConfig(
+  tsc: typeof ts,
+  repo: LoadedRepo,
+  rel: string,
+): { path: string; reason: string } | undefined {
+  for (let dir = dirname(join(repo.dir, rel)); dir.startsWith(`${repo.dir}/`); dir = dirname(dir)) {
+    const config = join(dir, 'tsconfig.json');
+    if (!existsSync(config)) continue;
+    if (!nestedConfigs.has(config)) nestedConfigs.set(config, unresolvedConfig(tsc, config));
+    const reason = nestedConfigs.get(config);
+    return reason === undefined ? undefined : { path: relative(repo.dir, config), reason };
+  }
+  return undefined;
+}
 
 /** What became of the files asked about: compiled, or skipped and why. */
 function coverageOf(
@@ -721,6 +751,26 @@ export async function compileAgainstTargets(
       timing: { baselineMs: 0, overlayMs: 0, dependenciesMs: 0 },
     };
   }
+  // A project whose tsconfig cannot be resolved is not compiled: its diagnostics would come from
+  // options the repository never builds with, and none of them is a place to change.
+  const unresolved = repo.tsconfig ? unresolvedConfig(compiler.ts, repo.tsconfig) : undefined;
+  if (repo.tsconfig && unresolved !== undefined) {
+    const requested = options.files?.length ?? 0;
+    return {
+      diagnostics: [],
+      baselineErrors: 0,
+      skipped: `not compiled: tsconfig.json (${unresolved})`,
+      coverage: {
+        ...coverageOf(compiler, 0, 0, { reason: 'tsconfig cannot be resolved', count: requested }),
+        notCompiled: [{ path: 'tsconfig.json', reason: unresolved }],
+      },
+      unresolvedInTarget: [],
+      unresolvedFiles: [],
+      linkedDependencies: [],
+      unsatisfiedDependencies: [],
+      timing: { baselineMs: 0, overlayMs: 0, dependenciesMs: 0 },
+    };
+  }
   const t0 = Date.now();
   const base = nativeBase(repo, compiler);
   // Diagnostics come from a baseline that checks JavaScript too; files and resolutions are the
@@ -755,7 +805,36 @@ export async function compileAgainstTargets(
       new Map(),
     ).program;
   }
-  const { files, missing } = filesToCheck(repo, repoRef, checked, options.files);
+  // Files that belong to a nested project whose tsconfig cannot be resolved (a docs site whose
+  // `extends` is not installed) are not judged under this workspace's options: they are
+  // dropped, counted, and named in the coverage.
+  const unresolvedProjects = new Map<string, { reason: string; count: number }>();
+  const requested = (options.files ?? []).filter((rel) => {
+    const nested = nestedUnresolvedConfig(compiler.ts, repo, rel);
+    if (!nested) return true;
+    const known = unresolvedProjects.get(nested.path);
+    unresolvedProjects.set(nested.path, { reason: nested.reason, count: (known?.count ?? 0) + 1 });
+    return false;
+  });
+  const withNotCompiled = (coverage: CompileCoverage): CompileCoverage => {
+    if (unresolvedProjects.size === 0) return coverage;
+    const count = [...unresolvedProjects.values()].reduce((n, p) => n + p.count, 0);
+    return {
+      ...coverage,
+      total: coverage.total + count,
+      skipped: [...coverage.skipped, { reason: 'tsconfig cannot be resolved', count }],
+      notCompiled: [
+        ...(coverage.notCompiled ?? []),
+        ...[...unresolvedProjects].map(([path, p]) => ({ path, reason: p.reason })),
+      ],
+    };
+  };
+  const { files, missing } = filesToCheck(
+    repo,
+    repoRef,
+    checked,
+    options.files ? requested : undefined,
+  );
   const baseline = files.flatMap((f) =>
     memoized
       ? baselineErrorsOf(repo, checked, f)
@@ -769,10 +848,12 @@ export async function compileAgainstTargets(
       diagnostics: [],
       baselineErrors: baseline.length,
       skipped,
-      coverage: coverageOf(compiler, 0, missing, {
-        reason: skipReasonOf(skipped),
-        count: files.length,
-      }),
+      coverage: withNotCompiled(
+        coverageOf(compiler, 0, missing, {
+          reason: skipReasonOf(skipped),
+          count: files.length,
+        }),
+      ),
       unresolvedInTarget: [],
       unresolvedFiles: [],
       linkedDependencies: [],
@@ -850,7 +931,7 @@ export async function compileAgainstTargets(
         (a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.column - b.column,
       ),
       baselineErrors: baseline.length,
-      coverage: coverageOf(compiler, files.length, missing),
+      coverage: withNotCompiled(coverageOf(compiler, files.length, missing)),
       unresolvedInTarget: [...unresolvedInTarget].sort(),
       unresolvedFiles: [...unresolvedFiles].sort(),
       linkedDependencies: deps.linked,

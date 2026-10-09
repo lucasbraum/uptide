@@ -40,6 +40,25 @@ that no source supports does not belong in a pack. `supports(from, to)` defaults
 ranges; a pack may narrow it (stripe also requires the target to be newer than what is
 installed).
 
+A pack may also name `companions`: packages that always move with the package, even when
+their installed version already accepts the target.
+
+```ts
+companions: [{ name: 'ai-sdk-ollama', source: 'https://github.com/jagreehal/ai-sdk-ollama/blob/main/README.md' }],
+```
+
+**Companions come from official docs, never from ground truth alone.** `source` is the `https`
+URL of the official migration guide or changelog that says the package moves with the
+package: the leader's documentation or the companion's own, never the ground truth. A
+ground-truth repository that moved a package shows what one repository did, not that the
+package must move. `uptide pack test` fails a pack whose `companions` has an entry with no
+`source`, one that is not an `https` URL, or one that names the pack's own package.
+
+A release-group member published at the target's own version (`react-dom`) and `@types/*`
+need no entry. A package that only peers on the package and whose installed range rejects the
+target is left in place and listed under possible impact as a peer conflict; it is never
+compiled at another version.
+
 ### Mechanical rules: detect and rewrite
 
 ```ts

@@ -27,7 +27,8 @@ export function coverageLine(c: NonNullable<PackageReport['compile']>['coverage'
   if (!c) return '';
   const skipped = c.skipped.map((r) => `${r.reason} (${r.count})`).join(', ');
   const compilers = compilersPhrase(c.compilers ?? []);
-  return `compiled ${c.compiled} of ${count(c.total, 'file')} in ${count(c.workspaces, 'workspace')}${compilers ? ` with ${compilers}` : ''}${skipped ? `; skipped: ${skipped}` : ''}`;
+  const notCompiled = (c.notCompiled ?? []).map((n) => `; not compiled: ${n.path} (${n.reason})`);
+  return `compiled ${c.compiled} of ${count(c.total, 'file')} in ${count(c.workspaces, 'workspace')}${compilers ? ` with ${compilers}` : ''}${skipped ? `; skipped: ${skipped}` : ''}${notCompiled.join('')}`;
 }
 
 /**

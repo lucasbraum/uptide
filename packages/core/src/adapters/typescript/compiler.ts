@@ -82,3 +82,31 @@ export function repositoryCompiler(dir: string): Compiler {
 export function describeCompiler(c: { version: string; own: boolean }): string {
   return `${c.own ? "the repo's" : 'the bundled'} TypeScript ${c.version}`;
 }
+
+/**
+ * Why a tsconfig cannot be read whole, when it cannot: an `extends` naming a file or package
+ * that is not there (a project whose dependencies are not installed). Its options are then
+ * whatever the rest of the file says, not what the repository builds with, so what a compiler
+ * reports for it says nothing about the upgrade. `undefined`: the config resolves.
+ */
+export function unresolvedConfig(tsc: typeof ts, tsconfig: string): string | undefined {
+  try {
+    const read = tsc.readConfigFile(tsconfig, (p) => tsc.sys.readFile(p));
+    const extended = (read.config as { extends?: unknown } | undefined)?.extends;
+    if (read.config === undefined || extended === undefined) return undefined;
+    const parsed = tsc.parseJsonConfigFileContent(
+      read.config,
+      tsc.sys,
+      dirname(tsconfig),
+      undefined,
+      tsconfig,
+    );
+    // 6053: "File '<extends>' not found."
+    const missing = parsed.errors.find((e) => e.code === 6053);
+    if (!missing) return undefined;
+    const names = Array.isArray(extended) ? extended : [extended];
+    return `extends ${names.map((n) => JSON.stringify(n)).join(', ')} cannot be resolved`;
+  } catch {
+    return undefined;
+  }
+}

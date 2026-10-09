@@ -92,8 +92,23 @@ export interface MigrationRule {
   perFile?: boolean;
 }
 /** Packs own dependency knowledge. The runner owns git, verification, and publication. */
+/** A package a pack says always moves with its own, and the official page that says so. */
+export interface PackCompanion {
+  name: string;
+  /** An `https` URL to the official migration guide or changelog that says it moves with the leader. */
+  source: string;
+}
+
 export interface MigrationPack {
   readonly name: string;
+  /**
+   * Packages that always move with this one, even when the installed version of each already
+   * accepts the target. Each carries the `source` that says so: the URL of an official
+   * migration guide or changelog (the package's own, when the leader's does not name it).
+   * Release-group members published at the target's own version (`react-dom`) and `@types/*`
+   * need no entry.
+   */
+  readonly companions?: readonly PackCompanion[];
   readonly defaultTarget: string;
   readonly rules: readonly MigrationRule[];
   supports(from: string, to: string): boolean;

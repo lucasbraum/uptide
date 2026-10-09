@@ -53,6 +53,60 @@ describe('Signal B: compile against the target version', () => {
     });
   });
 
+  it('does not compile a project whose tsconfig extends what is not installed, and says so', async () => {
+    const dir = consumerCopy((d) => {
+      const config = JSON.parse(readFileSync(join(d, 'tsconfig.json'), 'utf8')) as object;
+      writeFileSync(
+        join(d, 'tsconfig.json'),
+        JSON.stringify({ extends: '@not-installed/base/tsconfig.json', ...config }),
+      );
+    });
+    const signal = await compileAgainstTarget({ dir }, 'synthetic', join(ROOT, 'synthetic-v2'));
+    // No diagnostics at all: none of them could be a place to change.
+    expect(signal.diagnostics).toEqual([]);
+    expect(signal.skipped).toBe(
+      'not compiled: tsconfig.json (extends "@not-installed/base/tsconfig.json" cannot be resolved)',
+    );
+    expect(signal.coverage.compiled).toBe(0);
+    expect(signal.coverage.notCompiled).toEqual([
+      {
+        path: 'tsconfig.json',
+        reason: 'extends "@not-installed/base/tsconfig.json" cannot be resolved',
+      },
+    ]);
+  });
+
+  it('does not judge files of a nested project whose tsconfig cannot be resolved', async () => {
+    const dir = consumerCopy((d) => {
+      // A docs site inside the workspace, with its own tsconfig that extends what is not installed.
+      mkdirSync(join(d, 'src/docs'), { recursive: true });
+      writeFileSync(
+        join(d, 'src/docs/tsconfig.json'),
+        JSON.stringify({ extends: '@not-installed/docs/tsconfig.json' }),
+      );
+      writeFileSync(
+        join(d, 'src/docs/page.ts'),
+        readFileSync(join(d, 'src/chains.ts'), 'utf8').replace('./lib/index.js', '../lib/index.js'),
+      );
+    });
+    const signal = await compileAgainstTarget({ dir }, 'synthetic', join(ROOT, 'synthetic-v2'), {
+      files: ['src/chains.ts', 'src/docs/page.ts'],
+    });
+    // The workspace's own file is judged; the docs file would give the same error and does not.
+    expect(signal.diagnostics.map((d) => `${d.file}:${d.line} ${d.code}`)).toEqual([
+      'src/chains.ts:6 2554',
+    ]);
+    expect(signal.coverage.compiled).toBe(1);
+    expect(signal.coverage.total).toBe(2);
+    expect(signal.coverage.skipped).toEqual([{ reason: 'tsconfig cannot be resolved', count: 1 }]);
+    expect(signal.coverage.notCompiled).toEqual([
+      {
+        path: 'src/docs/tsconfig.json',
+        reason: 'extends "@not-installed/docs/tsconfig.json" cannot be resolved',
+      },
+    ]);
+  });
+
   it('subtracts pre-existing errors instead of skipping: the upgrade error is still found', async () => {
     const dir = consumerCopy((d) =>
       writeFileSync(join(d, 'src/broken.ts'), 'export const n: number = "not a number";\n'),

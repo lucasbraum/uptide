@@ -616,6 +616,8 @@ export function mergeAcrossWorkspaces(
     const conflicts = [...new Set(list.flatMap((p) => p.companionConflicts ?? []))];
     if (companions.length > 0) combined.companions = companions;
     if (conflicts.length > 0) combined.companionConflicts = conflicts;
+    const peerConflicts = [...new Set(list.flatMap((p) => p.peerConflicts ?? []))].sort();
+    if (peerConflicts.length > 0) combined.peerConflicts = peerConflicts;
     const members = [
       ...new Map(list.flatMap((p) => p.members ?? []).map((m) => [m.name, m])).values(),
     ];
@@ -635,6 +637,12 @@ export function mergeAcrossWorkspaces(
       const skipped = new Map<string, number>();
       for (const c of coverages)
         for (const r of c.skipped) skipped.set(r.reason, (skipped.get(r.reason) ?? 0) + r.count);
+      const notCompiled = compiled.flatMap((p) =>
+        (p.compile?.coverage?.notCompiled ?? []).map((n) => ({
+          path: prefixed(p, n.path),
+          reason: n.reason,
+        })),
+      );
       combined.compile = {
         ...firstCompiled.compile,
         // Skipped in one workspace, compiled in another: the coverage says how much of each.
@@ -647,6 +655,7 @@ export function mergeAcrossWorkspaces(
                 total: coverages.reduce((n, c) => n + c.total, 0),
                 workspaces: coverages.reduce((n, c) => n + c.workspaces, 0),
                 skipped: [...skipped].map(([reason, count]) => ({ reason, count })),
+                ...(notCompiled.length > 0 ? { notCompiled } : {}),
                 ...(coverages.some((c) => c.compilers)
                   ? { compilers: uniqueCompilers(coverages.flatMap((c) => c.compilers ?? [])) }
                   : {}),
@@ -1100,8 +1109,10 @@ async function companionPlans(
         target,
         installed: [...installed.values()],
         manifests: (name) => manifests(name),
+        lockstep: (packsOf(opts).find((p) => p.name === lead)?.companions ?? []).map((c) => c.name),
       });
-      if (plan.companions.length > 0 || plan.conflicts.length > 0) plans[lead] = plan;
+      if (plan.companions.length > 0 || plan.conflicts.length > 0 || plan.peerConflicts.length > 0)
+        plans[lead] = plan;
     } catch {
       // A registry that cannot answer leaves the package alone, as before.
     }
@@ -1550,6 +1561,7 @@ async function checkGroup(
       (prepared.length === 1 ? prepared[0]?.target : targets.at(-1))) as string,
     ...(plan?.companions.length ? { companions: plan.companions } : {}),
     ...(plan?.conflicts.length ? { companionConflicts: plan.conflicts } : {}),
+    ...(plan?.peerConflicts.length ? { peerConflicts: plan.peerConflicts } : {}),
     majorsBehind: Math.max(...prepared.map((p) => majorsBehind(p.installedVersion, p.target))),
     findings: [],
     callSitesChecked: 0,

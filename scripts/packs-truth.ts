@@ -184,7 +184,11 @@ for (const swap of swaps) {
   for (const at of installs(swap.name, project)) links.push({ at, dir });
 }
 
-const { compiler: compilerName, diagnostics: baseline } = compilerDiagnostics(project, configs);
+const {
+  compiler: compilerName,
+  diagnostics: baseline,
+  notCompiled,
+} = compilerDiagnostics(project, configs);
 for (const link of links) {
   const at = join(project, link.at);
   renameSync(at, `${at}.uptide-orig`);
@@ -224,6 +228,7 @@ console.log(
       links: links.map((l) => `${l.at} → ${basename(l.dir)}`),
       compiledWith: compilerName,
       tsconfigs: configs,
+      notCompiled,
       compiler: compiler.map((d) => ({
         ...d,
         message: d.message.slice(0, 200),

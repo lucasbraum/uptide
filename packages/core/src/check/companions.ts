@@ -20,6 +20,12 @@ import { compareVersions, parseVersion } from './version.js';
  *   the target (`@ai-sdk/react@4.0.10` → `ai` 7.0.9);
  * - else its newest release whose exact pins agree with every exact pin of the target
  *   (`@ai-sdk/openai` on `@ai-sdk/provider`).
+ * A package that only peers on the lead moves when it is released in lockstep with it (a
+ * release at the target's own version: `react-dom`, `@types/react`) or the pack names it in
+ * `companions`; either way even when its installed range already accepts the target. Any
+ * other package whose installed peer range rejects the target stays where it is, is never
+ * compiled at another version, and is reported as a peer conflict (`peerConflicts`): real
+ * upgrades often leave one in place, and what that breaks is for a person to judge.
  * `@types/<pkg>` moves with `<pkg>` by name (nothing in its manifest says so): to the release
  * that types the version `<pkg>` moves to (`types-release.ts`). A companion can move with a
  * companion: `@types/react-dom` with `react-dom`, which moves with `react`.
@@ -44,6 +50,11 @@ export interface CompanionPlan {
   companions: Companion[];
   /** Members of the group with no release that agrees: the upgrade cannot be consistent. */
   conflicts: string[];
+  /**
+   * Packages left where they are though their installed peer range rejects the target:
+   * `next-mdx-remote-client 1.1.2 declares react >= 18.3.0 < 19.0.0`. Possible impact, never breaking.
+   */
+  peerConflicts: string[];
   /** The group as `list` names it (`@ai-sdk family, shared @ai-sdk/provider-utils`). */
   reason?: string;
 }
@@ -79,6 +90,34 @@ function related(lead: InstalledDependency, other: InstalledDependency): boolean
   return false;
 }
 
+/** Whether `name` is released with `lead@target`: it has a release at the target's own version that asks for it. */
+function releasedWith(lead: string, target: string, versions: Manifests): boolean {
+  const same = versions[target];
+  const range = same?.dependencies?.[lead] ?? same?.peerDependencies?.[lead];
+  return same !== undefined && range !== undefined && accepts(range, target);
+}
+
+/**
+ * `<pkg> <installed> declares <peer> <range>` when the package only peers on `host`, its
+ * installed range rejects the target, and nothing says it moves with it (named by the pack, or
+ * released at the target's own version). Undefined: it is a companion, or it agrees already.
+ */
+function peerConflictOf(
+  installed: InstalledDependency,
+  host: string,
+  target: string,
+  versions: Manifests,
+  lockstep: readonly string[] = [],
+): string | undefined {
+  if (lockstep.includes(installed.name) || releasedWith(host, target, versions)) return undefined;
+  const current = versions[installed.version] ?? installed.manifest;
+  // A dependency (an exact pin) is moved by the pin logic; only a bare peer is left alone.
+  if (current.dependencies?.[host] !== undefined) return undefined;
+  const range = current.peerDependencies?.[host];
+  if (range === undefined || accepts(range, target)) return undefined;
+  return `${installed.name} ${installed.version} declares ${host} ${range}`;
+}
+
 /** The release of `name` that agrees with `lead@target`, and why; undefined when none does. */
 function agreeing(
   installed: InstalledDependency,
@@ -86,6 +125,7 @@ function agreeing(
   target: string,
   targetManifest: Pick<Manifest, 'dependencies'>,
   versions: Manifests,
+  lockstep: readonly string[] = [],
 ): { version: string; reason: string } | undefined {
   const name = installed.name;
   const pinned = targetManifest.dependencies?.[name];
@@ -103,7 +143,8 @@ function agreeing(
     };
   const current = versions[installed.version] ?? installed.manifest;
   const range = current.dependencies?.[lead] ?? current.peerDependencies?.[lead];
-  if (range !== undefined && accepts(range, target))
+  // A package the pack names moves even when the installed copy accepts the target.
+  if (range !== undefined && accepts(range, target) && !lockstep.includes(name))
     return {
       version: installed.version,
       reason: `${name} ${installed.version} accepts ${lead} ${target}`,
@@ -166,11 +207,14 @@ export async function companionsOf(input: {
   target: string;
   installed: InstalledDependency[];
   manifests: (name: string) => Promise<Manifests>;
+  /** Packages the pack says always move with the lead (`MigrationPack.companions`). */
+  lockstep?: readonly string[];
 }): Promise<CompanionPlan> {
+  const none: CompanionPlan = { companions: [], conflicts: [], peerConflicts: [] };
   const lead = input.installed.find((d) => d.name === input.name);
-  if (!lead) return { companions: [], conflicts: [] };
+  if (!lead) return none;
   const targetManifest = (await input.manifests(input.name))[input.target];
-  if (!targetManifest) return { companions: [], conflicts: [] };
+  if (!targetManifest) return none;
   // Plausible members: related to the lead, the rest of their families, and the types
   // packages of any of those; then what relates to a member the same way, until nothing new.
   const scope = scopeOf(lead.name);
@@ -198,7 +242,7 @@ export async function companionsOf(input: {
     // until the closure is complete
   }
   const candidates = members.filter((d) => d !== lead);
-  if (candidates.length === 0) return { companions: [], conflicts: [] };
+  if (candidates.length === 0) return none;
 
   // Each candidate moves to the version that agrees with a decided package: the lead, else a
   // companion already placed (`@types/react-dom` with `react-dom`, which moved with `react`).
@@ -207,6 +251,8 @@ export async function companionsOf(input: {
   ]);
   const moves = new Map<string, { version: string; reason: string } | undefined>();
   const typesLinked = new Set<string>();
+  /** Peer-linked packages left in place, by name. */
+  const peerConflicts = new Map<string, string>();
   const names = new Set(members.map((m) => m.name));
   // A types package waits for the package it types (`@types/react-dom` for `react-dom`), which
   // may be placed in a later pass; only when that never happens does its own manifest decide.
@@ -235,8 +281,16 @@ export async function companionsOf(input: {
         for (const [host, at] of decided) {
           const hostDep = input.installed.find((d) => d.name === host);
           if (!hostDep || !related(hostDep, c)) continue;
-          move = agreeing(c, host, at.version, at.manifest, versions);
-          if (move) break;
+          const left = peerConflictOf(c, host, at.version, versions, input.lockstep);
+          if (left) {
+            peerConflicts.set(c.name, left);
+            continue;
+          }
+          move = agreeing(c, host, at.version, at.manifest, versions, input.lockstep);
+          if (move) {
+            peerConflicts.delete(c.name);
+            break;
+          }
         }
       }
       moves.set(c.name, move);
@@ -274,6 +328,9 @@ export async function companionsOf(input: {
     g.members.some((m) => m.name === lead.name),
   );
   const inGroup = new Set((group?.members ?? [listed(lead, input.target)]).map((m) => m.name));
+  // A package the pack names is a member whatever `list` draws: the pack knows it moves with the lead.
+  for (const c of candidates)
+    if (input.lockstep?.includes(c.name) && moves.get(c.name) !== undefined) inGroup.add(c.name);
   // `list` links nothing to a types package: `@types/<pkg>` joins the group of its `<pkg>`,
   // and what `list` would group with it (`@types/react-dom`, a peer of `@types/react`) follows.
   for (let grew = true; grew; ) {
@@ -292,11 +349,13 @@ export async function companionsOf(input: {
       grew = true;
     }
   }
-  if (inGroup.size < 2) return { companions: [], conflicts: [] };
+  if (inGroup.size < 2) return none;
   const companions: Companion[] = [];
   const conflicts: string[] = [];
   for (const member of candidates.filter((c) => inGroup.has(c.name))) {
     const move = moves.get(member.name);
+    // Left in place on purpose: reported as a peer conflict, not as an upgrade that cannot agree.
+    if (!move && peerConflicts.has(member.name)) continue;
     if (!move) {
       conflicts.push(
         `${member.name} ${member.version} has no release that agrees with ${lead.name} ${input.target}`,
@@ -322,6 +381,7 @@ export async function companionsOf(input: {
   return {
     companions: companions.sort((a, b) => a.name.localeCompare(b.name)),
     conflicts,
+    peerConflicts: [...peerConflicts.values()].sort(),
     ...(reason ? { reason } : {}),
   };
 }

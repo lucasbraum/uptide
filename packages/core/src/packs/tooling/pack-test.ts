@@ -5,6 +5,7 @@ import { check } from '../../check/check.js';
 import type { Companion } from '../../check/companions.js';
 import type { CheckReport } from '../../domain/report.js';
 import {
+  companionProblems,
   type GroundTruth,
   type GroundTruthRepo,
   type Pack,
@@ -246,6 +247,7 @@ export async function testPack(
   const problems: string[] = [];
   if (!pack.meta.sources.length) problems.push('meta.sources lists no changelog or guide');
   if (!pack.meta.maintainer) problems.push('meta.maintainer is empty');
+  problems.push(...companionProblems(pack.companions, pack.name));
   const fixtures = runFixtures(pack, dir, { update: options.updateFixtures === true });
   if (fixtures.cases.length === 0 && pack.rules.some((r) => r.rewrite || r.detect))
     problems.push('rules that rewrite or detect need fixtures (fixtures/<case>/before.ts)');

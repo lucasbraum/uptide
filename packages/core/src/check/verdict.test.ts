@@ -90,3 +90,21 @@ it('says the types are partly verified when some files that use the package were
     '0 breaking · compiled against 4.6.5: 0 new type errors',
   );
 });
+
+it('names a project that was not compiled, with its path and why', () => {
+  const coverage = {
+    compiled: 5,
+    total: 7,
+    workspaces: 2,
+    skipped: [{ reason: 'tsconfig cannot be resolved', count: 2 }],
+    notCompiled: [
+      {
+        path: 'docs/tsconfig.json',
+        reason: 'extends "@tsconfig/docusaurus/tsconfig.json" cannot be resolved',
+      },
+    ],
+  };
+  expect(coverageLine(coverage)).toBe(
+    'compiled 5 of 7 files in 2 workspaces; skipped: tsconfig cannot be resolved (2); not compiled: docs/tsconfig.json (extends "@tsconfig/docusaurus/tsconfig.json" cannot be resolved)',
+  );
+});

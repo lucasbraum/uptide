@@ -3,7 +3,13 @@ import { join } from 'node:path';
 import type { Finding } from '../domain/report.js';
 import type { Usage } from '../domain/usage.js';
 import { satisfies } from '../fetch/range.js';
-import type { MigrationPack, MigrationRule, PackContext, TransformResult } from './types.js';
+import type {
+  MigrationPack,
+  MigrationRule,
+  PackCompanion,
+  PackContext,
+  TransformResult,
+} from './types.js';
 
 /**
  * The public contract of a migration pack (docs/packs.md). `MigrationPack` is what the runner
@@ -298,6 +304,8 @@ export interface PackSpec {
   instructions: string;
   /** The version `fix` falls back to when the registry cannot answer. */
   defaultTarget?: string;
+  /** Packages that always move with the package, each with its official source (`MigrationPack.companions`). */
+  companions?: readonly PackCompanion[];
 }
 
 /**
@@ -313,6 +321,7 @@ export function definePack(spec: PackSpec): Pack {
     rules: spec.rules,
     behavior,
     instructions: spec.instructions,
+    ...(spec.companions ? { companions: spec.companions } : {}),
     defaultTarget: spec.defaultTarget ?? '',
     supports: (from, to) => satisfies(from, spec.meta.from) && satisfies(to, spec.meta.to),
     transform(text, finding, context) {
@@ -391,4 +400,33 @@ export function replaceAtSite(
     return { text, applied: false, reason: `the reported site is not \`${before}\`` };
   lines[index] = `${line.slice(0, match.index)}${after}${line.slice(match.index + before.length)}`;
   return { text: lines.join('\n'), applied: true, reason: `\`${before}\` is \`${after}\`` };
+}
+
+/**
+ * What is wrong with a pack's `companions`, as sentences: `pack test` refuses to score a pack
+ * with any. Every entry names the package and an `https` URL of the official migration guide or
+ * changelog that says it moves with the leader; an entry never rests on a ground-truth
+ * repository alone, which only shows what one repository did.
+ */
+export function companionProblems(
+  companions: readonly Partial<PackCompanion>[] | undefined,
+  packageName: string,
+): string[] {
+  const problems: string[] = [];
+  (companions ?? []).forEach((c, i) => {
+    const where = `companions[${i}]${c.name ? ` "${c.name}"` : ''}`;
+    if (!c.name?.trim()) problems.push(`${where}: name is empty`);
+    if (c.name === packageName) problems.push(`${where}: a pack does not name its own package`);
+    let https = false;
+    try {
+      https = c.source !== undefined && new URL(c.source).protocol === 'https:';
+    } catch {
+      https = false;
+    }
+    if (!https)
+      problems.push(
+        `${where}: source must be the https URL of the official migration guide or changelog that says it moves with ${packageName}`,
+      );
+  });
+  return problems;
 }
