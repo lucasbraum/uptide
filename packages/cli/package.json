@@ -1,6 +1,6 @@
 {
   "name": "uptide",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Uptide finds what a dependency upgrade breaks in your code, migrates it, and proves it with your compiler and tests.",
   "license": "Apache-2.0",
   "type": "module",

@@ -1,5 +1,81 @@
 # uptide
 
+## 0.6.0
+
+### Minor Changes
+
+- [#46](https://github.com/uptide-dev/uptide/pull/46) [`458aa14`](https://github.com/uptide-dev/uptide/commit/458aa144d3c3ab5739d70cdc0d44a29642563cd5) Thanks [@lucasbraum](https://github.com/lucasbraum)! - What changed in `check`:
+  
+  - **Breaking means confirmed.** A type-surface change is reported as breaking only when the
+    compiler rejects your code against the target at that site, the runtime probe saw the
+    export go, or a migration pack found it, in the verified tier as in the generic one. What
+    nothing confirmed is listed as "possible impact", apart from the breaking count.
+  - **Coverage, under every package.** `compiled 355 of 356 files in 5 workspaces; skipped:
+    <reason (count)>` says how much of the code that uses the package the compiler judged, and
+    the verdict says "types partly verified" when not every file was.
+  - **TypeScript-version-aware defaults.** A repository on TypeScript 5 is read with
+    TypeScript 5's defaults for what its tsconfig leaves unset (`strict` off, automatic
+    `@types`), not the bundled TypeScript 6's. Monorepos compile far more of their files:
+    workspace packages declared `workspace:*` under Yarn and npm resolve to their source,
+    scoped programs keep the tsconfig's ambient declaration files, and a workspace that only
+    peer-depends on a package finds the hoisted copy.
+  - **Companions.** `check` and `fix` move `@types/<pkg>` with `<pkg>`, and a package released
+    in lockstep with it (react-dom with react): `check react` 18 → 19 moves react-dom,
+    @types/react and @types/react-dom together.
+  - **One finding for a root cause that is one edit.** A compiler option (the global `JSX`
+    namespace `@types/react` 19 removes, read by `"jsx": "preserve"`) and a repository
+    parameter several call sites trip are each one finding at the place to edit, with the
+    compiler errors as evidence.
+
+- [#51](https://github.com/uptide-dev/uptide/pull/51) [`a18bebd`](https://github.com/uptide-dev/uptide/commit/a18bebde1b45819f275f8194ed589db742df25b9) Thanks [@lucasbraum](https://github.com/lucasbraum)! - `check` reports one breaking finding when call sites in different workspaces trace back to
+  the same local declaration (a parameter or prop whose type names something from the upgraded
+  package): the finding is anchored at the declaration, where the one edit is, and the call
+  sites are listed under it as evidence with an `N call sites in M workspaces` line, in the
+  terminal, the HTML report and the JSON report. Before, a site alone in its workspace stayed a
+  finding of its own, so a hook typed `RefObject<HTMLElement>` and called from three
+  workspaces was three findings plus the one that mattered. The JSON report gains `root` on
+  call-site findings and `workspace` on evidence sites; nothing is renamed or removed. The pack
+  test scorer counts the anchor as the predicted site and never the evidence under it.
+
+- [#49](https://github.com/uptide-dev/uptide/pull/49) [`2e5c510`](https://github.com/uptide-dev/uptide/commit/2e5c510c54b88bda11e1b889ca538b54089d518d) Thanks [@lucasbraum](https://github.com/lucasbraum)! - Two fixes to `check`:
+  
+  - **A project whose tsconfig cannot be resolved is not compiled.** A tsconfig that `extends` a
+    package or file that is not installed describes options the repository never builds with, so
+    what a compiler reports there is not a place to change. `check` skips it, never turns its
+    diagnostics into findings, and says so in the coverage line (a file governed by such a
+    nested project is dropped from the workspace that happens to reach it):
+    `compiled 5 of 7 files in 2 workspaces; not compiled: docs/tsconfig.json (extends "@tsconfig/docusaurus/tsconfig.json" cannot be resolved)`.
+  - **A package that only peers on the package is left in place when its peer range rejects the
+    target.** What always moves with the package stays as before: the release group published at
+    the target's own version (`react-dom`), `@types/*`, the exact pins of the target, and the
+    packages a pack names in `companions` (each with the official page that says so), even when their installed range already accepts the
+    target. Any other package whose installed peer range rejects the target is not moved and not
+    compiled at another version; `check` lists it under possible impact, never as breaking:
+    `? possible impact, peer conflict: next-mdx-remote-client 1.1.2 declares react >= 18.3.0 < 19.0.0`.
+
+- [#53](https://github.com/uptide-dev/uptide/pull/53) [`d33bdd0`](https://github.com/uptide-dev/uptide/commit/d33bdd0d1fff9e2b1ffeb50f9bdca3c02b292a5f) Thanks [@lucasbraum](https://github.com/lucasbraum)! - A verified migration pack for React 18 → 19, scored against excalidraw/excalidraw and
+  tldraw/tldraw at the commit before their own upgrade. Rewrites by rule: `useRef<T>()` →
+  `useRef<T>(undefined)`, `ref={(el) => (x = el)}` → a block body, and `React.MutableRefObject`
+  → `React.RefObject`. `RefObject<T | null>`, the removed global `JSX` namespace, untyped
+  `element.props`, the removed react-dom APIs and `PropsWithRef` go to the agent with the guide;
+  what the compiler cannot see (errors no longer re-thrown, removed legacy APIs, `act` moved to
+  "react", Strict Mode and Suspense changes) is listed for review. 2 public repositories, 100%
+  precision on breaking findings (89 sites, none false), recall 69% on breaking sites; the
+  sites it misses are listed in the pack test output.
+
+### Patch Changes
+
+- [#48](https://github.com/uptide-dev/uptide/pull/48) [`94611a9`](https://github.com/uptide-dev/uptide/commit/94611a9e5ed0ca1da332c286118bcd66b09795c2) Thanks [@lucasbraum](https://github.com/lucasbraum)! - `check` compiles your code with the repository's own TypeScript (the `node_modules/typescript`
+  its build uses, found the way `fix` has found it since verification), and falls back to the
+  bundled compiler only when the repository installs none. Errors and their positions are the
+  ones your `tsc` would print: a repository on TypeScript 4.9 is no longer judged by TypeScript
+  6's rules. The coverage line says which compiler judged: `compiled 355 of 356 files in 5
+  workspaces with the repo's TypeScript 4.9.5`.
+  
+  A workspace without a tsconfig of its own is now configured by the nearest one above it (a
+  monorepo root whose `include` covers the workspace), for its options only; synthetic defaults
+  apply only when no tsconfig exists anywhere.
+
 ## 0.5.0
 
 ### Minor Changes
