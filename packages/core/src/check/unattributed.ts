@@ -1,6 +1,6 @@
 import { posix } from 'node:path';
 import type { Change } from '../domain/change.js';
-import type { Finding } from '../domain/report.js';
+import type { Finding, SharedRoot } from '../domain/report.js';
 import type { ApiSurface } from '../domain/surface.js';
 import type { CompileDiagnostic, DiagnosticCause, Usage } from '../domain/usage.js';
 
@@ -93,13 +93,24 @@ export function unattributedFindings(
       // A cause that is itself the one edit (a compiler option, a parameter's type) is the
       // site; the errors under it are evidence.
       ...(cause.anchorOnly || cause.config ? { anchorOnly: true as const } : {}),
+      ...(cause.anchorOnly && !cause.config ? { root: sharedRoot(cause, filePrefix) } : {}),
       severity: 'breaking',
       confidence: 1,
       fixability: cause.anchorOnly || cause.config ? 'assisted' : 'unknown',
       reason: cause.anchorOnly || cause.config ? cause.reason : UNATTRIBUTED_REASON,
     };
   });
-  return [...clustered, ...plainFindings(single, meta, surfaceB, unresolvedFiles)];
+  return [...clustered, ...plainFindings(single, meta, surfaceB, unresolvedFiles, filePrefix)];
+}
+
+/** The declaration as the repository names it: a `../editor/x.ts` seen from a workspace is `packages/editor/x.ts`. */
+function sharedRoot(cause: DiagnosticCause, filePrefix: string): SharedRoot {
+  return {
+    name: cause.name,
+    file: posix.normalize(`${filePrefix}${cause.file}`),
+    line: cause.line,
+    reason: cause.reason,
+  };
 }
 
 function plainFindings(
@@ -107,6 +118,7 @@ function plainFindings(
   meta: { package: string; from: string; to: string },
   surfaceB: ApiSurface,
   unresolvedFiles: string[],
+  filePrefix: string,
 ): Finding[] {
   const unresolved = new Set(unresolvedFiles);
   // Leaf names declared in files the compiler could not fully resolve.
@@ -142,6 +154,7 @@ function plainFindings(
     return {
       change,
       usage,
+      ...(d.root ? { root: sharedRoot(d.root, filePrefix) } : {}),
       severity: inconclusive ? 'unverified' : 'breaking',
       confidence: 1,
       fixability: 'unknown',

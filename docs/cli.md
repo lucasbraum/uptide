@@ -126,7 +126,13 @@ from it, every element in every file errors with one fix: `check` reports one fi
 diagnostics as evidence, and `--details` shows a few of them. A repository parameter that
 several call sites trip over (a hook typed `RefObject<HTMLElement>` once `useRef` returns
 `RefObject<HTMLElement | null>`) is reported the same way: one finding at the parameter, with
-the call sites as evidence.
+the call sites as evidence, and `--details` prints `N call sites in M workspaces` under it
+with a few of them. The call sites may sit in other workspaces than the parameter (a hook in
+`packages/editor` called from `apps/examples` and `packages/tldraw`): a site alone in its
+workspace still folds into the one finding at the declaration once the workspaces are merged.
+The HTML report lists the call sites, with their workspaces, under the anchor; the JSON report
+carries them as the finding's `downstream`, and `root` on each call-site finding names the
+declaration it traces to.
 
 ### Partial results
 

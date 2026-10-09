@@ -109,6 +109,12 @@ export interface CompileDiagnostic {
   snippet: string;
   /** The repo declaration this error descends from, when one could be traced (see adapters/typescript/cause.ts). */
   cause?: DiagnosticCause;
+  /**
+   * The repository parameter or prop this mismatch traces to (`parameterCause`), set whether
+   * or not enough sites in this workspace share it for `cause` to be. Sites in other
+   * workspaces that trace to the same declaration fold into one finding at it (check/root-cause.ts).
+   */
+  root?: DiagnosticCause;
 }
 
 export interface DiagnosticCause {

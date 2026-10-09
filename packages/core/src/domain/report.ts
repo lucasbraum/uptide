@@ -14,12 +14,24 @@ export interface DownstreamSite {
   line: number;
   code: number;
   message: string;
+  /** The workspace the site is in, when the anchor gathers sites from several. */
+  workspace?: string;
 }
 
 /** `verified`: a migration pack covers the upgrade. `generic`: analysis only, no pack. */
 export type Tier = 'verified' | 'generic';
 
 /** A change joined to one usage of the changed symbol, with severity resolved for that usage. */
+/** A local declaration several call sites trace back to: where one edit resolves them all. */
+export interface SharedRoot {
+  /** Declared name (`ref`). */
+  name: string;
+  file: string;
+  line: number;
+  /** Why it is the edit, as a clause: "whose parameter `ref: RefObject<HTMLElement>` no longer accepts ...". */
+  reason: string;
+}
+
 export interface Finding {
   change: Change;
   usage: Usage;
@@ -30,6 +42,13 @@ export interface Finding {
    * one site to fix, and `downstream` is the evidence; it counts as one site, not as many.
    */
   anchorOnly?: true;
+  /**
+   * The repository declaration (a parameter, a prop) a compile error at a call site traces
+   * to, repository-relative. On a call-site finding it says where the one edit is; sites in
+   * different workspaces that share it are folded into one anchored finding at the
+   * declaration (`anchorOnly`, the sites as `downstream`), which carries `root` too.
+   */
+  root?: SharedRoot;
   /**
    * For a `module-format` finding: every `require()` site of the package in this file, the
    * finding's own first. Switching a file to `import()` is one unit of work however many

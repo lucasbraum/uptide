@@ -126,5 +126,15 @@ describe('root cause guard', () => {
     const at5 = signal.diagnostics.find((d) => d.file === 'src/single.ts' && d.line === 5);
     expect(at5?.code).toBe(2345);
     expect(at5?.cause?.anchorOnly).toBeUndefined();
+    // The declaration it traces to is kept: a site in another workspace at the same
+    // parameter folds with it after the merge (check/root-cause.ts).
+    expect(at5?.root).toEqual({
+      name: 'b',
+      file: 'src/single.ts',
+      line: 2,
+      reason:
+        "whose parameter `b: Box<number>` no longer accepts what the target gives it; widen the parameter's type there",
+      anchorOnly: true,
+    });
   });
 });

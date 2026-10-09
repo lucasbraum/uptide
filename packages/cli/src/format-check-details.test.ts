@@ -450,3 +450,62 @@ it('prints one native warning for a package regardless of how many findings it c
   const text = formatCheck({ ...report, packages: [p] });
   expect(text.match(/native package, runtime probe skipped/g)).toHaveLength(1);
 });
+
+it('prints the call sites under a declaration several workspaces trip, then a few as examples', () => {
+  const root = {
+    name: 'ref',
+    file: 'packages/editor/src/useTransform.ts',
+    line: 6,
+    reason:
+      "whose parameter `ref: RefObject<HTMLElement>` no longer accepts what the target gives it; widen the parameter's type there",
+  };
+  const anchor = finding({
+    change: { package: 'react', from: '18.3.1', to: '19.2.1', kind: 'cause', path: 'cause:ref' },
+    usage: { file: root.file, line: 6, symbolPath: 'cause:ref', access: 'read', via: 'inferred' },
+    anchorOnly: true,
+    root,
+    downstream: [
+      {
+        file: 'apps/examples/src/Custom.tsx',
+        line: 11,
+        code: 2345,
+        message: 'not assignable',
+        workspace: 'apps/examples',
+      },
+      {
+        file: 'packages/tldraw/src/Foreground.tsx',
+        line: 59,
+        code: 2345,
+        message: 'not assignable',
+        workspace: 'packages/tldraw',
+      },
+    ],
+    details: ['2 call sites in 2 workspaces'],
+    fixability: 'assisted',
+    reason: root.reason,
+    evidence: 'compiler',
+  });
+  const out = formatCheck(
+    {
+      ...report,
+      packages: [
+        {
+          ...(report.packages[0] as PackageReport),
+          name: 'react',
+          workspace: '*',
+          installed: '18.3.1',
+          target: '19.2.1',
+          latest: '19.2.1',
+          findings: [anchor],
+        },
+      ],
+    },
+    { color: false },
+  );
+  expect(out).toContain('  ✗ packages/editor/src/useTransform.ts:6  `ref`');
+  expect(out).toContain('      2 call sites in 2 workspaces, for example');
+  expect(out).toContain('        apps/examples/src/Custom.tsx:11  TS2345: not assignable');
+  expect(out).toContain('        packages/tldraw/src/Foreground.tsx:59  TS2345: not assignable');
+  // The count is printed once, not again from the details.
+  expect(out.split('2 call sites in 2 workspaces')).toHaveLength(2);
+});

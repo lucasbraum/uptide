@@ -183,3 +183,65 @@ it('omits workspace paths from check rows by default and counts breaking fixes c
   expect(html).toContain('<strong>25</strong><span class="label">Auto-fixable</span>');
   expect(html).toContain('<strong>7</strong><span class="label">Need the agent (LLM)</span>');
 });
+
+it('lists the call sites under a declaration anchor, with their workspaces', () => {
+  const report = fixture('stripe');
+  const p = report.packages.find(
+    (pkg) => pkg.findings.length > 0,
+  ) as (typeof report.packages)[number];
+  const first = p.findings[0] as NonNullable<(typeof p.findings)[number]>;
+  const root = {
+    name: 'ref',
+    file: 'packages/editor/src/useTransform.ts',
+    line: 6,
+    reason: 'whose parameter changed',
+  };
+  p.findings = [
+    {
+      ...first,
+      change: { ...first.change, kind: 'cause', path: 'cause:ref' },
+      usage: { ...first.usage, file: root.file, line: 6, compileError: undefined },
+      anchorOnly: true,
+      root,
+      severity: 'breaking',
+      reason: root.reason,
+      downstream: [
+        {
+          file: 'apps/examples/src/Custom.tsx',
+          line: 11,
+          code: 2345,
+          message: 'm',
+          workspace: 'apps/examples',
+        },
+        {
+          file: 'packages/tldraw/src/Foreground.tsx',
+          line: 59,
+          code: 2345,
+          message: 'm',
+          workspace: 'packages/tldraw',
+        },
+      ],
+      details: ['2 call sites in 2 workspaces'],
+    },
+  ];
+  p.plan = [
+    {
+      rule: 'TS2345',
+      title: 'ref',
+      severity: 'breaking',
+      by: { rule: 0, agent: 1, manual: 0 },
+      sites: 1,
+      fixes: 1,
+      locations: [{ file: root.file, line: 6 }],
+      detail: root.reason,
+    },
+  ];
+  const html = renderHtml(report, opts);
+  expect(html).toContain('<summary>2 call sites in 2 workspaces</summary>');
+  expect(html).toContain(
+    '<li>apps/examples/src/Custom.tsx:11 <span class="muted">apps/examples</span></li>',
+  );
+  expect(html).toContain(
+    '<li>packages/tldraw/src/Foreground.tsx:59 <span class="muted">packages/tldraw</span></li>',
+  );
+});
