@@ -9,12 +9,12 @@ your compiler and tests.
 [![CI](https://github.com/uptide-dev/uptide/actions/workflows/ci.yml/badge.svg)](https://github.com/uptide-dev/uptide/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-![uptide check on the storefront fixture: the HTML report with zod and stripe findings](docs/screenshots/pr-8/check-light.png)
+![uptide check zod on the storefront fixture: the HTML report's summary and the zod section](docs/screenshots/readme/check.png)
 
 ## Quickstart
 
-No account, no config. Node 20 or newer; npm, pnpm, Yarn (node-modules linker) or bun (text
-lockfile). In your repository:
+No account, no config. Node 20 or newer. `check` works on npm, pnpm, Yarn and bun (text
+lockfile); `fix` on npm, pnpm and Yarn with the node-modules linker. In your repository:
 
 ```sh
 npx uptide list                            # fast discovery; no install or compilation
