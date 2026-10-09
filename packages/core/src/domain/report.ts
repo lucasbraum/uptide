@@ -1,7 +1,13 @@
 import type { ErrorCode } from '../errors.js';
 import type { Change, Severity } from './change.js';
 import type { RuntimeChange, RuntimeLoad } from './runtime.js';
-import type { CompileCoverage, CompileDiagnostic, Unanalyzed, Usage } from './usage.js';
+import type {
+  CompileCoverage,
+  CompileDiagnostic,
+  DiagnosticCause,
+  Unanalyzed,
+  Usage,
+} from './usage.js';
 
 /** `none`: an additive finding, nothing to change; it counts in callSitesChecked only. */
 export type Fixability = 'mechanical' | 'assisted' | 'manual' | 'unknown' | 'none';
@@ -30,6 +36,18 @@ export interface Finding {
    * one site to fix, and `downstream` is the evidence; it counts as one site, not as many.
    */
   anchorOnly?: true;
+  /**
+   * The repository parameter this finding's compile error descends from, when it stands alone in
+   * its workspace: merged across workspaces, sites that trip the same declaration become one
+   * `cause` anchor at it. Dropped once joined or when no other site shares it.
+   */
+  sharedCause?: DiagnosticCause;
+  /**
+   * For a `cause` anchor at a repository parameter: how many call sites trip it, across every
+   * workspace (`downstream` lists them). Absent for a compiler-option anchor, whose errors are
+   * not call sites.
+   */
+  callSites?: number;
   /**
    * For a `module-format` finding: every `require()` site of the package in this file, the
    * finding's own first. Switching a file to `import()` is one unit of work however many

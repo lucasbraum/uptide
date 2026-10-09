@@ -104,11 +104,35 @@ function tally(tp: number, fp: number, fn: number): Tally {
 const key = (s: { file: string; line: number }): string => `${s.file}:${s.line}`;
 
 /**
+ * The call sites listed under a one-edit anchor (a repository parameter, a compiler option):
+ * evidence of the anchor, never sites of their own. Repository-relative.
+ */
+export function evidenceSites(report: CheckReport, pack: Pack): Set<string> {
+  const evidence = new Set<string>();
+  for (const p of report.packages) {
+    const names = p.members ? p.members.map((m) => m.name) : [p.name];
+    if (!names.includes(pack.name)) continue;
+    const prefix = p.workspace === '.' || p.workspace === '*' ? '' : `${p.workspace}/`;
+    for (const f of p.findings) {
+      if (f.change.kind !== 'cause' || !f.anchorOnly) continue;
+      for (const d of f.downstream ?? [])
+        evidence.add(
+          key({ file: d.file.startsWith(prefix) ? d.file : `${prefix}${d.file}`, line: d.line }),
+        );
+    }
+  }
+  return evidence;
+}
+
+/**
  * The sites `check` shows for the package, from its plan: the findings worth acting on,
  * grouped under the rule `fix` would apply. Repository-relative, as ground truth is written.
+ * An anchored finding is scored at its anchor (the declaration a ground-truth finding names);
+ * the call sites under it are evidence, neither true nor false positives.
  */
 export function predictedSites(report: CheckReport, pack: Pack): ScoredSite[] {
   const own = new Set([...pack.rules.map((r) => r.id), ...pack.behavior.map((b) => b.id)]);
+  const evidence = evidenceSites(report, pack);
   const sites = new Map<string, ScoredSite>();
   for (const p of report.packages) {
     const names = p.members ? p.members.map((m) => m.name) : [p.name];
@@ -117,6 +141,7 @@ export function predictedSites(report: CheckReport, pack: Pack): ScoredSite[] {
     for (const group of p.plan ?? [])
       for (const location of group.locations) {
         const file = location.file.startsWith(prefix) ? location.file : `${prefix}${location.file}`;
+        if (evidence.has(key({ file, line: location.line }))) continue;
         const site: ScoredSite = {
           file,
           line: location.line,

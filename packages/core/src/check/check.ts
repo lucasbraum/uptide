@@ -54,6 +54,7 @@ import { mapWithLimit, mapWithSerialRetry } from './pool.js';
 import { isBehind, rankCandidates } from './rank.js';
 import { groupRootCauses } from './root-cause.js';
 import { runtimeChangeFindings } from './runtime-changes.js';
+import { joinSharedRoots } from './shared-root.js';
 import { confirmBreaking, evidenceOf, tierOf } from './tier.js';
 import { typesPackageOf, typesReleaseFor } from './types-release.js';
 import { unattributedFindings } from './unattributed.js';
@@ -572,6 +573,9 @@ export function mergeAcrossWorkspaces(
         p.findings.map((f) => ({
           ...f,
           usage: { ...f.usage, file: prefixed(p, f.usage.file) },
+          ...(f.sharedCause
+            ? { sharedCause: { ...f.sharedCause, file: prefixed(p, f.sharedCause.file) } }
+            : {}),
           // A cluster's description names its cause by file: the same prefix applies there.
           change: f.change.path.startsWith('cause:')
             ? {
@@ -605,6 +609,8 @@ export function mergeAcrossWorkspaces(
         runtimeMs: sum((p) => p.timing.runtimeMs ?? 0),
       },
     };
+    // Sites that trip one repository declaration from different workspaces are one edit there.
+    combined.findings = joinSharedRoots(combined.findings);
     if (first.runtime) combined.runtime = first.runtime;
     // What moves with the package is one plan for the repository, carried by whichever
     // workspace reports it; the merged entry keeps every companion and conflict named.

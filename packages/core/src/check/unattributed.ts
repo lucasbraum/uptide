@@ -55,51 +55,63 @@ export function unattributedFindings(
     list.push(d);
     clusters.set(key, list);
   }
-  const clustered: Finding[] = [...clusters.values()].map((group) => {
-    const cause = (group[0] as CompileDiagnostic).cause as DiagnosticCause;
-    const usage: Usage = {
-      file: cause.file,
-      line: cause.line,
-      column: 1,
-      endLine: cause.line,
-      endColumn: 1,
-      symbolPath: `cause:${cause.name}`,
-      access: 'read',
-      snippet: '',
-      via: 'inferred',
-    };
-    const change: Change = {
-      ...meta,
-      path: `cause:${cause.name}`,
-      kind: 'cause',
-      severity: 'breaking',
-      source: 'types',
-      confidence: 1,
-      evidence: 'checker',
-      notes: describeCluster(group.length, {
-        ...cause,
-        file: posix.normalize(`${filePrefix}${cause.file}`),
-      }),
-    };
-    return {
-      change,
-      usage,
-      downstream: group.map((d) => ({
-        file: posix.normalize(`${filePrefix}${d.file}`),
-        line: d.line,
-        code: d.code,
-        message: d.message.split('\n')[0] ?? d.message,
-      })),
-      // A cause that is itself the one edit (a compiler option, a parameter's type) is the
-      // site; the errors under it are evidence.
-      ...(cause.anchorOnly || cause.config ? { anchorOnly: true as const } : {}),
-      severity: 'breaking',
-      confidence: 1,
-      fixability: cause.anchorOnly || cause.config ? 'assisted' : 'unknown',
-      reason: cause.anchorOnly || cause.config ? cause.reason : UNATTRIBUTED_REASON,
-    };
-  });
+  const clustered: Finding[] = [...clusters.values()].map((group) =>
+    clusterFinding(group, meta, filePrefix),
+  );
   return [...clustered, ...plainFindings(single, meta, surfaceB, unresolvedFiles)];
+}
+
+/** One finding at a traced cause, with the errors it explains under it. */
+export function clusterFinding(
+  group: CompileDiagnostic[],
+  meta: { package: string; from: string; to: string },
+  /** Prefix that makes a workspace-relative file repository-relative (`packages/api/`). */
+  filePrefix = '',
+): Finding {
+  const cause = (group[0] as CompileDiagnostic).cause as DiagnosticCause;
+  const usage: Usage = {
+    file: cause.file,
+    line: cause.line,
+    column: 1,
+    endLine: cause.line,
+    endColumn: 1,
+    symbolPath: `cause:${cause.name}`,
+    access: 'read',
+    snippet: '',
+    via: 'inferred',
+  };
+  const change: Change = {
+    ...meta,
+    path: `cause:${cause.name}`,
+    kind: 'cause',
+    severity: 'breaking',
+    source: 'types',
+    confidence: 1,
+    evidence: 'checker',
+    notes: describeCluster(group.length, {
+      ...cause,
+      file: posix.normalize(`${filePrefix}${cause.file}`),
+    }),
+  };
+  return {
+    change,
+    usage,
+    downstream: group.map((d) => ({
+      file: posix.normalize(`${filePrefix}${d.file}`),
+      line: d.line,
+      code: d.code,
+      message: d.message.split('\n')[0] ?? d.message,
+    })),
+    // A cause that is itself the one edit (a compiler option, a parameter's type) is the
+    // site; the errors under it are evidence.
+    ...(cause.anchorOnly || cause.config ? { anchorOnly: true as const } : {}),
+    // A parameter's errors are its call sites: the report says how many.
+    ...(cause.anchorOnly && !cause.config ? { callSites: group.length } : {}),
+    severity: 'breaking',
+    confidence: 1,
+    fixability: cause.anchorOnly || cause.config ? 'assisted' : 'unknown',
+    reason: cause.anchorOnly || cause.config ? cause.reason : UNATTRIBUTED_REASON,
+  };
 }
 
 function plainFindings(
@@ -142,6 +154,7 @@ function plainFindings(
     return {
       change,
       usage,
+      ...(d.sharedCause ? { sharedCause: d.sharedCause } : {}),
       severity: inconclusive ? 'unverified' : 'breaking',
       confidence: 1,
       fixability: 'unknown',

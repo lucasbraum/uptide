@@ -924,6 +924,8 @@ export async function compileAgainstTargets(
           : undefined) ??
         findCause(programs, d, overlaid, repo.dir, erroredLines);
       if (cause) diagnostic.cause = cause;
+      // A parameter only this site trips: left to the site here, offered to the other workspaces.
+      else if (parameter !== undefined) diagnostic.sharedCause = byParameter.get(parameter);
       return diagnostic;
     });
     return {

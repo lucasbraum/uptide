@@ -99,6 +99,7 @@ describe('root cause guard', () => {
       (d) => d.file === 'src/param.ts' && d.code === 2345,
     );
     expect(mismatches.map((d) => d.line)).toEqual([5, 6]);
+    for (const d of mismatches) expect(d.sharedCause).toBeUndefined();
     for (const d of mismatches)
       expect(d.cause).toEqual({
         name: 'b',
@@ -126,5 +127,15 @@ describe('root cause guard', () => {
     const at5 = signal.diagnostics.find((d) => d.file === 'src/single.ts' && d.line === 5);
     expect(at5?.code).toBe(2345);
     expect(at5?.cause?.anchorOnly).toBeUndefined();
+    // Not a cause in this workspace, but offered to the others: another workspace's lone site
+    // that trips the same parameter makes one finding at it (check/shared-root.ts).
+    expect(at5?.sharedCause).toEqual({
+      name: 'b',
+      file: 'src/single.ts',
+      line: 2,
+      reason:
+        "whose parameter `b: Box<number>` no longer accepts what the target gives it; widen the parameter's type there",
+      anchorOnly: true,
+    });
   });
 });

@@ -414,6 +414,76 @@ describe('mergeAcrossWorkspaces', () => {
     ...over,
   });
 
+  it('makes one finding at a repository parameter that one call site trips in each of two workspaces', () => {
+    // tldraw: useTransform(rSvg) in apps/examples and in packages/tldraw, both rejected by the
+    // hook's parameter in packages/editor. Each workspace has one site; together they are one edit.
+    const lone = (file: string, line: number): Finding => ({
+      change: {
+        package: 'react',
+        from: '18.3.1',
+        to: '19.2.1',
+        path: 'TS2345',
+        kind: 'type',
+        severity: 'breaking',
+        source: 'types',
+        confidence: 1,
+        evidence: 'checker',
+      },
+      usage: {
+        file,
+        line,
+        column: 15,
+        endLine: line,
+        endColumn: 19,
+        symbolPath: 'TS2345',
+        access: 'read',
+        snippet: 'useTransform(rSvg, x, y)',
+        via: 'inferred',
+        compileError: "Argument of type 'RefObject<SVGSVGElement | null>' is not assignable.",
+      },
+      sharedCause: {
+        name: 'ref',
+        file: '../../packages/editor/src/lib/hooks/useTransform.ts',
+        line: 6,
+        reason:
+          'whose parameter `ref: React.RefObject<HTMLElement | SVGElement>` no longer accepts what the target gives it',
+        anchorOnly: true,
+      },
+      severity: 'breaking',
+      confidence: 1,
+      fixability: 'unknown',
+      reason: 'compile error not attributed to a known API change',
+    });
+    const [merged] = mergeAcrossWorkspaces(
+      [
+        base('apps/examples', 'react', {
+          status: 'breaking',
+          findings: [lone('src/examples/CustomComponentsExample.tsx', 11)],
+        }),
+        base('packages/tldraw', 'react', {
+          status: 'breaking',
+          findings: [lone('src/lib/canvas/TldrawSelectionForeground.tsx', 59)],
+        }),
+      ],
+      {},
+    );
+    expect(merged?.findings).toHaveLength(1);
+    const anchor = merged?.findings[0] as Finding;
+    expect(anchor).toMatchObject({
+      change: { kind: 'cause', path: 'cause:ref' },
+      usage: { file: 'packages/editor/src/lib/hooks/useTransform.ts', line: 6 },
+      anchorOnly: true,
+      callSites: 2,
+      severity: 'breaking',
+    });
+    expect(anchor.downstream?.map((d) => `${d.file}:${d.line}`)).toEqual([
+      'apps/examples/src/examples/CustomComponentsExample.tsx:11',
+      'packages/tldraw/src/lib/canvas/TldrawSelectionForeground.tsx:59',
+    ]);
+    expect(anchor.sharedCause).toBeUndefined();
+    expect(sitesOf(anchor)).toBe(1);
+  });
+
   it('merges the same dependency at the same versions across workspaces, and marks catalog entries', () => {
     const out = mergeAcrossWorkspaces(
       [

@@ -131,6 +131,48 @@ const report: CheckReport = {
 };
 
 describe('formatCheckDetails', () => {
+  it('says how many call sites trip a parameter anchor, and shows them as evidence', () => {
+    const anchored = finding({
+      fixability: 'assisted',
+      anchorOnly: true,
+      callSites: 2,
+      reason: 'whose parameter `ref` no longer accepts what the target gives it',
+      change: { package: 'react', path: 'cause:ref', kind: 'cause' },
+      usage: { file: 'packages/editor/src/lib/hooks/useTransform.ts', line: 6 },
+      downstream: [
+        {
+          file: 'apps/examples/src/x.tsx',
+          line: 11,
+          code: 2345,
+          message: 'Argument not assignable.',
+        },
+        {
+          file: 'packages/tldraw/src/y.tsx',
+          line: 59,
+          code: 2345,
+          message: 'Argument not assignable.',
+        },
+      ],
+    });
+    const out = formatCheck(
+      {
+        ...report,
+        packages: [
+          {
+            ...(report.packages[0] as PackageReport),
+            name: 'react',
+            findings: [anchored],
+          },
+        ],
+      },
+      { color: false },
+    );
+    expect(out).toContain('packages/editor/src/lib/hooks/useTransform.ts:6  `ref`');
+    expect(out).toContain('2 call sites trip it at the target, for example');
+    expect(out).toContain('apps/examples/src/x.tsx:11  TS2345: Argument not assignable.');
+    expect(out).toContain('packages/tldraw/src/y.tsx:59  TS2345: Argument not assignable.');
+  });
+
   it('renders every site with its snippet and reason', () => {
     const out = formatCheck(report, { color: false });
     expect(out).toBe(

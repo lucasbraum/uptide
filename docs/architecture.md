@@ -589,8 +589,14 @@ the target's `useRef` returns `RefObject<HTMLElement | null>`) is anchored at th
 `anchorOnly`, when at least two sites trip it: the one edit is the parameter's type, as the
 migration guides say, and the call sites are evidence. The parameter may sit in another
 workspace whose source the program maps (`packages/editor` for a call in `packages/tldraw`);
-its path is the repository's. A parameter one site trips is left to
-that site, which may as well be the argument's.
+its path is the repository's. A parameter one site trips in a workspace is left to that site
+there, carrying the parameter as a candidate (`sharedCause`). When the workspaces' reports are
+merged (`mergeAcrossWorkspaces`, `check/shared-root.ts`), a lone site joins the anchor another
+workspace already reports for the same declaration, and lone sites of two or more workspaces
+make one anchor: one breaking finding at the declaration, `callSites` counting every workspace's
+call sites, `downstream` listing them. A parameter only one site in the whole repository trips
+stays that site's own finding. `pack test` scores the anchor at the declaration; the call sites
+under it are evidence, neither true nor false positives.
 
 A diagnostic confirms exactly one usage: the innermost whose span contains the
 diagnostic's start. `z.string().trim().url()` is three usages on one line, and an error

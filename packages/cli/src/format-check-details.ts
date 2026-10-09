@@ -99,7 +99,9 @@ function siteLines(
         `  ${tint(mark)} ${f.usage.file}:${f.usage.line}  \`${f.change.path.replace(/^cause:/, '')}\``,
         `      ${f.reason}`,
         colors.dim(
-          `      evidence: ${plural(sites.length, 'error')} at the target${shown.length ? ', for example' : ''}`,
+          f.callSites !== undefined
+            ? `      ${plural(f.callSites, 'call site')} trip it at the target${shown.length ? ', for example' : ''}`
+            : `      evidence: ${plural(sites.length, 'error')} at the target${shown.length ? ', for example' : ''}`,
         ),
         ...shown.map((site) =>
           colors.dim(`        ${site.file}:${site.line}  TS${site.code}: ${site.message}`),

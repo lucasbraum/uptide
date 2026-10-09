@@ -109,6 +109,12 @@ export interface CompileDiagnostic {
   snippet: string;
   /** The repo declaration this error descends from, when one could be traced (see adapters/typescript/cause.ts). */
   cause?: DiagnosticCause;
+  /**
+   * The repository parameter this error descends from when only this site in its workspace trips
+   * it: not a cause yet (one site keeps its own diagnostic), but a candidate to join the sites of
+   * the other workspaces that trip the same declaration (`check/shared-root.ts`).
+   */
+  sharedCause?: DiagnosticCause;
 }
 
 export interface DiagnosticCause {

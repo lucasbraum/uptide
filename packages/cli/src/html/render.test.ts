@@ -115,6 +115,54 @@ describe('HTML report', () => {
     expect(html.match(/<\/script>/g)).toHaveLength(1);
     expect(html).not.toContain('<img');
   });
+  it('lists the call sites under a parameter anchor, with an N call sites line', () => {
+    const report = fixture('zod');
+    const p = report.packages[0];
+    assert(p);
+    const decl = { file: 'packages/editor/src/lib/hooks/useTransform.ts', line: 6 };
+    p.findings.push({
+      change: {
+        package: 'zod',
+        from: p.installed,
+        to: p.target,
+        path: 'cause:ref',
+        kind: 'cause',
+        severity: 'breaking',
+        source: 'types',
+        confidence: 1,
+      },
+      usage: {
+        ...decl,
+        column: 1,
+        endLine: 6,
+        endColumn: 1,
+        symbolPath: 'cause:ref',
+        access: 'read',
+        snippet: '',
+        via: 'inferred',
+      },
+      anchorOnly: true,
+      callSites: 2,
+      downstream: [
+        { file: 'apps/examples/src/x.tsx', line: 11, code: 2345, message: 'x' },
+        { file: 'packages/tldraw/src/y.tsx', line: 59, code: 2345, message: 'x' },
+      ],
+      severity: 'breaking',
+      confidence: 1,
+      fixability: 'assisted',
+      reason: 'whose parameter `ref` no longer accepts what the target gives it',
+    });
+    const g = p.plan?.[0];
+    assert(g);
+    g.locations = [decl];
+    const html = renderHtml(report, opts);
+    expect(html).toContain('<p class="muted call-sites">2 call sites</p>');
+    expect(html).toContain('<li>apps/examples/src/x.tsx:11 <span class="muted">TS2345</span></li>');
+    expect(html).toContain(
+      '<li>packages/tldraw/src/y.tsx:59 <span class="muted">TS2345</span></li>',
+    );
+  });
+
   it('caps excerpts at 50 per group but retains additional sites within the size budget', () => {
     const report = fixture('zod');
     const g = report.packages[0]?.plan?.[0];

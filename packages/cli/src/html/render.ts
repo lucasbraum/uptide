@@ -47,6 +47,30 @@ function compilerAt(p: PackageReport, group: PlanGroup, file: string, line: numb
     ].join(' · ') || (group.severity !== 'deprecated' ? group.detail : '')
   );
 }
+/**
+ * Under a parameter anchor: `N call sites`, then where (the first few). The anchor is the one
+ * edit; the call sites, in whatever workspace, are its evidence.
+ */
+function callSitesAt(
+  p: PackageReport,
+  file: string,
+  line: number,
+): ((e: (s: unknown) => string) => string) | undefined {
+  const anchor = p.findings.find(
+    (f) =>
+      f.change.kind === 'cause' &&
+      f.callSites !== undefined &&
+      f.usage.file === file &&
+      f.usage.line === line,
+  );
+  if (!anchor?.callSites) return undefined;
+  const sites = anchor.downstream ?? [];
+  const shown = sites.slice(0, CALL_SITES_SHOWN);
+  return (e) =>
+    `<p class="muted call-sites">${e(anchor.callSites)} ${anchor.callSites === 1 ? 'call site' : 'call sites'}</p><ul class="mono call-sites">${shown.map((s) => `<li>${e(`${s.file}:${s.line}`)} <span class="muted">TS${e(s.code)}</span></li>`).join('')}${sites.length > shown.length ? `<li class="muted">and ${e(sites.length - shown.length)} more</li>` : ''}</ul>`;
+}
+const CALL_SITES_SHOWN = 10;
+
 /** No repo data is interpolated into executable JS, CSS, attribute names or element names. */
 export function renderHtml(report: CheckReport, opts: HtmlOptions): string {
   function render(
@@ -108,7 +132,8 @@ export function renderHtml(report: CheckReport, opts: HtmlOptions): string {
             ? `<details class="compiler"><summary>compiler message</summary><a href="#${id}">Same message, shown above</a></details>`
             : `<details class="compiler" id="${id}"><summary>compiler message</summary><pre>${escapeHtml(message)}</pre></details>`;
         }
-        const article = `<article class="site"><div class="mono">${link}</div>${excerpt}${compiler}</article>`;
+        const callers = callSitesAt(p, site.file, site.line);
+        const article = `<article class="site"><div class="mono">${link}</div>${excerpt}${compiler}${callers ? callers(e) : ''}</article>`;
         if (index < siteLimit) body += article;
         else overflow += article;
       }
