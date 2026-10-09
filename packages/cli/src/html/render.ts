@@ -1,5 +1,12 @@
 import { basename } from 'node:path';
-import { type CheckReport, isFailure, type PackageReport, type PlanGroup } from '@uptide/core';
+import {
+  type CheckReport,
+  callSitesLine,
+  type Finding,
+  isFailure,
+  type PackageReport,
+  type PlanGroup,
+} from '@uptide/core';
 import { byLine, checkRows, type FormatCheckOptions, nextCommands } from '../format-check.js';
 import { groupReason, groupsForHtml, notesOf, stripeNote, verdict } from './content.js';
 import { escapeHtml } from './escape.js';
@@ -45,6 +52,23 @@ function compilerAt(p: PackageReport, group: PlanGroup, file: string, line: numb
         }),
       ),
     ].join(' · ') || (group.severity !== 'deprecated' ? group.detail : '')
+  );
+}
+/** The anchored finding at a site, when the site is the one edit several call sites trace to. */
+function anchorAt(
+  p: PackageReport,
+  group: PlanGroup,
+  file: string,
+  line: number,
+): Finding | undefined {
+  return p.findings.find(
+    (f) =>
+      f.anchorOnly &&
+      f.root !== undefined &&
+      f.severity === group.severity &&
+      f.usage.file === file &&
+      f.usage.line === line &&
+      (f.downstream?.length ?? 0) > 0,
   );
 }
 /** No repo data is interpolated into executable JS, CSS, attribute names or element names. */
@@ -108,7 +132,20 @@ export function renderHtml(report: CheckReport, opts: HtmlOptions): string {
             ? `<details class="compiler"><summary>compiler message</summary><a href="#${id}">Same message, shown above</a></details>`
             : `<details class="compiler" id="${id}"><summary>compiler message</summary><pre>${escapeHtml(message)}</pre></details>`;
         }
-        const article = `<article class="site"><div class="mono">${link}</div>${excerpt}${compiler}</article>`;
+        // One edit at the anchor resolves every call site listed under it.
+        const anchor = anchorAt(p, g, site.file, site.line);
+        const callSites = anchor?.downstream
+          ? `<details class="compiler"><summary>${e(callSitesLine(anchor.downstream))}</summary><ul class="mono">${anchor.downstream
+              .slice(0, 50)
+              .map(
+                (d) =>
+                  `<li>${e(`${d.file}:${d.line}`)}${d.workspace && d.workspace !== '.' ? ` <span class="muted">${e(d.workspace)}</span>` : ''}</li>`,
+              )
+              .join(
+                '',
+              )}${anchor.downstream.length > 50 ? `<li class="muted">and ${anchor.downstream.length - 50} more</li>` : ''}</ul></details>`
+          : '';
+        const article = `<article class="site"><div class="mono">${link}</div>${excerpt}${compiler}${callSites}</article>`;
         if (index < siteLimit) body += article;
         else overflow += article;
       }

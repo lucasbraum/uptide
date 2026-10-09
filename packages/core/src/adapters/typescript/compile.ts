@@ -924,6 +924,10 @@ export async function compileAgainstTargets(
           : undefined) ??
         findCause(programs, d, overlaid, repo.dir, erroredLines);
       if (cause) diagnostic.cause = cause;
+      // Traced to a parameter but alone in this workspace: the root is kept, so another
+      // workspace's site at the same declaration can fold with it after the merge.
+      const root = parameter !== undefined ? byParameter.get(parameter) : undefined;
+      if (root) diagnostic.root = root;
       return diagnostic;
     });
     return {

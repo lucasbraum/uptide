@@ -1,6 +1,6 @@
 import { posix } from 'node:path';
 import type { Change } from '../domain/change.js';
-import type { Finding } from '../domain/report.js';
+import type { Finding, SharedRoot } from '../domain/report.js';
 import type { ApiSurface } from '../domain/surface.js';
 import type { CompileDiagnostic, DiagnosticCause, Usage } from '../domain/usage.js';
 
@@ -93,6 +93,7 @@ export function unattributedFindings(
       // A cause that is itself the one edit (a compiler option, a parameter's type) is the
       // site; the errors under it are evidence.
       ...(cause.anchorOnly || cause.config ? { anchorOnly: true as const } : {}),
+      ...(cause.anchorOnly && !cause.config ? { root: sharedRoot(cause) } : {}),
       severity: 'breaking',
       confidence: 1,
       fixability: cause.anchorOnly || cause.config ? 'assisted' : 'unknown',
@@ -100,6 +101,15 @@ export function unattributedFindings(
     };
   });
   return [...clustered, ...plainFindings(single, meta, surfaceB, unresolvedFiles)];
+}
+
+/**
+ * The declaration as the workspace names it (`../editor/x.ts`), like `usage.file`: the merge
+ * across workspaces prefixes both the same way, and `packages/tldraw/../editor/x.ts`
+ * normalizes to the repository path.
+ */
+function sharedRoot(cause: DiagnosticCause): SharedRoot {
+  return { name: cause.name, file: cause.file, line: cause.line, reason: cause.reason };
 }
 
 function plainFindings(
@@ -142,6 +152,7 @@ function plainFindings(
     return {
       change,
       usage,
+      ...(d.root ? { root: sharedRoot(d.root) } : {}),
       severity: inconclusive ? 'unverified' : 'breaking',
       confidence: 1,
       fixability: 'unknown',

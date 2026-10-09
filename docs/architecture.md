@@ -589,8 +589,19 @@ the target's `useRef` returns `RefObject<HTMLElement | null>`) is anchored at th
 `anchorOnly`, when at least two sites trip it: the one edit is the parameter's type, as the
 migration guides say, and the call sites are evidence. The parameter may sit in another
 workspace whose source the program maps (`packages/editor` for a call in `packages/tldraw`);
-its path is the repository's. A parameter one site trips is left to
-that site, which may as well be the argument's.
+its path is the repository's. A parameter one site trips in its workspace is left to that
+site, which may as well be the argument's, but the declaration it traces to is kept on the
+diagnostic (`root`) and on the finding (`Finding.root`, repository-relative). After the
+workspaces are merged, `foldSharedRoots` (`check/root-cause.ts`) compares roots across them:
+two or more sites at one declaration, or a site plus the anchor another workspace already
+produced, become one anchored finding at the declaration (`anchorOnly`, the sites as
+`downstream`, each with its `workspace`, `details` opening with `N call sites in M
+workspaces`), filed under the pack rule the sites agreed on. tldraw's `useTransform(ref)` is
+called from three workspaces and was fixed upstream once, in the hook's parameter; `check`
+now reports that one site. The JSON report only gains fields for this (`root`,
+`downstream[].workspace`); nothing is renamed or removed. The pack test scorer counts the
+anchor as the predicted site and never the evidence under it, even when another finding
+lands on an evidence line.
 
 A diagnostic confirms exactly one usage: the innermost whose span contains the
 diagnostic's start. `z.string().trim().url()` is three usages on one line, and an error

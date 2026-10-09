@@ -114,9 +114,32 @@ export function predictedSites(report: CheckReport, pack: Pack): ScoredSite[] {
     const names = p.members ? p.members.map((m) => m.name) : [p.name];
     if (!names.includes(pack.name)) continue;
     const prefix = p.workspace === '.' || p.workspace === '*' ? '' : `${p.workspace}/`;
+    const absolute = (file: string): string =>
+      file.startsWith(prefix) ? file : `${prefix}${file}`;
+    // A call site an anchored finding lists as evidence is neither a true nor a false
+    // positive: the one site is the anchor (the declaration, a compiler option), which the
+    // ground truth names, and the evidence under it is not scored even when another finding
+    // lands on the same line.
+    const evidence = new Set(
+      p.findings
+        .filter((f) => f.anchorOnly)
+        .flatMap((f) =>
+          (f.downstream ?? []).map((d) => key({ file: absolute(d.file), line: d.line })),
+        ),
+    );
+    const anchors = new Set(
+      p.findings
+        .filter((f) => f.anchorOnly)
+        .map((f) => key({ file: absolute(f.usage.file), line: f.usage.line })),
+    );
     for (const group of p.plan ?? [])
       for (const location of group.locations) {
-        const file = location.file.startsWith(prefix) ? location.file : `${prefix}${location.file}`;
+        const file = absolute(location.file);
+        if (
+          evidence.has(key({ file, line: location.line })) &&
+          !anchors.has(key({ file, line: location.line }))
+        )
+          continue;
         const site: ScoredSite = {
           file,
           line: location.line,

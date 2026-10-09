@@ -52,7 +52,7 @@ import {
 } from './module-format.js';
 import { mapWithLimit, mapWithSerialRetry } from './pool.js';
 import { isBehind, rankCandidates } from './rank.js';
-import { groupRootCauses } from './root-cause.js';
+import { foldSharedRoots, groupRootCauses } from './root-cause.js';
 import { runtimeChangeFindings } from './runtime-changes.js';
 import { confirmBreaking, evidenceOf, tierOf } from './tier.js';
 import { typesPackageOf, typesReleaseFor } from './types-release.js';
@@ -563,15 +563,16 @@ export function mergeAcrossWorkspaces(
     const first = list[0] as PackageReport;
     const sum = (pick: (p: PackageReport) => number): number =>
       list.reduce((n, p) => n + pick(p), 0);
-    const combined: PackageReport = {
-      ...first,
-      workspace: '*',
-      workspaces: list.map((p) => p.workspace),
-      ...(catalog ? { source: 'catalog' as const } : {}),
-      findings: list.flatMap((p) =>
-        p.findings.map((f) => ({
+    const workspaceOf = new WeakMap<Finding, string>();
+    const findings = list.flatMap((p) =>
+      p.findings.map((f) => {
+        const moved: Finding = {
           ...f,
           usage: { ...f.usage, file: prefixed(p, f.usage.file) },
+          ...(f.root ? { root: { ...f.root, file: prefixed(p, f.root.file) } } : {}),
+          ...(f.downstream
+            ? { downstream: f.downstream.map((d) => ({ workspace: p.workspace, ...d })) }
+            : {}),
           // A cluster's description names its cause by file: the same prefix applies there.
           change: f.change.path.startsWith('cause:')
             ? {
@@ -582,8 +583,19 @@ export function mergeAcrossWorkspaces(
                 ),
               }
             : f.change,
-        })),
-      ),
+        };
+        workspaceOf.set(moved, p.workspace);
+        return moved;
+      }),
+    );
+    // Sites in several workspaces that trace to one declaration: one finding, at the declaration.
+    const folded = foldSharedRoots(findings, (f) => workspaceOf.get(f));
+    const combined: PackageReport = {
+      ...first,
+      workspace: '*',
+      workspaces: list.map((p) => p.workspace),
+      ...(catalog ? { source: 'catalog' as const } : {}),
+      findings: folded,
       callSitesChecked: sum((p) => p.callSitesChecked),
       unanalyzed: list.flatMap((p) =>
         p.unanalyzed.map((u) => ({ ...u, file: prefixed(p, u.file) })),
@@ -593,7 +605,7 @@ export function mergeAcrossWorkspaces(
         ? { skipReason: list.find((p) => p.skipReason)?.skipReason }
         : {}),
       status: statusOf(
-        list.flatMap((p) => p.findings),
+        folded,
         sum((p) => p.callSitesChecked),
         sum((p) => p.unanalyzed.length),
       ),

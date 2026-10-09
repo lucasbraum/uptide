@@ -438,6 +438,80 @@ describe('mergeAcrossWorkspaces', () => {
     });
   });
 
+  it('folds sites in two workspaces that trace to one declaration, prefixing the root by workspace', () => {
+    const root = (file: string) => ({
+      name: 'ref',
+      file,
+      line: 6,
+      reason: 'whose parameter changed',
+    });
+    const site = (file: string, line: number, rootFile: string): Finding => ({
+      change: {
+        package: 'react',
+        from: '18.3.1',
+        to: '19.2.1',
+        path: 'TS2345',
+        kind: 'type',
+        severity: 'breaking',
+        source: 'types',
+        confidence: 1,
+      },
+      usage: {
+        file,
+        line,
+        column: 1,
+        endLine: line,
+        endColumn: 2,
+        symbolPath: 'TS2345',
+        access: 'read',
+        via: 'inferred',
+        snippet: '',
+        compileCode: 2345,
+        compileError: 'mismatch',
+      },
+      root: root(rootFile),
+      severity: 'breaking',
+      confidence: 1,
+      fixability: 'unknown',
+      reason: 'compile error',
+      evidence: 'compiler',
+    });
+    const out = mergeAcrossWorkspaces(
+      [
+        base('apps/examples', 'react', {
+          installed: '18.3.1',
+          findings: [site('src/Custom.tsx', 11, '../../packages/editor/src/useTransform.ts')],
+        }),
+        base('packages/tldraw', 'react', {
+          installed: '18.3.1',
+          findings: [site('src/Foreground.tsx', 59, '../editor/src/useTransform.ts')],
+        }),
+      ],
+      {},
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0]?.findings).toHaveLength(1);
+    expect(out[0]?.findings[0]).toMatchObject({
+      anchorOnly: true,
+      usage: { file: 'packages/editor/src/useTransform.ts', line: 6 },
+      root: root('packages/editor/src/useTransform.ts'),
+      details: ['2 call sites in 2 workspaces'],
+    });
+    expect(out[0]?.findings[0]?.downstream).toEqual([
+      expect.objectContaining({
+        file: 'apps/examples/src/Custom.tsx',
+        line: 11,
+        workspace: 'apps/examples',
+      }),
+      expect.objectContaining({
+        file: 'packages/tldraw/src/Foreground.tsx',
+        line: 59,
+        workspace: 'packages/tldraw',
+      }),
+    ]);
+    expect(out[0]?.status).toBe('breaking');
+  });
+
   it('merges coverage across workspaces, naming each compiler once', () => {
     const compile = (version: string, own: boolean) => ({
       baselineErrors: 0,
