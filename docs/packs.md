@@ -49,7 +49,7 @@ companions: [{ name: 'ai-sdk-ollama', source: 'https://github.com/jagreehal/ai-s
 
 **Companions come from official docs, never from ground truth alone.** `source` is the `https`
 URL of the official migration guide or changelog that says the package moves with the
-package (the companion's own documentation, when the leader's guide does not name it). A
+package: the leader's documentation or the companion's own, never the ground truth. A
 ground-truth repository that moved a package shows what one repository did, not that the
 package must move. `uptide pack test` fails a pack whose `companions` has an entry with no
 `source`, one that is not an `https` URL, or one that names the pack's own package.

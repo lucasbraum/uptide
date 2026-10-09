@@ -1,5 +1,5 @@
 ---
-"uptide": patch
+"uptide": minor
 ---
 
 Two fixes to `check`:
