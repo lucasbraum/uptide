@@ -41,6 +41,21 @@ jobs:
           UPTIDE_NETWORK: '1'
         run: pnpm --filter @uptide/core exec vitest run src/action/action.test.ts
 
+  docs:
+    # Every relative link in the Markdown resolves, and the README's packs table matches what
+    # each pack's verification.json and ground truth say (`pnpm docs:packs` rewrites it).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm docs:links
+      - run: pnpm docs:packs --check
+
   smoke:
     # The packed CLI, installed in a clean Node container, against npm, pnpm and yarn fixtures.
     runs-on: ubuntu-latest

@@ -5,9 +5,11 @@ import { fakeEngine, memoryIo } from './test-utils.js';
 
 const root = new URL('../../../', import.meta.url);
 const readme = readFileSync(new URL('README.md', root), 'utf8');
+const section = (from: string, to: string): string =>
+  readme.slice(readme.indexOf(from), readme.indexOf(to));
 
 describe('README', () => {
-  it('opens with the pitch and a quickstart that needs no setup', () => {
+  it('opens with the pitch, the badges, one picture and a quickstart that needs no setup', () => {
     // The tagline is the first line under the title, then the one-sentence pitch npm shows.
     expect(readme.split('\n').slice(0, 3)).toEqual([
       '# Uptide',
@@ -20,58 +22,69 @@ describe('README', () => {
     expect(
       JSON.parse(readFileSync(new URL('packages/cli/package.json', root), 'utf8')).description,
     ).toBe(pitch);
+    // Three badges, under the pitch: npm version, CI, and the license linking to its text.
+    const badges = readme.split('\n').filter((l) => l.startsWith('[!['));
+    expect(badges).toHaveLength(3);
+    expect(badges).toContain(
+      '[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)',
+    );
+    // One picture, from the public fixtures' screenshots.
+    const images = [...readme.matchAll(/^!\[[^\]]*\]\(([^)]+)\)/gm)].map((m) => m[1] as string);
+    expect(images).toHaveLength(1);
+    expect(existsSync(new URL(images[0] as string, root))).toBe(true);
     // Renovate and Dependabot are tools Uptide works alongside, named once, never the framing.
     expect(readme.match(/Renovate/g)).toHaveLength(1);
     expect(readme).not.toContain('Renovate updates');
-    const quickstart = readme.slice(
-      readme.indexOf('## Quickstart'),
-      readme.indexOf('## Before and after'),
-    );
-    for (const command of ['npx uptide ', 'npx uptide check', 'npx uptide fix zod'])
+    const quickstart = section('## Quickstart', '## Why Uptide');
+    for (const command of [
+      'npx uptide list',
+      'npx uptide check zod',
+      'npx uptide fix zod',
+      'npx uptide pr --branch',
+    ])
       expect(quickstart).toContain(command);
     expect(quickstart).toContain('No account, no config.');
+    expect(quickstart).toContain('Node 20 or newer');
+  });
+
+  it('stays short: under 150 lines', () => {
+    expect(readme.split('\n').length).toBeLessThanOrEqual(150);
   });
 
   it('shows a before and after from a fixture in this repository', () => {
-    const example = readme.slice(
-      readme.indexOf('## Before and after'),
-      readme.indexOf('## What is supported'),
-    );
+    const example = section('## Before and after', '## Privacy');
     const fixture = /\]\((fixtures\/repos\/[a-z-]+)\)/.exec(example)?.[1];
     expect(fixture && existsSync(new URL(fixture, root))).toBe(true);
     expect(example).toContain('uptide check · storefront');
     expect(example).toContain('uptide fix · zod 3.25.76 → 4.6.5');
-    expect(example).toContain('uptide fix · stripe 14.25.0 → 23.0.0');
     // What a stable build prints, and what the quickstart says.
     expect(readme).not.toContain('uptide@next');
-    expect(example.match(/```diff\n-.*\n\+.*\n```/g)).toHaveLength(2);
+    expect(example.match(/```diff\n-.*\n\+.*\n```/g)).toHaveLength(1);
   });
 
-  it('features no other project: it links no repository on GitHub', () => {
-    expect([...readme.matchAll(/github\.com\/[\w.-]+\/[\w.-]+/g)].map((m) => m[0])).toEqual([]);
+  it('features no other project: the only repository it links on GitHub is its own', () => {
+    expect([
+      ...new Set([...readme.matchAll(/github\.com\/([\w.-]+\/[\w.-]+)/g)].map((m) => m[1])),
+    ]).toEqual(['uptide-dev/uptide']);
   });
 
-  it('explains the support tiers, verification, privacy and exit codes', () => {
-    expect(readme).toMatch(/\| \*\*Verified\*\* \| zod 3 → 4, stripe 14 and newer, ai 6 → 7 \|/);
-    expect(readme).toMatch(/\| \*\*Generic\*\* \| any other dependency/);
-    for (const heading of ['## How verification works', '## Privacy', '## Documentation'])
-      expect(readme).toContain(heading);
-    const privacy = readme.slice(readme.indexOf('## Privacy'), readme.indexOf('## Exit codes'));
-    for (const fact of [
-      'ANTHROPIC_API_KEY',
-      '--no-llm',
-      'Anonymous telemetry is off by default',
-      'No LLM call',
-    ])
+  it('lists the verified packs from a generated table, and privacy in four lines plus the table', () => {
+    const packs = section('<!-- packs:start -->', '<!-- packs:end -->');
+    expect(packs).toContain(
+      '| Package | Range | Precision | Recall | Ground-truth repositories | Status |',
+    );
+    for (const name of ['`zod`', '`stripe`', '`ai`']) expect(packs).toContain(`| ${name} |`);
+    const privacy = section('## Privacy', '## Documentation');
+    const prose = privacy
+      .split('\n')
+      .filter(
+        (l) => l !== '' && !l.startsWith('|') && !l.startsWith('#') && !l.startsWith('The full'),
+      );
+    expect(prose).toHaveLength(4);
+    for (const fact of ['--no-llm', 'off by default', 'No LLM call', 'no Uptide server'])
       expect(privacy).toContain(fact);
-    expect(readme).toMatch(
-      /\*\*0\*\* nothing breaking, \*\*1\*\* breaking changes found,\n\*\*2\*\*/,
-    );
     expect(readme).toContain('[Apache-2.0](LICENSE)');
-    // A badge, under the tagline, that states the license and links to the text itself.
-    expect(readme.split('\n').slice(0, 6)).toContain(
-      '[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)',
-    );
+    expect(readme).toContain('Releases up to and including 0.3.0 were published under the MIT');
   });
 
   it('links only files that exist', () => {
@@ -87,8 +100,6 @@ describe('README', () => {
       help.push(io.stdout());
     }
     const flags = new Set(readme.match(/--[a-z][a-z-]+/g));
-    // `git diff --stat` is git's flag, printed in fix's real output.
-    flags.delete('--stat');
     for (const flag of flags) expect(help.join('\n'), flag).toContain(flag);
   });
 });

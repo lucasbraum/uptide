@@ -43,8 +43,13 @@ describe('private material stays out of this repository', () => {
     expect(result?.files).toBeGreaterThan(100);
   });
 
-  it('flags a planning or audit document under any name', () => {
-    const dir = tree({ 'docs/roadmap-q4.md': 'x', 'docs/plan-next.md': 'x', 'README.md': 'x' });
+  it('flags a planning or audit document under any name, except the `uptide plan` command page', () => {
+    const dir = tree({
+      'docs/roadmap-q4.md': 'x',
+      'docs/plan-next.md': 'x',
+      'docs/commands/plan.md': 'x',
+      'README.md': 'x',
+    });
     expect(check(dir, '').result?.problems).toEqual([
       'docs/plan-next.md: a private planning or audit document does not belong here',
       'docs/roadmap-q4.md: a private planning or audit document does not belong here',

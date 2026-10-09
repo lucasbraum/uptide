@@ -30,7 +30,9 @@
     "uptide": "node --conditions=source --import tsx packages/cli/src/index.ts",
     "packs:fetch": "node --conditions=source --import tsx scripts/packs-fetch.ts",
     "packs:queue": "node --conditions=source --import tsx scripts/packs-queue.ts",
-    "packs:truth": "node --conditions=source --import tsx scripts/packs-truth.ts"
+    "packs:truth": "node --conditions=source --import tsx scripts/packs-truth.ts",
+    "docs:packs": "node --conditions=source --import tsx scripts/docs-packs.ts",
+    "docs:links": "node scripts/check-links.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.14",

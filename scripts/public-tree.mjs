@@ -34,8 +34,12 @@ export function denylist(env = process.env) {
   return terms.length ? terms : undefined;
 }
 
-/** Private planning and audit documents, whatever they are called next time. */
+/**
+ * Private planning and audit documents, whatever they are called next time. The page that
+ * documents the `uptide plan` command (docs/commands/plan.md) is not one.
+ */
 const PRIVATE_DOC = /(^|\/)(plan|roadmap|privacy-audit|audit)[^/]*\.md$/i;
+const COMMAND_PAGE = /^docs\/commands\/plan\.md$/;
 const TEXT =
   /\.(md|ts|tsx|mts|mjs|js|json|ya?ml|txt|snap|html|css|sh)$|(^|\/)\.[\w.-]+$|(^|\/)(LICENSE|NOTICE)$/;
 
@@ -53,7 +57,7 @@ export function problems(root, terms = denylist(), files = trackedFiles(root)) {
   const found = [];
   const matchers = (terms ?? []).map((term) => [term, matcher(term)]);
   for (const path of files) {
-    if (PRIVATE_DOC.test(path))
+    if (PRIVATE_DOC.test(path) && !COMMAND_PAGE.test(path))
       found.push(`${path}: a private planning or audit document does not belong here`);
     for (const [term, matches] of matchers)
       if (matches(path)) found.push(`${path}: the path contains the private identifier "${term}"`);

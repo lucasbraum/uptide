@@ -31,10 +31,10 @@ describe('privacy statement', () => {
     expect(io.stdout()).toContain(PRIVACY);
   });
 
-  it('is in the README, word for word', () => {
-    const readme = readFileSync(new URL('../../../README.md', import.meta.url), 'utf8');
+  it('is in docs/privacy.md, word for word', () => {
+    const page = readFileSync(new URL('../../../docs/privacy.md', import.meta.url), 'utf8');
     const body = flat(PRIVACY.replace(/^Privacy:\n/, ''));
-    expect(flat(readme)).toContain(body);
+    expect(flat(page)).toContain(body);
   });
 });
 
