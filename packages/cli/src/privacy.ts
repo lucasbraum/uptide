@@ -1,5 +1,5 @@
 /**
- * The privacy statement, word for word the same in `--help` and in the README (a test
+ * The privacy statement, word for word the same in `--help` and in docs/privacy.md (a test
  * compares them). Change it only together with what the code does.
  */
 export const PRIVACY = `Privacy:

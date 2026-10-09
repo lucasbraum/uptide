@@ -283,3 +283,28 @@ record no longer matches the evidence, so the label cannot outlive what supports
   marked "not measured". A partial codemod is named and counts 0.9.
 - The **Packs** workflow (`.github/workflows/packs.yml`) runs `uptide pack test --json` for
   every pack with the ground-truth cache restored, on pull requests that touch packs.
+
+## The `uptide pack` command
+
+Packs are written in an uptide checkout; the steps are in
+[CONTRIBUTING.md, "Write a pack"](../CONTRIBUTING.md#write-a-pack). `pnpm uptide` runs the
+CLI from source.
+
+```sh
+pnpm uptide pack new ai --from ">=6 <7" --to ">=7 <8" --maintainer @you
+pnpm uptide pack test ai                 # fixtures, then check on each ground-truth repository
+pnpm uptide pack test --json             # every pack, for CI
+pnpm uptide pack test ai --offline       # cached repositories only
+pnpm uptide pack test ai --fixtures-only
+pnpm uptide pack test ai --write         # record the measured status in verification.json
+pnpm uptide pack test ai --fixtures-only --update-fixtures  # write after.ts from the rules
+```
+
+`pack test` prints precision and recall per rule, overall and for breaking findings, and
+every false positive and false negative as `repository  file:line  rule`. Exit codes: **0**
+every pack passed, **1** a false positive among breaking findings, a failing fixture, or a
+`verification.json` the run does not support, **2** it could not run (not in a checkout, bad
+arguments).
+
+The "Verified packs" table in the README is generated from each pack's `verification.json`
+and ground truth by `pnpm docs:packs`; CI fails when it is stale.
