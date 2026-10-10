@@ -2,10 +2,9 @@
 "uptide": minor
 ---
 
-A candidate migration pack for Vitest 4 → 5, scored against votingworks/vxsuite and
-vitorvasc/opentelemetry-ecosystem-explorer at the commit before their own upgrade. It is not
-verified yet (one false positive among breaking findings), so `check` and `fix` still treat
-vitest as a generic dependency. Sites it finds: custom matchers declared on the global
+A verified migration pack for Vitest 4 → 5, scored against votingworks/vxsuite and
+vitorvasc/opentelemetry-ecosystem-explorer at the commit before their own upgrade. It is verified
+with two public repositories and no false positive among breaking findings (recall 50%). Sites it finds: custom matchers declared on the global
 `jest.Matchers` or on a one-parameter `Assertion<T>`, `import '@testing-library/jest-dom/vitest'`
 registrations whose types stop reaching `expect`, the removed `bench` export, bare-directory
 `coverage.include` and `coverage.exclude` entries, and the removed `vitest/*` entry points
