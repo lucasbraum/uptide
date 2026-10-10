@@ -1,5 +1,20 @@
 # uptide
 
+## 0.6.1
+
+### Patch Changes
+
+- [#56](https://github.com/uptide-dev/uptide/pull/56) [`c64ba2c`](https://github.com/uptide-dev/uptide/commit/c64ba2c74cd5ba5275a729c2274ae714240b33f3) Thanks [@lucasbraum](https://github.com/lucasbraum)! - The HTML report's light theme uses `#6A675F` for dimmed text (5.1:1 on the page background,
+  was 4.2:1, below WCAG AA's 4.5:1), and the package's homepage is https://uptide-dev.github.io/docs.
+
+- [#54](https://github.com/uptide-dev/uptide/pull/54) [`c502cc8`](https://github.com/uptide-dev/uptide/commit/c502cc831fd45a817b6e5de6e8a405e957e76995) Thanks [@lucasbraum](https://github.com/lucasbraum)! - `fix` and `verify` install a repository that pins Yarn 2 or later in `packageManager` even
+  when the `yarn` on PATH is classic 1.x or absent: the pinned version runs through corepack
+  (`corepack yarn install ...`, download prompt off) without enabling corepack or changing
+  anything on your machine outside corepack's cache. Before, Yarn stopped the run with "the
+  current global version of Yarn is 1.22.22". When corepack is missing, the run stops before
+  cloning with exit code 2 and the command to run (`corepack enable`); when corepack cannot
+  fetch the pinned version, the message names `COREPACK_NPM_REGISTRY` for corporate mirrors.
+
 ## 0.6.0
 
 ### Minor Changes
