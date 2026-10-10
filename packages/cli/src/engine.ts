@@ -11,6 +11,8 @@ import {
   type ListReport,
   listDependencies,
   openPr,
+  type PeerBlockerGroup,
+  PeerPreflightError,
   type PreflightOptions,
   type PrOptions,
   type ProgressEvent,
@@ -88,7 +90,13 @@ async function offThread<T>(job: Job, onProgress?: ProgressListener): Promise<T>
         reply:
           | { type: 'progress'; event: ProgressEvent }
           | { ok: true; value: T }
-          | { ok: false; message: string; code: ErrorCode },
+          | {
+              ok: false;
+              message: string;
+              code: ErrorCode;
+              peerConflicts?: PeerBlockerGroup[];
+              next?: string;
+            },
       ) => {
         if ('type' in reply) {
           onProgress?.(reply.event);
@@ -96,7 +104,12 @@ async function offThread<T>(job: Job, onProgress?: ProgressListener): Promise<T>
         }
         settled = true;
         if (reply.ok) resolvePromise(reply.value);
-        else reject(new UptideError(reply.code, reply.message));
+        else
+          reject(
+            reply.peerConflicts && reply.next
+              ? new PeerPreflightError(reply.peerConflicts, reply.next, reply.message)
+              : new UptideError(reply.code, reply.message),
+          );
       },
     );
     worker.once('error', reject);
