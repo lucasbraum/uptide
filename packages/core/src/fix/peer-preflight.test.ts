@@ -97,8 +97,8 @@ it.each([false, true])(
         ),
       ).rejects.toThrow(
         newer
-          ? 'plugin 1.2.0 accepts it; run npx uptide fix zod plugin'
-          : 'plugin 1.0.0 declares zod ^3, which rejects 4.6.5. No newer compatible release',
+          ? 'upgrade to 1.2.0 (accepts zod 4): add plugin to the command'
+          : 'plugin 1.0.0 declares zod ^3, which rejects 4.6.5. no release accepts zod 4',
       );
       expect(check).not.toHaveBeenCalled();
       expect(install).not.toHaveBeenCalled();
@@ -133,7 +133,7 @@ it.each(['pnpm', 'yarn'] as const)(
     );
     expect(plan?.companions).toEqual([]);
     expect(plan?.conflicts).toMatchObject([{ name: 'plugin', allowed: false, newer: '1.2.0' }]);
-    expect(onProgress.mock.calls[0]?.[0].detail).toContain('plugin 1.2.0 accepts it');
+    expect(onProgress.mock.calls[0]?.[0].detail).toContain('upgrade to 1.2.0 (accepts zod 4)');
   },
 );
 
@@ -171,6 +171,7 @@ it('allowed peers are committed with the upgrade and listed under PR risks with 
   const { root, services } = fixture('pnpm');
   const install = vi.fn(async (dir: string, upgrade: Parameters<typeof services.install>[1]) => {
     expect(upgrade?.files).toContain('package.json');
+    expect(upgrade?.allowedPeers).toEqual(['plugin']);
     expect(
       JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')).pnpm.peerDependencyRules
         .allowedVersions,
@@ -210,4 +211,119 @@ it('bumps an explicitly selected peer in the same upgrade and report', async () 
   expect(install).toHaveBeenCalledOnce();
   expect(report.companions).toMatchObject([{ name: 'plugin', from: '1.0.0', to: '1.2.0' }]);
   expect(report.peerConflicts).toBeUndefined();
+});
+
+it('collects allowed, leader, companion and proposed-extra blockers, then prints one command that passes', async () => {
+  const { root, services } = fixture('npm', true);
+  const json = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+  const packages = {
+    blocked: { version: '1.0.0', peerDependencies: { zod: '^3' } },
+    runtime: { version: '3.25.76', peerDependencies: { zod: '^3' } },
+    runtimePlugin: { version: '1.0.0', peerDependencies: { runtime: '^3' } },
+    observer: { version: '1.0.0', peerDependencies: { plugin: '<1.2' } },
+  };
+  for (const [name, manifest] of Object.entries(packages)) {
+    json.dependencies[name] = manifest.version;
+    mkdirSync(join(root, 'node_modules', name));
+    writeFileSync(
+      join(root, 'node_modules', name, 'package.json'),
+      JSON.stringify({ name, ...manifest }),
+    );
+  }
+  writeFileSync(join(root, 'package.json'), JSON.stringify(json));
+  const registry: Awaited<ReturnType<NonNullable<PackageFetcher['manifests']>>> = {};
+  const original = services.manifests;
+  services.manifests = vi.fn(async (name) => {
+    if (name === 'runtime')
+      return {
+        '3.25.76': packages.runtime,
+        '4.6.5': { peerDependencies: { zod: '^4' } },
+      } as typeof registry;
+    if (name in packages) {
+      const m = packages[name as keyof typeof packages];
+      return { [m.version]: m };
+    }
+    return original(name);
+  });
+  let message = '';
+  try {
+    await peerPreflight(
+      { cwd: root, only: 'zod', target: '4.6.5', fixer: null, allowPeer: ['blocked'] },
+      services,
+    );
+  } catch (e) {
+    message = (e as Error).message;
+  }
+  expect(message).toContain('blocked 1.0.0 declares zod ^3');
+  expect(message).toContain('Explicitly allowed');
+  expect(message).toContain('plugin 1.0.0 declares zod ^3');
+  expect(message).toContain('runtimePlugin 1.0.0 declares runtime ^3');
+  expect(message).toContain('observer 1.0.0 declares plugin <1.2');
+  expect(message.match(/Next:/g)).toHaveLength(1);
+  expect(message).toContain(
+    'Next: npx uptide fix zod plugin --target 4.6.5 --no-llm --allow-peer blocked --allow-peer runtimePlugin --allow-peer observer',
+  );
+  const plan = await peerPreflight(
+    {
+      cwd: root,
+      only: 'zod',
+      target: '4.6.5',
+      fixer: null,
+      also: ['plugin'],
+      allowPeer: ['blocked', 'runtimePlugin', 'observer'],
+    },
+    services,
+  );
+  expect(plan?.companions.map((c) => c.name).sort()).toEqual(['plugin', 'runtime']);
+  expect(plan?.conflicts.every((p) => p.allowed)).toBe(true);
+});
+
+it('inspects an explicitly added member at its target version and chooses a release accepting every target', async () => {
+  const { root, services } = fixture('npm', true);
+  const json = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+  json.dependencies.runtime = '3.25.76';
+  writeFileSync(join(root, 'package.json'), JSON.stringify(json));
+  mkdirSync(join(root, 'node_modules/runtime'));
+  writeFileSync(
+    join(root, 'node_modules/runtime/package.json'),
+    JSON.stringify({ version: '3.25.76', peerDependencies: { zod: '^3' } }),
+  );
+  services.manifests = vi.fn(async (name): ReturnType<NonNullable<PackageFetcher['manifests']>> => {
+    if (name === 'zod') return { '4.6.5': {} };
+    if (name === 'runtime') return { '4.6.5': { peerDependencies: { zod: '^4' } } };
+    return {
+      ...versions,
+      '1.2.0': { peerDependencies: { zod: '^4', runtime: '^3' } },
+      '1.3.0': { peerDependencies: { zod: '^4', runtime: '^4' } },
+    };
+  });
+  const plan = await peerPreflight(
+    { cwd: root, only: 'zod', target: '4.6.5', also: ['plugin'] },
+    services,
+  );
+  expect(plan?.companions.find((c) => c.name === 'plugin')?.to).toBe('1.3.0');
+  expect(plan?.conflicts).toEqual([]);
+});
+
+it('finds a types-companion blocker even when no installed package peers on the leader', async () => {
+  const { root, services } = fixture('npm');
+  const json = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+  json.dependencies['@types/zod'] = '3.25.76';
+  writeFileSync(join(root, 'package.json'), JSON.stringify(json));
+  mkdirSync(join(root, 'node_modules/@types/zod'), { recursive: true });
+  writeFileSync(
+    join(root, 'node_modules/@types/zod/package.json'),
+    JSON.stringify({ version: '3.25.76' }),
+  );
+  writeFileSync(
+    join(root, 'node_modules/plugin/package.json'),
+    JSON.stringify({ version: '1.0.0', peerDependencies: { '@types/zod': '^3' } }),
+  );
+  services.manifests = vi.fn(async (name): ReturnType<NonNullable<PackageFetcher['manifests']>> => {
+    if (name === 'zod' || name === '@types/zod') return { '3.25.76': {}, '4.6.5': {} };
+    return { '1.0.0': { peerDependencies: { '@types/zod': '^3' } } };
+  });
+  await expect(
+    peerPreflight({ cwd: root, only: 'zod', target: '4.6.5' }, services),
+  ).rejects.toThrow('plugin 1.0.0 declares @types/zod ^3, which rejects 4.6.5');
 });

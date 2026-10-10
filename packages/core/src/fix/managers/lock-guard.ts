@@ -41,7 +41,7 @@ export interface LockDiff {
   changed: string[];
   allowed: string[];
 }
-/** Compare entries, not lines: formatting changes cannot disguise an unrelated resolution. */
+/** Union every authorized root's reachable records in both locks; never allow other copies by name. */
 export function assertLockScope(before: LockGraph, after: LockGraph, target: Targets): LockDiff {
   const names = targetNames(target);
   const allowed = new Set<string>();

@@ -117,7 +117,9 @@ older than 7 days ([`uptide clean`](commands/fix.md#uptide-clean)).
 `Peer blockers (before cloning)` names each package, its declared peer range and the target
 that range rejects. With npm, exit 2 means no clone, branch or install was started. If the
 message names a newer compatible release, include the package explicitly:
-`npx uptide fix react <peer-package>`. The planner selects the lowest compatible newer release.
+`npx uptide fix react <peer-package>`. The planner selects the lowest compatible newer release
+and reports blockers introduced by that proposed upgrade too. Use its single final command,
+which retains existing allowances and includes all required extras and allowances.
 
 If none exists, `--allow-peer <package>` is an explicit compatibility exception. Repeat the
 flag for each package you intend to allow. It writes the package manager's scoped override to

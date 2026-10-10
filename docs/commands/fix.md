@@ -64,7 +64,10 @@ repository already had are subtracted, never blamed on the upgrade.
 Before cloning, `fix` checks the installed direct dependencies' peer ranges against the
 upgrade and its lockstep companions, using the same conflict rule as `check`. For each
 conflict it looks for the **lowest newer stable release** declaring a compatible peer range.
-It suggests an explicit group upgrade; it never adds that package silently:
+It reports all conflicts together, including already allowed peers, and looks ahead through
+proposed peer upgrades and their lockstep companions. It ends with one full command containing
+all proposed extras, required `--allow-peer` flags, the resolved target and `--no-llm` when set.
+It never adds an unrequested peer upgrade silently:
 
 ```sh
 npx uptide fix react some-react-plugin --no-llm
@@ -96,8 +99,11 @@ setting when requested; Yarn resolutions select a version but may still leave pe
 For npm, Uptide also compares the committed root and workspace declarations with their
 lockfile importers and locked direct versions. If they disagree it exits **2** before cloning:
 `the lockfile does not match package.json; run npm install first`. This is a read-only check;
-it does not normalize the lockfile. The existing scope guard still rejects unrelated lockfile
-changes during the upgrade.
+it does not normalize the lockfile. The scope guard permits only the union of the resolved
+subtrees of the leader, companions, explicit extras and allowed-peer overrides in the old and new lockfile. Shared transitive
+records reachable from that union are included; another copy with the same name or scope is
+not automatically included. Importer ranges can change only for packages actually upgraded.
+Every changed record outside that union still stops the install.
 
 ## Step by step
 

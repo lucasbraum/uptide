@@ -18,6 +18,8 @@ export interface Upgrade {
    * and the lockfile may change inside any of their subtrees, never outside them.
    */
   also?: { name: string; version: string }[];
+  /** Packages whose peer edges the user explicitly overrides, without changing their ranges. */
+  allowedPeers?: string[];
 }
 export interface InstallReport extends LockDiff {
   manager: string;
@@ -94,7 +96,8 @@ export async function upgradeInstall(root: string, upgrade: Upgrade): Promise<In
   // Let the real manager reconcile the final manifest, including its original range operator.
   await run(root, pm, updateArgs(pm, root, upgrade.workspaces));
   const afterText = readFileSync(lockfile, 'utf8');
-  const diff = assertLockScope(before, lockGraph(pm, afterText, names), names);
+  const scope = [...new Set([...names, ...(upgrade.allowedPeers ?? [])])];
+  const diff = assertLockScope(before, lockGraph(pm, afterText, names), scope);
   // Every package that moved resolved the version asked for, in every workspace declaring it.
   for (const workspace of upgrade.workspaces) {
     const json = JSON.parse(readFileSync(join(root, workspace, 'package.json'), 'utf8'));

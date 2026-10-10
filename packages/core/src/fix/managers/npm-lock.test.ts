@@ -77,3 +77,67 @@ it('allows only target ranges in npm v2 workspace compatibility records', () => 
     'outside target',
   );
 });
+
+it('unions both group subtrees in old and new locks, including shared and relocated transitive records', () => {
+  const before = {
+    lockfileVersion: 3,
+    packages: {
+      '': { dependencies: { leader: '^1', extra: '^1', unrelated: '^1' } },
+      'node_modules/leader': { version: '1.0.0', dependencies: { shared: '^1', old: '^1' } },
+      'node_modules/extra': { version: '1.0.0', dependencies: { shared: '^1' } },
+      'node_modules/shared': { version: '1.0.0' },
+      'node_modules/old': { version: '1.0.0' },
+      'node_modules/unrelated': { version: '1.0.0' },
+    },
+  };
+  const after = {
+    lockfileVersion: 3,
+    packages: {
+      '': { dependencies: { leader: '^2', extra: '^2', unrelated: '^1' } },
+      'node_modules/leader': { version: '2.0.0', dependencies: { shared: '^2' } },
+      'node_modules/extra': { version: '2.0.0', dependencies: { shared: '^2', added: '^1' } },
+      'node_modules/shared': { version: '2.0.0' },
+      'node_modules/extra/node_modules/added': { version: '1.0.0' },
+      'node_modules/unrelated': { version: '1.0.0' },
+    },
+  };
+  const names = ['leader', 'extra'];
+  const first = npmGraph(JSON.stringify(before), names);
+  const last = npmGraph(JSON.stringify(after), names);
+  const diff = assertLockScope(first, last, names);
+  expect(diff.changed).toContain('node_modules/shared');
+  expect(diff.removed).toEqual(['node_modules/old']);
+  expect(diff.added).toEqual(['node_modules/extra/node_modules/added']);
+  after.packages['node_modules/unrelated'].version = '2.0.0';
+  expect(() => assertLockScope(first, npmGraph(JSON.stringify(after), names), names)).toThrow(
+    'node_modules/unrelated (1.0.0 → 2.0.0)',
+  );
+});
+
+it('adds an allowed peer subtree without exempting its declared range or another copy outside the union', () => {
+  const lock = {
+    lockfileVersion: 3,
+    packages: {
+      '': { dependencies: { leader: '^2', allowed: '^1' } },
+      'node_modules/leader': { version: '2.0.0' },
+      'node_modules/allowed': { version: '1.0.0', dependencies: { child: '^1' } },
+      'node_modules/child': { version: '1.0.0' },
+      'node_modules/unrelated': { version: '1.0.0', dependencies: { child: '^1' } },
+      'node_modules/unrelated/node_modules/child': { version: '1.0.0' },
+    },
+  };
+  const before = npmGraph(JSON.stringify(lock), ['leader']);
+  lock.packages['node_modules/child'].version = '1.1.0';
+  const scope = ['leader', 'allowed'];
+  expect(() =>
+    assertLockScope(before, npmGraph(JSON.stringify(lock), ['leader']), scope),
+  ).not.toThrow();
+  lock.packages['node_modules/unrelated/node_modules/child'].version = '1.1.0';
+  expect(() => assertLockScope(before, npmGraph(JSON.stringify(lock), ['leader']), scope)).toThrow(
+    'node_modules/unrelated/node_modules/child',
+  );
+  lock.packages[''].dependencies.allowed = '^2';
+  expect(() => assertLockScope(before, npmGraph(JSON.stringify(lock), ['leader']), scope)).toThrow(
+    'lockfile metadata/importers',
+  );
+});

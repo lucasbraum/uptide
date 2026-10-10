@@ -342,6 +342,13 @@ async function fixPackage(options: FixOptions, services: FixServices): Promise<F
         version: target,
         workspaces: bump.workspaces,
         files: bump.files.map((f) => relative(root, f)),
+        ...(peerPlan?.conflicts.some((p) => p.allowed)
+          ? {
+              allowedPeers: [
+                ...new Set(peerPlan.conflicts.filter((p) => p.allowed).map((p) => p.name)),
+              ],
+            }
+          : {}),
         ...(companions.length
           ? { also: companions.map((c) => ({ name: c.name, version: c.to })) }
           : {}),
