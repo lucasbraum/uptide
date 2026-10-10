@@ -27,8 +27,10 @@ installed versions.
 
 `fix` runs the package manager the repository names in `packageManager` (corepack's choice),
 else the one its lockfile implies, with lifecycle scripts disabled and corepack's network
-access off, so the binary must already be there at the pinned version. When it is not, the
-run fails before changing anything and prints the recovery command:
+access off, so the binary must already be there at the pinned version. A pinned Yarn 2 or
+later is the exception: `fix` runs it through corepack when the `yarn` on PATH cannot (next
+section). Otherwise, when the binary is missing or at another version, the run fails before
+changing anything and prints the recovery command:
 
 ```sh
 corepack enable pnpm && corepack prepare pnpm@<version> --activate
@@ -36,6 +38,30 @@ corepack enable pnpm && corepack prepare pnpm@<version> --activate
 
 Unsupported range or lockfile syntax fails explicitly rather than silently broadening the
 upgrade.
+
+## Yarn 4 says the global Yarn is 1.x
+
+A repository that pins Yarn 2 or later in `packageManager` (`"packageManager": "yarn@4.7.0"`)
+on a machine whose `yarn` is classic 1.x, or has none, used to stop `fix` and `verify` with
+Yarn's own message, "This project's package.json defines packageManager yarn@4.7.0. However
+the current global version of Yarn is 1.22.22". Now `fix` and `verify` notice the mismatch
+and run the pinned version through corepack (`corepack yarn install ...`, with the download
+prompt off), which fetches it into corepack's own cache. Nothing on your machine is changed:
+corepack is not enabled, no shim is installed, and the `packageManager` field is not
+rewritten. A Berry `yarn` on PATH at the pinned version is used as it is.
+
+When corepack itself is not available (it ships with Node 16.9 and later, and some
+distributions leave it out), the run stops before cloning, with exit code 2:
+
+```
+This repository pins yarn@4.7.0 (packageManager), but the yarn on PATH is 1.22.22 and corepack is not available to run the pinned version. Nothing was cloned or installed.
+Next: corepack enable
+```
+
+When corepack is there but cannot fetch the pinned version (an offline machine, a registry
+it cannot reach), the message says so and names `COREPACK_NPM_REGISTRY`: set it to your npm
+mirror and run again, or activate the version by hand with `corepack enable yarn && corepack
+prepare yarn@4.7.0 --activate`.
 
 ## Corporate proxy and corepack registry
 
