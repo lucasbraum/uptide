@@ -20,6 +20,7 @@ import { ACCEPTED_KEYS, selectLlm } from '../llm/config.js';
 import { activePack } from '../packs/index.js';
 import { uptideVersionInfo } from '../version.js';
 import { git, projectRoot } from './process.js';
+import { rangePreflight } from './range-preflight.js';
 import { prBody } from './report.js';
 import { type ReverifyOptions, type ReverifyServices, reverify } from './reverify.js';
 import { confirmServices, type FixOptions, type FixServices, fix, publishVerified } from './run.js';
@@ -478,6 +479,10 @@ export async function isolatedFix(
       'DIRTY_UPTIDE_TREE',
       `uptide fix --pr refuses to run from an Uptide checkout with uncommitted changes (at ${tool.uptideCommit.slice(0, 12)}); commit or stash them, rebuild, and run again`,
     );
+  const target = await rangePreflight(options, services, (file) =>
+    git(source, 'show', `${preflight.head}:${join(project, file)}`),
+  );
+  if (target) options = { ...options, target };
   const before = snapshot(source);
   const base = options.base ?? remoteDefaultBranch(source)?.name;
   const clone = isolate(source, undefined, project);

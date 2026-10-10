@@ -1,7 +1,7 @@
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { FixReport } from '@uptide/core';
+import { type FixReport, UptideError } from '@uptide/core';
 import { describe, expect, it } from 'vitest';
 import { run } from './cli.js';
 import {
@@ -246,6 +246,22 @@ describe('uptide fix', () => {
     expect(await run(['fix', '--only', 'zod'], io, failing)).toBe(1);
     expect(io.stdout()).toContain('High: unverified sites');
   });
+
+  it.each([{ flags: [] }, { flags: ['--pr', '--yes'] }])(
+    'exits 2 for an unsupported declared range (%s)',
+    async ({ flags }) => {
+      const io = memoryIo({ cwd: pnpmGitRepo() });
+      const message =
+        'package.json: dependencies.zod declares ">=3 <5". Change "zod": ">=3 <5" in package.json to "^3.25.76", then rerun.';
+      const engine = fakeEngine({
+        fix: async () => {
+          throw new UptideError('UNSUPPORTED_VERSION_RANGE', message);
+        },
+      });
+      expect(await run(['fix', 'zod', '--no-llm', ...flags], io, engine)).toBe(2);
+      expect(io.stderr()).toContain(message);
+    },
+  );
 
   it('says why a PR was not opened and that the branch stays local', async () => {
     const refused = {

@@ -77,7 +77,12 @@ export async function upgradeInstall(root: string, upgrade: Upgrade): Promise<In
           'optionalDependencies',
           'peerDependencies',
         ])
-          for (const m of moves) if (json[section]?.[m.name]) json[section][m.name] = m.version;
+          for (const m of moves) {
+            const spec = json[section]?.[m.name];
+            if (!spec) continue;
+            const alias = spec.startsWith('npm:') ? spec.slice(0, spec.lastIndexOf('@') + 1) : '';
+            json[section][m.name] = `${alias}${m.version}`;
+          }
         writeFileSync(join(root, file), `${JSON.stringify(json, null, 2)}\n`);
       }
     }
