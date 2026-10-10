@@ -1,6 +1,7 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { workspacePackagesOf } from '../adapters/typescript/repo.js';
+import { hoistedPackageDir } from '../adapters/typescript/usages.js';
 import { companionsOf, type InstalledDependency } from '../check/companions.js';
 import { UptideError } from '../errors.js';
 import { createNpmFetcher } from '../fetch/npm-fetcher.js';
@@ -31,7 +32,9 @@ export async function rangePreflight(
   validateVersionRanges(root, [options.only], read);
   const installed = new Map<string, InstalledDependency>();
   const names = new Set<string>();
-  for (const workspace of workspacePackagesOf(root)) {
+  const workspaces = workspacePackagesOf(root);
+  const workspaceDirs = new Set(workspaces.map((w) => realpathSync(join(root, w))));
+  for (const workspace of workspaces) {
     const manifest = JSON.parse(read(join(workspace, 'package.json'))) as Manifest;
     for (const [name, spec] of Object.entries({
       ...manifest.dependencies,
@@ -39,8 +42,10 @@ export async function rangePreflight(
       ...manifest.optionalDependencies,
       ...manifest.peerDependencies,
     })) {
-      names.add(name);
       if (/^(workspace|link|file):/.test(spec)) continue;
+      const dir = hoistedPackageDir(join(root, workspace), name);
+      if (dir && workspaceDirs.has(realpathSync(dir))) continue;
+      names.add(name);
       const local = installedManifest(root, workspace, name);
       if (!local?.version) continue;
       const key = `${name}@${local.version}`;

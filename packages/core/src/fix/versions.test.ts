@@ -6,6 +6,7 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -276,4 +277,28 @@ it('reads each committed manifest once during range planning', async () => {
   const read = vi.fn((file: string) => readFileSync(join(root, file), 'utf8'));
   await rangePreflight({ cwd: root, only: 'react' }, undefined, read);
   expect(read.mock.calls).toEqual([['package.json']]);
+});
+
+it('does not resolve npm workspace links declared as * against the registry', async () => {
+  const { root, put } = reactFixture();
+  const json = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+  json.workspaces = ['packages/*'];
+  json.dependencies['@fixture/shared'] = '*';
+  put('package.json', JSON.stringify(json));
+  put(
+    'packages/shared/package.json',
+    JSON.stringify({ name: '@fixture/shared', version: '1.0.0', dependencies: { react: '^18' } }),
+  );
+  mkdirSync(join(root, 'node_modules/@fixture'), { recursive: true });
+  symlinkSync(join(root, 'packages/shared'), join(root, 'node_modules/@fixture/shared'), 'dir');
+  const manifests = vi.fn(async () => {
+    throw new Error('workspace packages have no registry entry');
+  });
+  await expect(
+    rangePreflight(
+      { cwd: root, only: 'react', target: '19.3.4' },
+      { ...zodFixture(scratch).services, manifests },
+    ),
+  ).resolves.toBeUndefined();
+  expect(manifests).not.toHaveBeenCalled();
 });
