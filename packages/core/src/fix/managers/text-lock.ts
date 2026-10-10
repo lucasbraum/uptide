@@ -1,7 +1,9 @@
+import { parse as parseYaml } from 'yaml';
 import { UptideError } from '../../errors.js';
 import {
   type LockGraph,
   type LockRecord,
+  lockedIdentity,
   type Targets,
   targetNames,
   withoutTarget,
@@ -39,7 +41,8 @@ function dependencyPairs(lines: string[], indent: number): [string, string][] {
   for (const line of lines) {
     const spaces = line.length - line.trimStart().length;
     if (spaces === indent)
-      inDependencies = /^\s*(?:dependencies|optionalDependencies|peerDependencies):$/.test(line);
+      inDependencies =
+        /^\s*(?:dependencies|devDependencies|optionalDependencies|peerDependencies):$/.test(line);
     if (!inDependencies || spaces !== indent + 2) continue;
     const match = /^\s*(?:"([^"]+)"|'([^']+)'|([^\s:]+))(?::\s+|\s+)(.+)$/.exec(line);
     if (!match) throw new UptideError('UNSUPPORTED_LOCKFILE', `Cannot resolve dependency: ${line}`);
@@ -146,10 +149,15 @@ export function parsedEntry(lines: string[], indent: number): Record<string, unk
 export function yarnGraph(text: string, target: Targets): LockGraph {
   const records = new Map<string, LockRecord>();
   const metadata: Record<string, unknown> = {};
+  const roots: NonNullable<LockGraph['roots']> = {};
   const entries = blocks(text.split('\n'), 0);
   for (const b of entries) {
     if (unquote(b.key) === '__metadata' || b.key.includes('@workspace:')) {
       metadata[unquote(b.key)] = omitTarget(b.lines, target);
+      if (b.key.includes('@workspace:'))
+        roots[unquote(b.key)] = Object.fromEntries(
+          dependencyPairs(b.lines, 2).map(([n, r]) => [n, `${n}@${r}`]),
+        );
       continue;
     }
     const descriptors = yarnDescriptors(b.key);
@@ -157,13 +165,30 @@ export function yarnGraph(text: string, target: Targets): LockGraph {
     if (!name || !b.lines.some((l) => /^ {2}version[: ]/.test(l)))
       throw new UptideError('UNSUPPORTED_LOCKFILE', `Unknown Yarn entry ${b.key}`);
     const data = parsedEntry(b.lines, 2);
-    const dependencies = dependencyPairs(b.lines, 2).map(([n, r]) => `${n}@${r}`);
-    for (const d of descriptors) records.set(d, { name, dependencies, data });
+    const edges = Object.fromEntries(dependencyPairs(b.lines, 2).map(([n, r]) => [n, `${n}@${r}`]));
+    for (const d of descriptors) {
+      const own = packageName(d);
+      const alias = d.slice(own.length + 1).replace(/^npm:/, '');
+      const actual = alias.includes('@') ? packageName(alias) : own;
+      records.set(d, {
+        name: own,
+        dependencies: Object.values(edges),
+        edges,
+        data,
+        identity: lockedIdentity(actual, data.version, data.integrity ?? data.checksum, data),
+      });
+    }
   }
   // A dependency names a descriptor; `a@npm:b@^1` is how an alias is written on both sides.
-  for (const record of records.values())
+  for (const record of records.values()) {
+    for (const [name, key] of Object.entries(record.edges))
+      if (!key || !records.has(key)) record.edges[name] = undefined;
     record.dependencies = record.dependencies.filter((d) => records.has(d));
-  return { records, metadata };
+  }
+  for (const edges of Object.values(roots))
+    for (const [name, key] of Object.entries(edges))
+      if (!key || !records.has(key)) edges[name] = undefined;
+  return { records, metadata, roots };
 }
 
 /**
@@ -183,56 +208,64 @@ function withoutTargetPeerVersion(text: string, target: Targets): string {
 }
 
 export function pnpmGraph(raw: string, target: Targets): LockGraph {
-  const text = withoutTargetPeerVersion(raw, target);
+  const lock = parseYaml(withoutTargetPeerVersion(raw, target));
+  if (!lock || typeof lock !== 'object' || Array.isArray(lock) || !lock.lockfileVersion)
+    throw new UptideError('UNSUPPORTED_LOCKFILE', 'Invalid pnpm lockfile');
+  const { packages = {}, snapshots = {}, ...metadata } = lock;
   const records = new Map<string, LockRecord>();
-  const metadata: string[] = [];
-  let section = '',
-    lines: string[] = [];
-  function flush() {
-    if (section !== 'packages' && section !== 'snapshots') {
-      if (section === 'catalogs') {
-        let skip = false;
-        metadata.push(
-          ...meaningful(lines).filter((line) => {
-            const indent = line.length - line.trimStart().length;
-            if (indent <= 4)
-              skip =
-                indent === 4 &&
-                targetNames(target).includes(unquote(line.trim().replace(/:$/, '')));
-            return !skip;
-          }),
-        );
-      } else metadata.push(...omitTarget(lines, target));
-      return;
-    }
-    for (const b of blocks(lines.slice(1), 2)) {
-      const key = unquote(b.key).replace(/^\//, '');
-      const name = packageName(key);
-      const data = parsedEntry(b.lines, 4);
-      records.set(`${section}:${key}`, {
+  const locator = (name: string, version: string) =>
+    /^(?:@[^/()]+\/)?[^@/()]+@/.test(version) ? version : `${name}@${version}`;
+  for (const [section, entries] of [
+    ['packages', packages],
+    ['snapshots', snapshots],
+  ] as const) {
+    for (const [key, value] of Object.entries(entries)) {
+      const data = (value ?? {}) as Record<string, unknown>;
+      const clean = key.replace(/^\//, '');
+      const name = packageName(clean);
+      if (
+        !clean.includes('@', clean.startsWith('@') ? 1 : 0) ||
+        typeof value !== 'object' ||
+        Array.isArray(value)
+      )
+        throw new UptideError('UNSUPPORTED_LOCKFILE', `Invalid pnpm entry ${key}`);
+      const base = clean.replace(/\(.*$/, '');
+      const content =
+        section === 'snapshots' ? (packages[base] ?? packages[`/${base}`] ?? {}) : data;
+      const identity = { ...content, ...data };
+      const edges: Record<string, string | undefined> = {};
+      for (const field of ['dependencies', 'optionalDependencies'])
+        for (const [n, v] of Object.entries((data[field] ?? {}) as object)) {
+          if (typeof v !== 'string')
+            throw new UptideError('UNSUPPORTED_LOCKFILE', `Cannot resolve pnpm dependency ${n}`);
+          edges[n] = `${lock.snapshots === undefined ? 'packages' : 'snapshots'}:${locator(n, v)}`;
+        }
+      if (section === 'snapshots') edges['#package'] = `packages:${base}`;
+      records.set(`${section}:${clean}`, {
         name,
-        dependencies: [],
-        // A dependent's pointer at the target moves with the target; the rest of it may not.
         data: targetNames(target).includes(name) ? data : withoutTarget(data, target),
+        edges,
+        dependencies: [],
+        identity: lockedIdentity(
+          name,
+          base.slice(name.length + 1),
+          (identity.resolution as { integrity?: unknown } | undefined)?.integrity,
+          identity,
+        ),
       });
-      if (section === 'snapshots') {
-        const r = records.get(`${section}:${key}`) as LockRecord;
-        r.dependencies = dependencyPairs(b.lines, 4).flatMap(([n, v]) => [
-          `snapshots:${n}@${v}`,
-          `packages:${n}@${v.replace(/\(.*$/, '')}`,
-        ]);
-      }
     }
   }
-  for (const line of meaningful(text.split('\n'))) {
-    if (!line.startsWith(' ')) {
-      flush();
-      section = line.split(':')[0] ?? '';
-      lines = [line];
-    } else lines.push(line);
+  for (const record of records.values()) {
+    for (const [name, key] of Object.entries(record.edges))
+      if (!key || !records.has(key)) record.edges[name] = undefined;
+    record.dependencies = Object.values(record.edges).filter((k): k is string => k !== undefined);
   }
-  flush();
-  for (const record of records.values())
-    record.dependencies = record.dependencies.filter((k) => records.has(k));
+  // Importer specs and manager settings remain protected independently of package metadata.
+  if (metadata.importers)
+    for (const [name, importer] of Object.entries(metadata.importers))
+      metadata.importers[name] = withoutTarget(importer as Record<string, unknown>, target);
+  if (metadata.catalogs)
+    for (const catalog of Object.values(metadata.catalogs))
+      for (const name of targetNames(target)) delete (catalog as Record<string, unknown>)[name];
   return { records, metadata };
 }

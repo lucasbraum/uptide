@@ -37,3 +37,51 @@ it('keeps simple npm aliases during exact resolution and restores partial ranges
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+it('passes allowed-peer roots to the guard while keeping their manifest declarations protected', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'uptide-allowed-scope-'));
+  const manifest = {
+    dependencies: { leader: '^2', plugin: '^1', unrelated: '^1' },
+    overrides: { plugin: { leader: '$leader' } },
+  };
+  const lock = {
+    lockfileVersion: 3,
+    packages: {
+      '': { dependencies: { leader: '^1', plugin: '^1', unrelated: '^1' } },
+      'node_modules/leader': { version: '1.0.0' },
+      'node_modules/plugin': { version: '1.0.0', dependencies: { child: '^1' } },
+      'node_modules/child': { version: '1.0.0' },
+      'node_modules/unrelated': { version: '1.0.0' },
+    },
+  };
+  writeFileSync(join(root, 'package.json'), JSON.stringify(manifest));
+  writeFileSync(join(root, 'package-lock.json'), JSON.stringify(lock));
+  const command = vi.spyOn(process, 'command').mockImplementation(async (_root, _bin, args) => {
+    if (args[0] === '--version') return { code: 0, output: '11.0.0', timeout: false };
+    if (args[0] === 'install') {
+      lock.packages[''].dependencies = JSON.parse(
+        readFileSync(join(root, 'package.json'), 'utf8'),
+      ).dependencies;
+      lock.packages['node_modules/leader'].version = '2.0.0';
+      lock.packages['node_modules/child'].version = '1.1.0';
+      writeFileSync(join(root, 'package-lock.json'), JSON.stringify(lock));
+    }
+    return { code: 0, output: '', timeout: false };
+  });
+  try {
+    const report = await upgradeInstall(root, {
+      name: 'leader',
+      version: '2.0.0',
+      allowedPeers: ['plugin'],
+      files: ['package.json'],
+      workspaces: ['.'],
+    });
+    expect(report.changed).toContain('node_modules/child');
+    expect(report.allowed).not.toContain('node_modules/unrelated');
+    expect(command.mock.calls.flatMap((c) => c[2])).not.toContain('--force');
+    expect(command.mock.calls.flatMap((c) => c[2])).not.toContain('--legacy-peer-deps');
+  } finally {
+    command.mockRestore();
+    rmSync(root, { recursive: true, force: true });
+  }
+});

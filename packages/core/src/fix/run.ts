@@ -19,7 +19,9 @@ import { assist } from './assisted.js';
 import { behaviorCheck } from './behavior.js';
 import { type Generated, generateClients } from './generate.js';
 import { assertManagerAvailable } from './managers/availability.js';
+import { assertNpmLockSync } from './managers/npm-sync.js';
 import type { InstallReport, Upgrade } from './managers/upgrade.js';
+import { type PeerPlan, peerPreflight, writePeerOverrides } from './peer-preflight.js';
 import { pinCurrentApi } from './pin.js';
 import { command, git, projectRoot } from './process.js';
 import { publicationBlockers } from './publish.js';
@@ -47,6 +49,10 @@ export interface FixOptions {
   model?: string;
   /** Any direct dependency: one with a pack (zod, stripe) or, with the agent, any other. */
   only: string;
+  also?: string[];
+  allowPeer?: string[];
+  /** Frozen read-only plan made before the CLI clone. */
+  peerPlan?: PeerPlan;
   target?: string;
   includeDeprecated?: boolean;
   pr?: boolean;
@@ -187,7 +193,11 @@ async function fixPackage(options: FixOptions, services: FixServices): Promise<F
       `uptide fix --pr refuses to run from an Uptide checkout with uncommitted changes (at ${tool.uptideCommit.slice(0, 12)}); commit or stash them, rebuild, and run again`,
     );
   validateVersionRanges(root, [pack.name]);
-  const resolved = await resolveTarget(pack, options.target, services.resolve);
+  if (!options.pinCurrentApi) assertNpmLockSync(root);
+  const peerPlan = options.peerPlan ?? (await peerPreflight(options, services));
+  const resolved = peerPlan
+    ? { version: peerPlan.target, source: peerPlan.targetSource }
+    : await resolveTarget(pack, options.target, services.resolve);
   const target = resolved.version;
   if (!/^\d+\.\d+\.\d+(?:-[\w.-]+)?$/.test(target))
     throw new Error('target must be an exact version');
@@ -234,7 +244,12 @@ async function fixPackage(options: FixOptions, services: FixServices): Promise<F
       `${pack.name} ${target} cannot be installed consistently: ${conflicts.join('; ')}. Nothing was changed.`,
     );
   const companions = [
-    ...new Map(packages.flatMap((p) => p.companions ?? []).map((c) => [c.name, c])).values(),
+    ...new Map(
+      [...packages.flatMap((p) => p.companions ?? []), ...(peerPlan?.companions ?? [])].map((c) => [
+        c.name,
+        c,
+      ]),
+    ).values(),
   ].sort((a, b) => a.name.localeCompare(b.name));
   validateVersionRanges(root, [pack.name, ...companions.map((c) => c.name)]);
   const initialContext = {
@@ -305,7 +320,12 @@ async function fixPackage(options: FixOptions, services: FixServices): Promise<F
     ...companions.map((c) => bumpVersions(root, c.name, c.to)),
   ];
   const bump = {
-    files: [...new Set(bumps.flatMap((b) => b.files))],
+    files: [
+      ...new Set([
+        ...bumps.flatMap((b) => b.files),
+        ...writePeerOverrides(root, peerPlan?.conflicts ?? []),
+      ]),
+    ],
     workspaces: [...new Set(bumps.flatMap((b) => b.workspaces))],
   };
   const moved = companions.map((c) => `${c.name} ${c.to}`).join(', ');
@@ -322,6 +342,13 @@ async function fixPackage(options: FixOptions, services: FixServices): Promise<F
         version: target,
         workspaces: bump.workspaces,
         files: bump.files.map((f) => relative(root, f)),
+        ...(peerPlan?.conflicts.some((p) => p.allowed)
+          ? {
+              allowedPeers: [
+                ...new Set(peerPlan.conflicts.filter((p) => p.allowed).map((p) => p.name)),
+              ],
+            }
+          : {}),
         ...(companions.length
           ? { also: companions.map((c) => ({ name: c.name, version: c.to })) }
           : {}),
@@ -485,6 +512,7 @@ async function fixPackage(options: FixOptions, services: FixServices): Promise<F
     target,
     targetSource: resolved.source,
     ...(companions.length ? { companions } : {}),
+    ...(peerPlan?.conflicts.length ? { peerConflicts: peerPlan.conflicts } : {}),
     ...tool,
     verifiedAt: new Date().toISOString(),
     head: git(root, 'rev-parse', 'HEAD'),

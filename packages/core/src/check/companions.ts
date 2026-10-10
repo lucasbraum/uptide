@@ -102,7 +102,7 @@ function releasedWith(lead: string, target: string, versions: Manifests): boolea
  * installed range rejects the target, and nothing says it moves with it (named by the pack, or
  * released at the target's own version). Undefined: it is a companion, or it agrees already.
  */
-function peerConflictOf(
+export function peerConflictOf(
   installed: InstalledDependency,
   host: string,
   target: string,

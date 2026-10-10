@@ -317,6 +317,30 @@ describe('uptide fix', () => {
     expect(engine.calls.at(-1)).toMatchObject({ pr: true, base: 'release', allowDirty: true });
   });
 
+  it('forwards explicit peer upgrades and repeatable peer allowances to planning', async () => {
+    const engine = fakeEngine();
+    await run(
+      [
+        'fix',
+        'zod',
+        'plugin',
+        '--allow-peer',
+        'old-plugin',
+        '--allow-peer',
+        'another-plugin',
+        '--no-llm',
+      ],
+      memoryIo({ cwd: pnpmGitRepo() }),
+      engine,
+    );
+    expect(engine.calls.at(-1)).toMatchObject({
+      only: 'zod',
+      also: ['plugin'],
+      allowPeer: ['old-plugin', 'another-plugin'],
+      llm: false,
+    });
+  });
+
   it('prints the FixReport with --json', async () => {
     const io = memoryIo({ cwd: pnpmGitRepo() });
     await run(['fix', '--only', 'zod', '--json', '--target', 'zod@4.6.5'], io, fakeEngine());

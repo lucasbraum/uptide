@@ -59,6 +59,22 @@ export function formatFixSummary(report: FixReport, opts: FormatFixOptions = {})
       : []),
     '',
   ];
+  if (report.peerConflicts?.length) {
+    lines.push(colors.bold('Peer risks'));
+    for (const peer of report.peerConflicts)
+      lines.push(
+        `  ${peer.name} ${peer.version}: ${peer.peer} ${peer.range} rejects ${peer.target}${peer.allowed ? ' · explicitly allowed in package.json' : ''}`,
+      );
+    lines.push('');
+  }
+  const housekeeping = report.lockfile?.housekeeping;
+  if (housekeeping)
+    lines.push(
+      colors.dim(
+        `Lockfile housekeeping · ${housekeeping.deduped.length} dedupe move${housekeeping.deduped.length === 1 ? '' : 's'} · ${housekeeping.metadata.length} metadata-only change${housekeeping.metadata.length === 1 ? '' : 's'} (details in the report)`,
+      ),
+      '',
+    );
   const from = opts.cwd ?? report.source ?? report.repo;
   const where = report.source ? `in your repository, not checked out` : `in ${report.repo}`;
   lines.push(`${colors.bold('Branch')} ${report.branch} ${colors.dim(`(${where})`)}`);

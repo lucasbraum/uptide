@@ -3,6 +3,35 @@ import { formatFixSummary } from './format-fix.js';
 import { fixReport } from './test-utils.js';
 
 describe('formatFixSummary', () => {
+  it('shows allowed and unallowed peer risks with their declared ranges', () => {
+    const out = formatFixSummary({
+      ...fixReport(true),
+      peerConflicts: [
+        {
+          name: 'plugin',
+          version: '1.0.0',
+          peer: 'react',
+          range: '^18',
+          target: '19.0.0',
+          allowed: true,
+        },
+        {
+          name: 'other',
+          version: '1.0.0',
+          peer: 'react',
+          range: '^18',
+          target: '19.0.0',
+          allowed: false,
+        },
+      ],
+    });
+    expect(out).toContain('Peer risks');
+    expect(out).toContain(
+      'plugin 1.0.0: react ^18 rejects 19.0.0 · explicitly allowed in package.json',
+    );
+    expect(out).toContain('other 1.0.0: react ^18 rejects 19.0.0');
+  });
+
   it('says the five facts, where the branch is, and the exact next commands', () => {
     const report = {
       ...fixReport(true),
@@ -60,4 +89,30 @@ describe('formatFixSummary', () => {
     // Aligned with the other next steps, whose longest entry sets the padding.
     expect(published).toMatch(/https:\/\/github\.com\/o\/r\/pull\/9 +the pull request/);
   });
+});
+
+it('summarizes lockfile housekeeping without expanding placements in the terminal', () => {
+  const report = fixReport(true);
+  report.lockfile = {
+    manager: 'npm',
+    file: 'package-lock.json',
+    added: [],
+    removed: [],
+    changed: [],
+    allowed: [],
+    housekeeping: {
+      deduped: [
+        {
+          from: 'node_modules/a/node_modules/b',
+          to: 'node_modules/b',
+          name: 'b',
+          version: '1.0.0',
+        },
+      ],
+      metadata: [],
+    },
+  };
+  const out = formatFixSummary(report, { color: false });
+  expect(out).toContain('Lockfile housekeeping · 1 dedupe move · 0 metadata-only changes');
+  expect(out).not.toContain('node_modules/');
 });

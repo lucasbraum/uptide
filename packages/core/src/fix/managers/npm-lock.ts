@@ -3,6 +3,7 @@ import { UptideError } from '../../errors.js';
 import {
   type LockGraph,
   type LockRecord,
+  lockedIdentity,
   type Targets,
   targetNames,
   withoutTarget,
@@ -49,8 +50,8 @@ export function npmGraph(text: string, target: Targets): LockGraph {
     let dir = from;
     for (;;) {
       const key = `${dir ? `${dir}/` : ''}node_modules/${name}`;
-      if (nodes.has(key)) return key;
-      if (!dir || dir === '.') return undefined;
+      if (!dir.endsWith('node_modules') && nodes.has(key)) return key;
+      if (!dir || dir === '.' || dir === 'legacy') return undefined;
       dir = dirname(dir);
       if (dir === '.') dir = '';
     }
@@ -61,22 +62,44 @@ export function npmGraph(text: string, target: Targets): LockGraph {
         Object.keys((entry[s] ?? {}) as object),
       ),
     );
-    // v2's compatibility tree may include bundled children without a requires field.
-    for (const child of nodes.keys())
+    // Only bundled children imply an edge without a declaration; placement alone does not.
+    for (const [child, data] of nodes)
       if (
+        (data.bundled === true || data.inBundle === true) &&
         child.startsWith(`${key}/node_modules/`) &&
         !child.slice(key.length + 14).includes('/node_modules/')
       )
         names.add(child.slice(key.length + 14));
+    const edges = Object.fromEntries([...names].map((n) => [n, resolve(key, n)]));
+    const name = key.slice(key.lastIndexOf('node_modules/') + 13);
     records.set(key, {
-      name: key.slice(key.lastIndexOf('node_modules/') + 13),
+      name,
+      identity: lockedIdentity(String(entry.name ?? name), entry.version, entry.integrity, entry),
+      edges,
       data: entry,
-      dependencies: [...names].flatMap((n) => {
-        const r = resolve(key, n);
-        return r ? [r] : [];
-      }),
+      dependencies: Object.values(edges).filter((r): r is string => r !== undefined),
     });
   }
   const { packages: _p, dependencies: _d, ...meta } = lock;
-  return { records, metadata: { ...meta, importers } };
+  const roots = Object.fromEntries(
+    Object.entries(lock.packages as Record<string, Entry>)
+      .filter(([key]) => !key.includes('node_modules/'))
+      .map(([key, entry]) => [
+        key,
+        Object.fromEntries(
+          ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']
+            .flatMap((s) => Object.keys((entry[s] ?? {}) as object))
+            .map((name) => [name, resolve(key, name)]),
+        ),
+      ]),
+  );
+  function relocate(key: string, previous: LockGraph): string | undefined {
+    if (records.has(key)) return key;
+    const name = previous.records.get(key)?.name;
+    if (!name) return undefined;
+    const parent = key.slice(0, key.lastIndexOf('node_modules/')).replace(/\/$/, '');
+    const placed = previous.records.has(parent) ? relocate(parent, previous) : parent;
+    return placed === undefined ? undefined : resolve(placed, name);
+  }
+  return { records, metadata: { ...meta, importers }, roots, relocate };
 }

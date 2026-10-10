@@ -5,6 +5,7 @@ import { GENERIC_NOTE } from '../packs/generic.js';
 import { UPTIDE_COMMAND } from '../version.js';
 import type { BehaviorResult } from './behavior.js';
 import { fitPieces, must, type Piece } from './budget.js';
+import { peerDescription } from './peer-preflight.js';
 import type { FixDiagnostic, FixReport, FixSite, ReviewSection } from './types.js';
 import { missingPackages } from './verify.js';
 
@@ -304,6 +305,7 @@ export function migrationRisk(report: FixReport): {
     return { level: 'Low', reason: 'no behaviour change: the explicit pin equals the SDK default' };
   const g = groups(report);
   const high = [
+    ...(report.peerConflicts?.length ? ['peer compatibility is not verified'] : []),
     ...(report.sites.some((s) => s.outcome === 'manual') ? ['manual sites left'] : []),
     ...(!report.verification.passed ||
     report.verification.newErrors.length ||
@@ -653,6 +655,26 @@ export function renderMigration(
     lines.push(`> ${GENERIC_NOTE(report.package)}`, '');
   if (report.llm.disabled) lines.push('Assisted fixes disabled (--no-llm).', '');
   lines.push(...summaryRows(report), '');
+  const housekeeping = report.lockfile?.housekeeping;
+  if (mode === 'full' && housekeeping) {
+    const label = `Lockfile housekeeping · ${count(housekeeping.deduped.length, 'dedupe move')} · ${count(housekeeping.metadata.length, 'metadata-only change')}`;
+    lines.push(
+      droppable(
+        2,
+        collapse(label, [
+          'Outside resolutions retain the same package name, version and integrity; execution and platform fields are unchanged.',
+          '',
+          ...housekeeping.deduped.map(
+            (d) =>
+              `- \`${cell(d.name)}@${cell(d.version)}\`: \`${cell(d.from)}\` → \`${cell(d.to)}\`.`,
+          ),
+          ...housekeeping.metadata.map((key) => `- Metadata only: \`${cell(key)}\`.`),
+        ]),
+        label,
+      ),
+      '',
+    );
+  }
   if (groups(report).length) lines.push('### What changed', '');
   groups(report).forEach((g, i) => {
     lines.push(heading(g, report, i));
@@ -697,6 +719,20 @@ export function renderMigration(
     const label = g.outcome === 'mechanical' ? 'Example and files' : 'Diff and reasoning';
     lines.push(droppable(1, collapse(label, detail), label), '');
   });
+  if (report.peerConflicts?.length)
+    lines.push(
+      must(
+        [
+          '### Peer risks',
+          '',
+          ...report.peerConflicts.map(
+            (p) =>
+              `- ${peerDescription(p)}. ${p.allowed ? 'Explicitly allowed with `--allow-peer`; the manager override is in package.json.' : 'Not overridden; the package manager may warn.'} Runtime compatibility needs review.`,
+          ),
+        ].join('\n'),
+      ),
+      '',
+    );
   if (mode === 'compact')
     return `${lines
       .filter((l): l is string => typeof l === 'string')
