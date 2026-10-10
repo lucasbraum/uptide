@@ -333,23 +333,23 @@ describe('uptide fix', () => {
   it('a generic package without an agent: says what it cannot do, and nothing happens', async () => {
     for (const [argv, env, why, next] of [
       [
-        ['fix', '--only', 'vitest'],
+        ['fix', '--only', 'lodash'],
         {},
         'no selected-provider API key is set',
-        'Next: npx uptide fix vitest',
+        'Next: npx uptide fix lodash',
       ],
       [
-        ['fix', '--only', 'vitest', '--no-llm'],
+        ['fix', '--only', 'lodash', '--no-llm'],
         { ANTHROPIC_API_KEY: 'test-key' },
         'assisted fixes are off (--no-llm)',
-        'Next: npx uptide check vitest --details',
+        'Next: npx uptide check lodash --details',
       ],
     ] as const) {
       const engine = fakeEngine();
       const io = memoryIo({ cwd: pnpmGitRepo(), env });
       expect(await run([...argv], io, engine)).toBe(2);
       expect(io.stderr()).toContain(
-        `error: vitest has no migration pack, so every fix would come from the agent, and ${why}`,
+        `error: lodash has no migration pack, so every fix would come from the agent, and ${why}`,
       );
       expect(io.stderr()).toContain('Nothing was changed: no clone, no branch, no install.');
       expect(io.stderr()).toContain(next);
@@ -362,18 +362,18 @@ describe('uptide fix', () => {
       'package.json': JSON.stringify({
         name: 'shop',
         packageManager: 'pnpm@10.17.1',
-        dependencies: { vitest: '^4.0.0' },
+        dependencies: { lodash: '^4.0.0' },
       }),
-      'node_modules/vitest/package.json': '{"name":"vitest","version":"4.1.11"}',
+      'node_modules/lodash/package.json': '{"name":"lodash","version":"4.17.21"}',
     });
     const engine = fakeEngine({
-      declared: async () => new Map([['vitest', '^4.0.0']]),
-      installed: async () => new Map([['vitest', '4.1.11']]),
+      declared: async () => new Map([['lodash', '^4.0.0']]),
+      installed: async () => new Map([['lodash', '4.17.21']]),
       fix: async (request) => {
         engine.calls.push(request);
         return {
           ...fixReport(true),
-          package: 'vitest',
+          package: 'lodash',
           tier: 'generic',
           // One edit the agent made before the limit: the tier note is about its edits.
           sites: [
@@ -383,7 +383,7 @@ describe('uptide fix', () => {
               reason: 'compiler error resolved',
               finding: {
                 usage: { file: 'src/app.test.ts', line: 1 },
-                change: { from: '4.1.11', path: 'FC' },
+                change: { from: '4.17.21', path: 'FC' },
               },
             } as unknown as FixReport['sites'][number],
           ],
@@ -398,10 +398,10 @@ describe('uptide fix', () => {
       },
     });
     const io = memoryIo({ cwd, env: { ANTHROPIC_API_KEY: 'test-key' } });
-    await run(['fix', '--only', 'vitest'], io, engine);
-    expect(engine.calls).toEqual([expect.objectContaining({ only: 'vitest', llm: true })]);
+    await run(['fix', '--only', 'lodash'], io, engine);
+    expect(engine.calls).toEqual([expect.objectContaining({ only: 'lodash', llm: true })]);
     expect(io.stderr()).toContain(
-      'vitest has no migration pack (generic tier): every fix comes from the agent, up to $1.00 (--max-cost)',
+      'lodash has no migration pack (generic tier): every fix comes from the agent, up to $1.00 (--max-cost)',
     );
     expect(io.stdout()).toContain(
       "  Tier      generic: no migration pack; every edit is the agent's, kept on the compiler's word. Review each one.",
@@ -412,7 +412,7 @@ describe('uptide fix', () => {
     expect(io.stderr()).toContain('LLM spend: $0.60\n');
     // --max-cost reaches the engine; nonsense is refused.
     await run(
-      ['fix', '--only', 'vitest', '--max-cost', '2.5'],
+      ['fix', '--only', 'lodash', '--max-cost', '2.5'],
       memoryIo({ cwd, env: { ANTHROPIC_API_KEY: 'k' } }),
       engine,
     );

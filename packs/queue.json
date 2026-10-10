@@ -32,7 +32,7 @@
       "from": ">=4 <5",
       "to": ">=5 <6",
       "why": "declared directly in 39 of 52 sample repositories, 31 of them on an older major; 332 breaking API changes, 276 distinct (224 removed or renamed, 52 change shapes) from 4.1.11 to 5.0.3; upgraded with @vitest/browser-playwright, @vitest/coverage-istanbul, @vitest/coverage-v8, @vitest/ui (released in lockstep, shared @vitest/mocker)",
-      "status": "todo",
+      "status": "verified",
       "repos": 39,
       "reposBehind": 31,
       "weeklyDownloads": 0,
