@@ -21,7 +21,7 @@
     "url": "git+https://github.com/uptide-dev/uptide.git",
     "directory": "packages/cli"
   },
-  "homepage": "https://github.com/uptide-dev/uptide#readme",
+  "homepage": "https://uptide-dev.github.io/docs",
   "bugs": "https://github.com/uptide-dev/uptide/issues",
   "keywords": [
     "zod",
