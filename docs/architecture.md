@@ -603,6 +603,16 @@ now reports that one site. The JSON report only gains fields for this (`root`,
 anchor as the predicted site and never the evidence under it, even when another finding
 lands on an evidence line.
 
+A root cause can be a repository augmentation (`augmentationCause` in `cause.ts`). A member
+the compiler no longer finds (TS2339, TS2551) is resolved in the baseline program, where it
+still exists; when its declaration sits in a repository file, inside `declare global` (a
+setup file's `namespace jest { interface Matchers<R> { toMatchImageSnapshot(): R } }`) or a
+`declare module "x"` block, every call site is anchored at that declaration, `anchorOnly`,
+with the sites as evidence: a `declare global` block at the block, a module augmentation at
+the interface inside it, any other repository declaration at itself. One site is enough,
+unlike a parameter: the edit is never at the call. The anchor also serves as the diagnostic's
+`root`, so sites in other workspaces fold with it after the merge.
+
 A diagnostic confirms exactly one usage: the innermost whose span contains the
 diagnostic's start. `z.string().trim().url()` is three usages on one line, and an error
 under `url` says nothing about `trim`, whose finding goes through the arbiter like any

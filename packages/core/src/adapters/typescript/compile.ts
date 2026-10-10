@@ -20,7 +20,7 @@ import type {
 } from '../../domain/usage.js';
 import { satisfies } from '../../fetch/range.js';
 import { onReset } from '../../shared-state.js';
-import { findCause, parameterCause } from './cause.js';
+import { augmentationCause, findCause, parameterCause } from './cause.js';
 import { type Compiler, repositoryCompiler, unresolvedConfig } from './compiler.js';
 import { jsxNamespaceCause } from './config-cause.js';
 import { type LoadedRepo, loadedRepo, ownsFile } from './repo.js';
@@ -917,16 +917,27 @@ export async function compileAgainstTargets(
     const diagnostics: CompileDiagnostic[] = fresh.map(({ d, overlaid }) => {
       const diagnostic = toDiagnostic(d, overlaid, repo.dir);
       const parameter = parameterOf.get(d);
+      // A member the repository declared in an augmentation the target ignores is never fixed
+      // at the call site, however many sites there are: that anchor needs no second site.
+      const augmentation = augmentationCause(
+        programs,
+        d,
+        overlaid,
+        repo.dir,
+        repoRef.root ?? repo.dir,
+      );
       const cause =
         (jsx?.explains(d) ? jsx.cause : undefined) ??
+        augmentation ??
         (parameter !== undefined && (shared.get(parameter) ?? 0) >= 2
           ? byParameter.get(parameter)
           : undefined) ??
         findCause(programs, d, overlaid, repo.dir, erroredLines);
       if (cause) diagnostic.cause = cause;
-      // Traced to a parameter but alone in this workspace: the root is kept, so another
+      // Traced to a declaration but alone in this workspace: the root is kept, so another
       // workspace's site at the same declaration can fold with it after the merge.
-      const root = parameter !== undefined ? byParameter.get(parameter) : undefined;
+      const root =
+        augmentation ?? (parameter !== undefined ? byParameter.get(parameter) : undefined);
       if (root) diagnostic.root = root;
       return diagnostic;
     });

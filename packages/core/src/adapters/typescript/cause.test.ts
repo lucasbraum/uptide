@@ -138,3 +138,77 @@ describe('root cause guard', () => {
     });
   });
 });
+
+describe('a member declared in a repository augmentation the target no longer reads', () => {
+  /** The dep consumer with `matchers` 1 installed (the global-reading assertion) and the given sources. */
+  function withMatchers(files: Record<string, string>): string {
+    const dir = consumerWith('setup.ts', files['setup.ts'] ?? '');
+    const tsconfig = JSON.parse(readFileSync(join(dir, 'tsconfig.json'), 'utf8'));
+    tsconfig.compilerOptions.paths.matchers = [join(DEPS, 'matchers-v1/index.d.ts')];
+    writeFileSync(join(dir, 'tsconfig.json'), JSON.stringify(tsconfig));
+    const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
+    manifest.dependencies.matchers = '1.0.0';
+    writeFileSync(join(dir, 'package.json'), JSON.stringify(manifest));
+    const lock = JSON.parse(readFileSync(join(dir, 'package-lock.json'), 'utf8'));
+    lock.packages['node_modules/matchers'] = {
+      version: '1.0.0',
+      resolved: `file:${join(DEPS, 'matchers-v1')}`,
+    };
+    writeFileSync(join(dir, 'package-lock.json'), JSON.stringify(lock));
+    for (const [name, source] of Object.entries(files))
+      writeFileSync(join(dir, 'src', name), source);
+    return dir;
+  }
+
+  it('anchors every call site at the `declare global` block of a setup file, as one site', async () => {
+    const dir = withMatchers({
+      'setup.ts': [
+        "import 'matchers';",
+        'declare global {',
+        '  namespace checks {',
+        '    interface Matchers<R> {',
+        '      toBeEven(): R;',
+        '    }',
+        '  }',
+        '}',
+        'export {};',
+        '',
+      ].join('\n'),
+      'even.test.ts': [
+        "import { expect } from 'matchers';",
+        'expect(2).toBeEven();',
+        'expect(4).toBeEven();',
+        '',
+      ].join('\n'),
+      'odd.test.ts': ["import { expect } from 'matchers';", 'expect(6).toBeEven();', ''].join('\n'),
+    });
+    const signal = await compileAgainstTarget({ dir }, 'matchers', join(DEPS, 'matchers-v2'));
+    const missing = signal.diagnostics.filter((d) => d.code === 2339);
+    expect(missing.map((d) => `${d.file}:${d.line}`)).toEqual([
+      'src/even.test.ts:2',
+      'src/even.test.ts:3',
+      'src/odd.test.ts:2',
+    ]);
+    const cause = {
+      name: 'checks.Matchers',
+      file: 'src/setup.ts',
+      line: 2,
+      reason:
+        'which declares `toBeEven` on the global `checks.Matchers`, an augmentation the target no longer reads; declare it on the interface the target reads instead',
+      anchorOnly: true,
+    };
+    // Every site, the lone one in odd.test.ts included: the edit is never at the call.
+    for (const d of missing) {
+      expect(d.cause).toEqual(cause);
+      expect(d.root).toEqual(cause);
+    }
+  });
+
+  it('leaves a member the package itself dropped to the site', async () => {
+    const dir = withMatchers({
+      'plain.test.ts': ["import { expect } from 'matchers';", 'expect(1).toBe(1);', ''].join('\n'),
+    });
+    const signal = await compileAgainstTarget({ dir }, 'matchers', join(DEPS, 'matchers-v2'));
+    expect(signal.diagnostics.filter((d) => d.file === 'src/plain.test.ts')).toEqual([]);
+  });
+});

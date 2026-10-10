@@ -47,8 +47,10 @@ describe('README', () => {
     expect(quickstart).toContain('Node 20 or newer');
   });
 
-  it('stays short: under 150 lines', () => {
-    expect(readme.split('\n').length).toBeLessThanOrEqual(150);
+  it('stays short: under 150 lines, the generated packs table not counted', () => {
+    // The table between the markers grows one row per pack (`pnpm docs:packs`); the prose does not.
+    const prose = readme.replace(/<!-- packs:start -->[\s\S]*?<!-- packs:end -->/, '');
+    expect(prose.split('\n').length).toBeLessThanOrEqual(150);
   });
 
   it('shows a before and after from a fixture in this repository', () => {
