@@ -1,5 +1,39 @@
 # uptide
 
+## 0.7.0
+
+### Minor Changes
+
+- [#60](https://github.com/uptide-dev/uptide/pull/60) [`7ec02e0`](https://github.com/uptide-dev/uptide/commit/7ec02e0a4e791558f83d9ddb64cca8cae5370241) Thanks [@lucasbraum](https://github.com/lucasbraum)! - `check` reports one breaking finding when a member the target no longer sees was declared by
+  your own code in an augmentation: a custom matcher on the global `jest.Matchers` in a test
+  setup file, or an interface augmented in a `declare module "x"` block. The finding is anchored
+  at that declaration (the `declare global` block, or the augmented interface), where the one
+  edit is, and the call sites that fail (TS2339, TS2551) are listed under it as evidence, in the
+  terminal, the HTML report and the JSON report. Before, each call site was a breaking finding
+  of its own next to the declaration. The README's line budget no longer counts the generated
+  "Verified packs" table, which grows one row per pack.
+
+- [#64](https://github.com/uptide-dev/uptide/pull/64) [`86b24d2`](https://github.com/uptide-dev/uptide/commit/86b24d291685db47b57f4494da06efc2554f0f00) Thanks [@lucasbraum](https://github.com/lucasbraum)! - Plan peer blockers before cloning or installing, suggest explicit compatible peer upgrades, and add repeatable `--allow-peer` with visible package-manager overrides and PR risks. Reject npm lockfiles that disagree with committed manifests before starting a migration.
+  
+  Collect peer blockers across the complete upgrade group and print one complete retry command. Include explicitly allowed peer packages in the old/new lockfile subtree union while retaining strict rejection of unrelated resolution changes.
+  
+  Accept same-content lockfile deduplication and descriptive metadata updates only when outside resolutions stay identical, and disclose accepted housekeeping in the fix report and PR description.
+
+- [#63](https://github.com/uptide-dev/uptide/pull/63) [`8dcf5fb`](https://github.com/uptide-dev/uptide/commit/8dcf5fbac4e213a6f71b31b854fe8795739de7b6) Thanks [@lucasbraum](https://github.com/lucasbraum)! - A verified migration pack for Vitest 4 → 5, scored against votingworks/vxsuite and
+  vitorvasc/opentelemetry-ecosystem-explorer at the commit before their own upgrade. It is verified
+  with two public repositories and no false positive among breaking findings (recall 50%). Sites it finds: custom matchers declared on the global
+  `jest.Matchers` or on a one-parameter `Assertion<T>`, `import '@testing-library/jest-dom/vitest'`
+  registrations whose types stop reaching `expect`, the removed `bench` export, bare-directory
+  `coverage.include` and `coverage.exclude` entries, and the removed `vitest/*` entry points
+  (`vitest/coverage`, `vitest/reporters`, `vitest/environments` and `vitest/snapshot` are
+  rewritten). What the compiler cannot see (mock history cleared by default, `testNamePattern`
+  joined with " > ", hoisted `vi.mock` calls, un-awaited assertions, timers, report locations,
+  browser mode) is listed for review.
+
+### Patch Changes
+
+- [#62](https://github.com/uptide-dev/uptide/pull/62) [`c0f8a70`](https://github.com/uptide-dev/uptide/commit/c0f8a70c5b73df11139d6ac01dac679a3b4de51a) Thanks [@lucasbraum](https://github.com/lucasbraum)! - Preserve partial version ranges such as `^18`, `~18.2`, and `18.x` when fixing packages and their companions, including workspace manifests and pnpm catalogs. Reject unsupported complex ranges before cloning or spending on assisted fixes, with the declaration location and an installed-version replacement suggestion.
+
 ## 0.6.1
 
 ### Patch Changes
