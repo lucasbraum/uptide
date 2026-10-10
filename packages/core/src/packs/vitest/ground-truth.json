@@ -1,0 +1,211 @@
+{
+  "$comment": "Ground truth for the vitest pack (docs/packs.md, \"Ground truth\"). Each public repository is pinned at the commit before its own Vitest 4 to 5 upgrade. Expected findings come from two sources that are not Uptide: the diagnostics the repository's TypeScript reports with vitest at the upgrade's version linked in and not without it, and the lines the upgrade commit changed (pnpm packs:truth, read by hand). Left out on purpose: the 169 diagnostics under votingworks/vxsuite's libs/image-utils/src/vitest_setup.ts, which are evidence of that declaration (one cause, recorded once at it); renames of setup files and of eslint ignores for them, a new fsModuleCache option, removed redundant clearMocks: true opt-ins, the snapshot files renamed by the new test.each titles, jest.CustomMatcherResult becoming SyncMatcherResult (it compiles at Vitest 5), and everything in votingworks/vxsuite that is not about vitest. Paths are the ones at the pinned commit: pnpm packs:truth prints the post-rename path with the pre-rename line for a file the upgrade moved, so those were read from git diff -M by hand. siemens/element (a real Vitest 5 migration) cannot be installed from a public registry (its @simpl and @siemens-ux packages live on code.siemens.com), so it is not ground truth. votingworks/vxsuite has no entry point removals, sequential tests or nested vi.mock; those rules and notes rest on fixtures and the guide only. Expected 'matcher-types' at libs/ui/src/setupTests.ts:20 and 'bench-api' at libs/hmpb/src/render_ballot.bench.ts:16 are sites no check signal covers yet.",
+  "package": "vitest",
+  "repos": [
+    {
+      "repo": "votingworks/vxsuite",
+      "commit": "5cb3c7d9c1abc891e7b12de57c0278790dd6160a",
+      "migration": "https://github.com/votingworks/vxsuite/commit/bb04c5fb01aa9bcd285170d2277df04ad5d7e09c",
+      "from": "4.1.11",
+      "to": "5.0.2",
+      "with": {
+        "@vitest/coverage-istanbul": "5.0.2"
+      },
+      "why": "large pnpm monorepo (70 workspaces) with custom matchers declared on the global jest.Matchers and on Assertion<T>, jest-dom registered in eleven setup files, a benchmark file and bare-directory coverage excludes",
+      "findings": [
+        {
+          "file": "apps/admin/frontend/src/setupTests.ts",
+          "line": 3,
+          "rule": "jest-dom-matchers"
+        },
+        {
+          "file": "apps/admin/frontend/vitest.config.ts",
+          "line": 11,
+          "rule": "coverage-patterns",
+          "note": "a bare directory in coverage.exclude became <dir>/**"
+        },
+        {
+          "file": "apps/central-scan/frontend/src/setupTests.ts",
+          "line": 2,
+          "rule": "jest-dom-matchers"
+        },
+        {
+          "file": "apps/central-scan/frontend/vitest.config.ts",
+          "line": 11,
+          "rule": "coverage-patterns",
+          "note": "a bare directory in coverage.exclude became <dir>/**"
+        },
+        {
+          "file": "apps/central-scan/frontend/vitest.config.ts",
+          "line": 16,
+          "rule": "coverage-patterns",
+          "note": "a bare directory in coverage.exclude became <dir>/**"
+        },
+        {
+          "file": "apps/design/frontend/test/setupTests.ts",
+          "line": 2,
+          "rule": "jest-dom-matchers"
+        },
+        {
+          "file": "apps/mark-scan/frontend/src/setupTests.tsx",
+          "line": 4,
+          "rule": "jest-dom-matchers"
+        },
+        {
+          "file": "apps/mark-scan/frontend/vitest.config.ts",
+          "line": 12,
+          "rule": "coverage-patterns",
+          "note": "a bare directory in coverage.exclude became <dir>/**"
+        },
+        {
+          "file": "apps/mark-scan/frontend/vitest.config.ts",
+          "line": 13,
+          "rule": "coverage-patterns",
+          "note": "a bare directory in coverage.exclude became <dir>/**"
+        },
+        {
+          "file": "apps/mark/frontend/src/setupTests.tsx",
+          "line": 2,
+          "rule": "jest-dom-matchers"
+        },
+        {
+          "file": "apps/mark/frontend/vitest.config.ts",
+          "line": 11,
+          "rule": "coverage-patterns",
+          "note": "a bare directory in coverage.exclude became <dir>/**"
+        },
+        {
+          "file": "apps/mark/frontend/vitest.config.ts",
+          "line": 12,
+          "rule": "coverage-patterns",
+          "note": "a bare directory in coverage.exclude became <dir>/**"
+        },
+        {
+          "file": "apps/mark/frontend/vitest.config.ts",
+          "line": 19,
+          "rule": "coverage-patterns",
+          "note": "a bare directory in coverage.exclude became <dir>/**"
+        },
+        {
+          "file": "apps/pollbook/frontend/src/setupTests.ts",
+          "line": 1,
+          "rule": "jest-dom-matchers"
+        },
+        {
+          "file": "apps/print/frontend/src/setupTests.ts",
+          "line": 2,
+          "rule": "jest-dom-matchers"
+        },
+        {
+          "file": "apps/scan/frontend/src/setupTests.ts",
+          "line": 2,
+          "rule": "jest-dom-matchers"
+        },
+        {
+          "file": "libs/auth/vitest.config.ts",
+          "line": 11,
+          "rule": "coverage-patterns",
+          "note": "a bare directory in coverage.exclude became <dir>/**"
+        },
+        {
+          "file": "libs/auth/vitest.config.ts",
+          "line": 13,
+          "rule": "coverage-patterns",
+          "note": "a bare directory in coverage.exclude became <dir>/**"
+        },
+        {
+          "file": "libs/ballot-encoder/test/expect.ts",
+          "line": 3,
+          "rule": "matcher-types",
+          "note": "toEqualBits declared on the global jest.Matchers; now Matchers<R, T> of \"vitest\" (the file became test/setup.ts)"
+        },
+        {
+          "file": "libs/dev-dock/frontend/src/setupTests.ts",
+          "line": 1,
+          "rule": "jest-dom-matchers"
+        },
+        {
+          "file": "libs/fixture-generators/vitest.config.ts",
+          "line": 10,
+          "rule": "coverage-patterns",
+          "note": "a bare directory in coverage.exclude became <dir>/**"
+        },
+        {
+          "file": "libs/fixture-generators/vitest.config.ts",
+          "line": 11,
+          "rule": "coverage-patterns",
+          "note": "a bare directory in coverage.exclude became <dir>/**"
+        },
+        {
+          "file": "libs/hmpb/src/render_ballot.bench.ts",
+          "line": 2,
+          "rule": "bench-api",
+          "note": "TS2724: \"vitest\" has no exported member named bench"
+        },
+        {
+          "file": "libs/hmpb/src/render_ballot.bench.ts",
+          "line": 16,
+          "rule": "bench-api",
+          "note": "the describe wrapper becomes a test whose callback receives { bench }"
+        },
+        {
+          "file": "libs/hmpb/src/render_ballot.bench.ts",
+          "line": 21,
+          "rule": "bench-api",
+          "note": "bench(name, fn, options) becomes await bench(name, fn, options).run() inside the test"
+        },
+        {
+          "file": "libs/hmpb/vitest.config.ts",
+          "line": 12,
+          "rule": "coverage-patterns",
+          "note": "a bare directory in coverage.exclude became <dir>/**"
+        },
+        {
+          "file": "libs/image-utils/src/vitest_setup.ts",
+          "line": 10,
+          "rule": "matcher-types",
+          "note": "declare global { namespace jest { interface Matchers } }: the one cause of 167 TS2339/TS2551 errors on toMatchImage, toMatchPdfSnapshot and toMatchImageSnapshot; the upgrade declares them on Matchers<R, T> of \"vitest\""
+        },
+        {
+          "file": "libs/mark-flow-ui/src/setupTests.ts",
+          "line": 2,
+          "rule": "jest-dom-matchers"
+        },
+        {
+          "file": "libs/ui/src/setupTests.ts",
+          "line": 3,
+          "rule": "jest-dom-matchers"
+        },
+        {
+          "file": "libs/ui/src/setupTests.ts",
+          "line": 20,
+          "rule": "matcher-types",
+          "note": "TS2428 on Assertion<T = any>: the declaration needs the two type parameters of Vitest 5, and the upgrade moves toHaveStyleRule to Matchers<R, T> (the file became test/setup.ts)"
+        }
+      ]
+    },
+    {
+      "repo": "vitorvasc/opentelemetry-ecosystem-explorer",
+      "commit": "46d5b37d00bbf27f394e33cee64a0e206c31315f",
+      "migration": "https://github.com/vitorvasc/opentelemetry-ecosystem-explorer/commit/2b0497b35d0e49dbeeb0d6174ad09aed03d46697",
+      "directory": "ecosystem-explorer",
+      "from": "4.1.11",
+      "to": "5.0.0",
+      "why": "a bun-managed React app that registers jest-dom for Vitest and replaced it, when its matcher types stopped reaching expect",
+      "findings": [
+        {
+          "file": "src/test/integration/setup.ts",
+          "line": 21,
+          "rule": "jest-dom-matchers",
+          "note": "import \"@testing-library/jest-dom\" replaced by expect.extend(matchers) and an augmentation of Matchers<R>"
+        },
+        {
+          "file": "src/test/setup.ts",
+          "line": 16,
+          "rule": "jest-dom-matchers",
+          "note": "import \"@testing-library/jest-dom\" replaced by the shared dom-matchers module"
+        }
+      ]
+    }
+  ]
+}
