@@ -9,5 +9,7 @@ export function Timer() {
   const input = useRef<HTMLInputElement>(null); // @uptide use-ref-argument keep at:useRef kind:signature path:TS2554 message:"Expected 1 arguments, but got 0."
   // Two calls on one line: the reported site is ambiguous, so the rule declines.
   const pair = [useRef<number>(), useRef<string>()]; // @uptide use-ref-argument keep at:useRef kind:signature path:TS2554 message:"Expected 1 arguments, but got 0."
-  return { timer, handler, anything, input, pair };
+  // Confirmed signature finding retains the exported symbol path.
+  const previous = useRef<string[]>(); // @uptide use-ref-argument at:useRef kind:signature path:".":useRef message:"Expected 1 arguments, but got 0."
+  return { timer, handler, anything, input, pair, previous };
 }

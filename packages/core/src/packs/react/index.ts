@@ -99,7 +99,7 @@ const rules: PackRule[] = [
     summary: '`useRef` requires an argument: `useRef<T>()` is `useRef<T>(undefined)`',
     severity: 'breaking',
     kinds: ['signature', 'required', 'type'],
-    symbols: /^TS2554$/,
+    symbols: /(?:^TS2554$|(?:^|:)useRef$)/,
     message: /Expected 1 arguments?, but got 0/,
     guide:
       'In React 19 types `useRef` always takes an initial value. `useRef<T>()` is `useRef<T>(undefined)`, which still types as `RefObject<T | undefined>`. Keep the type argument; do not change the initial value to anything but `undefined`. `types-react-codemod preset-19` (`useRef-required-initial`) does the same edit; it skips an aliased `useRef` import.',
@@ -145,7 +145,9 @@ const rules: PackRule[] = [
       'the global `JSX` namespace is gone: import `JSX` from "react", and type the JSX runtime in tsconfig',
     severity: 'breaking',
     kinds: ['type', 'signature', 'required'],
-    symbols: /^TS(?:2741|2746|2786|7026)$/,
+    symbols: /^TS(?:2503|2741|2746|2786|7026)$/,
+    // Other missing namespaces are unrelated; keep the existing JSX element diagnostics.
+    message: /^(?:Cannot find namespace 'JSX'\.$|(?!Cannot find namespace\b).+)/,
     guide:
       'The global `JSX` namespace was removed from @types/react: use `import type { JSX } from "react"` (or `React.JSX`) where code names `JSX.Element`, and move any `declare global { namespace JSX { ... } }` augmentation into `declare module "react/jsx-runtime"` (or "react" with `jsx: react`, "react/jsx-dev-runtime" with `react-jsxdev`). With `jsx: react-jsx` and several copies of the React types, setting `jsxImportSource: "react"` in tsconfig points the compiler at one. Many diagnostics at JSX elements (7026, 2786, 2741, 2746) can come from this one cause: fix it once, then recompile. `types-react-codemod` has `scoped-jsx`.',
   },
