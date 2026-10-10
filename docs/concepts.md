@@ -73,7 +73,11 @@ from it, every element in every file errors with one fix: `check` reports one fi
 diagnostics as evidence, and `--details` shows a few of them. A repository parameter that
 several call sites trip over (a hook typed `RefObject<HTMLElement>` once `useRef` returns
 `RefObject<HTMLElement | null>`) is reported the same way: one finding at the parameter,
-with the call sites as evidence. The call sites may sit in other workspaces than the
+with the call sites as evidence. So is a member your own code declared in an augmentation
+the target no longer reads (a custom matcher on the global `jest.Matchers` in a test setup
+file, once `expect` stops reading that namespace): every `expect(...).toMatchImageSnapshot()`
+that now fails is evidence of the one declaration, reported at the `declare global` block or
+the augmented interface. The call sites may sit in other workspaces than the
 parameter (a hook in `packages/editor` called from `apps/examples` and `packages/tldraw`):
 a site alone in its workspace still folds into the one finding at the declaration once the
 workspaces are merged, and `--details` prints `N call sites in M workspaces` under it. The
