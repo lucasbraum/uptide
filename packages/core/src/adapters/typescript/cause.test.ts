@@ -145,6 +145,7 @@ describe('a member declared in a repository augmentation the target no longer re
     const dir = consumerWith('setup.ts', files['setup.ts'] ?? '');
     const tsconfig = JSON.parse(readFileSync(join(dir, 'tsconfig.json'), 'utf8'));
     tsconfig.compilerOptions.paths.matchers = [join(DEPS, 'matchers-v1/index.d.ts')];
+    tsconfig.compilerOptions.paths['matchers-extra'] = [join(DEPS, 'matchers-extra-v1/index.d.ts')];
     writeFileSync(join(dir, 'tsconfig.json'), JSON.stringify(tsconfig));
     const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
     manifest.dependencies.matchers = '1.0.0';
@@ -194,7 +195,7 @@ describe('a member declared in a repository augmentation the target no longer re
       file: 'src/setup.ts',
       line: 2,
       reason:
-        'which declares `toBeEven` on the global `checks.Matchers`, an augmentation the target no longer reads; declare it on the interface the target reads instead',
+        'which declares `toBeEven` on `checks.Matchers`, a global augmentation the target no longer reads; declare the matchers on the interface the target reads instead',
       anchorOnly: true,
     };
     // Every site, the lone one in odd.test.ts included: the edit is never at the call.
@@ -210,5 +211,37 @@ describe('a member declared in a repository augmentation the target no longer re
     });
     const signal = await compileAgainstTarget({ dir }, 'matchers', join(DEPS, 'matchers-v2'));
     expect(signal.diagnostics.filter((d) => d.file === 'src/plain.test.ts')).toEqual([]);
+  });
+
+  it('anchors a member another package declared on the interface the setup file augments', async () => {
+    // `toBeOdd` comes from matchers-extra's own types, on the same global `checks.Matchers`
+    // the setup file augments: that augmentation is where every matcher moves together.
+    const dir = withMatchers({
+      'setup.ts': [
+        "import 'matchers';",
+        "import 'matchers-extra';",
+        'declare global {',
+        '  namespace checks {',
+        '    interface Matchers<R> {',
+        '      toBeEven(): R;',
+        '    }',
+        '  }',
+        '}',
+        'export {};',
+        '',
+      ].join('\n'),
+      'odd.test.ts': ["import { expect } from 'matchers';", 'expect(3).toBeOdd();', ''].join('\n'),
+    });
+    const signal = await compileAgainstTarget({ dir }, 'matchers', join(DEPS, 'matchers-v2'));
+    const [missing] = signal.diagnostics.filter((d) => d.code === 2339);
+    expect(missing?.file).toBe('src/odd.test.ts');
+    expect(missing?.cause).toEqual({
+      name: 'checks.Matchers',
+      file: 'src/setup.ts',
+      line: 3,
+      reason:
+        'which augments `checks.Matchers`, the interface `toBeOdd` is declared on (by matchers-extra), a global augmentation the target no longer reads; declare the matchers on the interface the target reads instead',
+      anchorOnly: true,
+    });
   });
 });

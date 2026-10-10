@@ -379,14 +379,18 @@ function namesForeignType(
 const MISSING_MEMBER_CODES = new Set([2339, 2551]);
 
 /**
- * A member the target no longer sees that the repository declared itself, in an augmentation:
- * `declare global { namespace jest { interface Matchers<R> { toMatchImageSnapshot(): R } } }`
- * in a setup file, read by the installed `expect` and ignored by the target's. Every
- * `expect(x).toMatchImageSnapshot()` then fails with TS2339 or TS2551, and the one edit is the
- * declaration: it has to move to the interface the target reads. The member is resolved in
- * the baseline program, where it still exists, and blamed only when its declaration sits in a
- * repository file; a `declare global` block is anchored at the block, a `declare module "x"`
- * augmentation at the interface inside it, any other repository declaration at itself.
+ * A member the target no longer sees that reaches the installed type through an augmentation
+ * the repository takes part in. `declare global { namespace jest { interface Matchers<R> {
+ * toMatchPdfSnapshot(): R } } }` in a setup file, read by the installed `expect` and ignored by
+ * the target's: every `expect(x).toMatchPdfSnapshot()` then fails with TS2339 or TS2551, and
+ * the one edit is the declaration. The member may also come from a package's own types on
+ * the same global interface (`jest-image-snapshot` declares `toMatchImageSnapshot` there):
+ * then the repository's augmentation of that interface is still where the change goes, since
+ * the matchers it registers have to move to the interface the target reads together. The
+ * member is resolved in the baseline program, where it still exists; a `declare global` block
+ * is anchored at the block, a `declare module "x"` augmentation at the interface inside it,
+ * any other repository declaration at itself. One site is enough: the edit is never at the
+ * call.
  */
 export function augmentationCause(
   programs: Programs,
@@ -408,14 +412,29 @@ export function augmentationCause(
   // The baseline still resolves the member; its declaration says where it came from.
   const before = counterpart(tsc, name, programs.base);
   if (!before) return undefined;
-  const symbol = programs.base.getTypeChecker().getSymbolAtLocation(before);
-  const decl = symbol?.declarations?.find(inRepo);
-  if (!decl) return undefined;
+  const checker = programs.base.getTypeChecker();
+  const member = checker.getSymbolAtLocation(before)?.declarations?.[0];
+  if (!member) return undefined;
+  let decl: ts.Node | undefined = inRepo(member) ? member : undefined;
+  let elsewhere: string | undefined;
+  if (!decl) {
+    // Declared by a package on an interface the repository augments too: the repository's own
+    // augmentation (this workspace's first) is the place.
+    const owner = member.parent;
+    if (!owner || !tsc.isInterfaceDeclaration(owner)) return undefined;
+    const declarations = (checker.getSymbolAtLocation(owner.name)?.declarations ?? []).filter(
+      (d) => inRepo(d) && isAugmentation(tsc, d),
+    );
+    decl =
+      declarations.find((d) => d.getSourceFile().fileName.startsWith(`${repoDir}/`)) ??
+      declarations[0];
+    if (!decl) return undefined;
+    elsewhere = packageOf(member.getSourceFile().fileName);
+  }
   const site = `${relative(repoDir, file.fileName)}:${file.getLineAndCharacterOfPosition(diagnostic.start).line + 1}`;
   // The declaration's container: the outermost `declare global`, else the interface (or other
   // named declaration) inside a `declare module "x"` block, else the declaration itself.
-  let anchor: ts.Node = decl;
-  let holder: ts.Node | undefined;
+  let holder: ts.Node | undefined = tsc.isInterfaceDeclaration(decl) ? decl : undefined;
   let global: ts.ModuleDeclaration | undefined;
   let augmented: string | undefined;
   for (let n: ts.Node | undefined = decl.parent; n && !tsc.isSourceFile(n); n = n.parent) {
@@ -428,18 +447,20 @@ export function augmentationCause(
     )
       holder = n;
   }
-  if (global) anchor = global;
-  else if (holder) anchor = holder;
+  const anchor: ts.Node = global ?? holder ?? decl;
   const at = anchor.getSourceFile();
   const line = at.getLineAndCharacterOfPosition(anchor.getStart()).line + 1;
   if (`${relative(repoDir, at.fileName)}:${line}` === site) return undefined;
-  const member = tsc.getNameOfDeclaration(decl)?.getText() ?? name.getText();
+  const memberName = tsc.getNameOfDeclaration(member)?.getText() ?? name.getText();
   const path = qualifiedName(tsc, decl, holder);
+  const declares = elsewhere
+    ? `which augments \`${path}\`, the interface \`${memberName}\` is declared on (by ${elsewhere})`
+    : `which declares \`${memberName}\` on \`${path}\``;
   const reason = global
-    ? `which declares \`${member}\` on the global \`${path}\`, an augmentation the target no longer reads; declare it on the interface the target reads instead`
+    ? `${declares}, a global augmentation the target no longer reads; declare the matchers on the interface the target reads instead`
     : augmented !== undefined
-      ? `which declares \`${member}\` in an augmentation of \`${path}\` from "${augmented}", a shape the target no longer merges; match the target's declaration there`
-      : `which declares \`${member}\` on \`${path}\`, which the target no longer reads at this site`;
+      ? `${declares} in an augmentation of "${augmented}", a shape the target no longer merges; match the target's declaration there`
+      : `${declares}, which the target no longer reads at this site`;
   return {
     name: path,
     file: relative(repoDir, at.fileName).split('\\').join('/'),
@@ -447,6 +468,25 @@ export function augmentationCause(
     reason,
     anchorOnly: true,
   };
+}
+
+/** Whether a declaration sits inside `declare global` or `declare module "x"`. */
+function isAugmentation(tsc: typeof ts, decl: ts.Node): boolean {
+  for (let n: ts.Node | undefined = decl.parent; n && !tsc.isSourceFile(n); n = n.parent)
+    if (
+      tsc.isModuleDeclaration(n) &&
+      (n.flags & tsc.NodeFlags.GlobalAugmentation || tsc.isStringLiteral(n.name))
+    )
+      return true;
+  return false;
+}
+
+/** The package a file under node_modules (or a fixture directory) belongs to, as a short label. */
+function packageOf(fileName: string): string {
+  const m = /\/node_modules\/((?:@[^/]+\/)?[^/]+)\//.exec(fileName);
+  if (m) return m[1] as string;
+  const dir = fileName.split('/').at(-2) ?? fileName;
+  return dir.replace(/-v\d+$/, '');
 }
 
 /** `jest.Matchers` for a member inside `namespace jest { interface Matchers }`; the holder's name alone otherwise. */
