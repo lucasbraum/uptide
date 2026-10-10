@@ -67,6 +67,12 @@ export function formatFixSummary(report: FixReport, opts: FormatFixOptions = {})
       );
     lines.push('');
   }
+  if (report.lockfile?.peerReresolved?.length) {
+    lines.push(colors.bold('Re-resolved because a peer changed'));
+    for (const p of report.lockfile.peerReresolved)
+      lines.push(`  ${p.name} ${p.from} → ${p.to} · peers ${p.peers.join(', ')}`);
+    lines.push('');
+  }
   const housekeeping = report.lockfile?.housekeeping;
   if (housekeeping)
     lines.push(

@@ -136,8 +136,10 @@ so an uncommitted repair will not change the migration baseline.
 A synchronized baseline can still produce unrelated lockfile churn during an upgrade.
 For example, switching to `legacy-peer-deps` removes packages installed only as peers;
 changing peer constraints can also cause npm to re-resolve or deduplicate other subtrees.
-Uptide does not enable that mode and does not loosen the scope guard: an unrelated lockfile
-change stops the run before an upgrade commit. Reconcile the baseline separately instead of
+Uptide does not enable that mode. npm peer packages may be re-resolved only within their
+previously declared ranges, without a major change or downgrade; the report names them under
+**Re-resolved because a peer changed**. Other unrelated lockfile changes stop the run before
+an upgrade commit. Reconcile the baseline separately instead of
 including unrelated dependency changes in the migration.
 
 

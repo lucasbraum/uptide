@@ -294,3 +294,37 @@ it('accepts hoisting to a new placement when the resolved package graph is uncha
   );
   expect(diff.housekeeping?.deduped).toHaveLength(1);
 });
+
+it.each([2, 3])(
+  'keeps identical copies nested under new dependents after npm v%s rehoists their parent',
+  (v) => {
+    const before = dedupeLock(v),
+      after = structuredClone(before);
+    const shared = after.packages['node_modules/@lib/shared'];
+    after.packages['node_modules/parent/node_modules/helper/node_modules/@lib/shared'] = {
+      ...shared,
+    };
+    const diff = assertLockScope(
+      npmGraph(JSON.stringify(before), 'target'),
+      npmGraph(JSON.stringify(after), 'target'),
+      'target',
+    );
+    expect(diff.housekeeping?.deduped).toContainEqual(
+      expect.objectContaining({
+        to: 'node_modules/parent/node_modules/helper/node_modules/@lib/shared',
+        version: '1.0.0',
+      }),
+    );
+    after.packages['node_modules/parent/node_modules/helper/node_modules/@lib/shared'] = {
+      ...shared,
+      integrity: 'different',
+    };
+    expect(() =>
+      assertLockScope(
+        npmGraph(JSON.stringify(before), 'target'),
+        npmGraph(JSON.stringify(after), 'target'),
+        'target',
+      ),
+    ).toThrow('outside target');
+  },
+);

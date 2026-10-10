@@ -920,3 +920,30 @@ it('keeps accepted lockfile housekeeping collapsed with counts and exact placeme
   expect(visible(body)).not.toContain('node_modules/');
   expect(migrationBody(report)).toContain('Lockfile housekeeping');
 });
+
+it('lists npm peer re-resolutions and their pre-existing ranges in the report and PR', () => {
+  const report = fixture('storefront-zod');
+  report.lockfile = {
+    manager: 'npm',
+    file: 'package-lock.json',
+    added: [],
+    removed: [],
+    changed: [],
+    allowed: [],
+    peerReresolved: [
+      {
+        name: 'plugin',
+        from: '1.1.0',
+        to: '1.2.0',
+        peers: ['zod'],
+        ranges: { '. (dependencies)': '^1' },
+        records: ['node_modules/plugin'],
+      },
+    ],
+  };
+  for (const body of [prBody(report), migrationBody(report)]) {
+    expect(body).toContain('Re-resolved because a peer changed');
+    expect(body).toContain('`plugin` 1.1.0 → 1.2.0; peers on `zod`');
+    expect(body).toContain('. (dependencies): ^1');
+  }
+});

@@ -116,3 +116,28 @@ it('summarizes lockfile housekeeping without expanding placements in the termina
   expect(out).toContain('Lockfile housekeeping · 1 dedupe move · 0 metadata-only changes');
   expect(out).not.toContain('node_modules/');
 });
+
+it('lists packages re-resolved because a peer changed', () => {
+  const report = fixReport(true);
+  report.lockfile = {
+    manager: 'npm',
+    file: 'package-lock.json',
+    added: [],
+    removed: [],
+    changed: [],
+    allowed: [],
+    peerReresolved: [
+      {
+        name: 'plugin',
+        from: '1.1.0',
+        to: '1.2.0',
+        peers: ['react'],
+        ranges: { '. (dependencies)': '^1' },
+        records: ['node_modules/plugin'],
+      },
+    ],
+  };
+  const out = formatFixSummary(report, { color: false });
+  expect(out).toContain('Re-resolved because a peer changed');
+  expect(out).toContain('plugin 1.1.0 → 1.2.0 · peers react');
+});

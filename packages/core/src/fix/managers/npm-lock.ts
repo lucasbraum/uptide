@@ -1,9 +1,13 @@
 import { dirname } from 'node:path';
+import { compareVersions, parseVersion } from '../../check/version.js';
 import { UptideError } from '../../errors.js';
+import { satisfies } from '../../fetch/range.js';
 import {
   type LockGraph,
   type LockRecord,
   lockedIdentity,
+  lockScope,
+  type PeerReresolution,
   type Targets,
   targetNames,
   withoutTarget,
@@ -102,4 +106,74 @@ export function npmGraph(text: string, target: Targets): LockGraph {
     return placed === undefined ? undefined : resolve(placed, name);
   }
   return { records, metadata: { ...meta, importers }, roots, relocate };
+}
+
+/** npm may re-resolve reverse peers; only existing, in-range, same-major upgrades qualify. */
+export function npmPeerReresolutions(
+  before: LockGraph,
+  after: LockGraph,
+  planned: Targets,
+  scope: Targets = planned,
+): PeerReresolution[] {
+  const allowed = lockScope(before, after, scope);
+  const names = targetNames(planned);
+  const results: PeerReresolution[] = [];
+  for (const [key, old] of before.records) {
+    if (allowed.has(key)) continue;
+    const next = after.records.get(key);
+    const from = String(old.identity.version ?? ''),
+      to = String(next?.identity.version ?? '');
+    const parsed = parseVersion(from),
+      target = parseVersion(to);
+    if (
+      !next ||
+      old.name !== next.name ||
+      !parsed ||
+      !target ||
+      parsed.major !== target.major ||
+      compareVersions(to, from) <= 0
+    )
+      continue;
+    const peers = Object.keys(old.data.peerDependencies ?? {}).filter((name) =>
+      names.includes(name),
+    );
+    if (!peers.length) continue;
+    const ranges: Record<string, string> = {};
+    const collect = (
+      dependent: string,
+      data: Record<string, unknown>,
+      edges: Record<string, string | undefined>,
+    ) => {
+      if (edges[old.name] !== key) return;
+      for (const field of [
+        'dependencies',
+        'devDependencies',
+        'optionalDependencies',
+        'peerDependencies',
+        'requires',
+      ]) {
+        const range = (data[field] as Record<string, unknown> | undefined)?.[old.name];
+        if (typeof range === 'string') ranges[`${dependent || '.'} (${field})`] = range;
+      }
+    };
+    for (const [dependent, record] of before.records) collect(dependent, record.data, record.edges);
+    const importers = (before.metadata as { importers: Record<string, Record<string, unknown>> })
+      .importers;
+    for (const [dependent, edges] of Object.entries(before.roots ?? {}))
+      collect(dependent, importers[dependent] ?? {}, edges);
+    if (
+      !Object.keys(ranges).length ||
+      !Object.values(ranges).every((range) => satisfies(from, range) && satisfies(to, range))
+    )
+      continue;
+    const legacy = `legacy/${key}`;
+    const records = [key];
+    if (
+      before.records.get(legacy)?.identity.version === from &&
+      after.records.get(legacy)?.identity.version === to
+    )
+      records.push(legacy);
+    results.push({ name: old.name, from, to, peers, ranges, records });
+  }
+  return results;
 }
