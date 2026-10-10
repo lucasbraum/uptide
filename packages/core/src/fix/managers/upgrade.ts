@@ -6,7 +6,7 @@ import { command } from '../process.js';
 import { assertManagerAvailable } from './availability.js';
 import { assertLockScope, type LockDiff, type LockGraph, type Targets } from './lock-guard.js';
 import { type PackageManager, updateArgs } from './manager.js';
-import { npmGraph } from './npm-lock.js';
+import { npmGraph, npmPeerReresolutions } from './npm-lock.js';
 import { pnpmGraph, yarnGraph } from './text-lock.js';
 export interface Upgrade {
   name: string;
@@ -97,7 +97,15 @@ export async function upgradeInstall(root: string, upgrade: Upgrade): Promise<In
   await run(root, pm, updateArgs(pm, root, upgrade.workspaces));
   const afterText = readFileSync(lockfile, 'utf8');
   const scope = [...new Set([...names, ...(upgrade.allowedPeers ?? [])])];
-  const diff = assertLockScope(before, lockGraph(pm, afterText, names), scope);
+  const after = lockGraph(pm, afterText, names);
+  const peerReresolved = pm.kind === 'npm' ? npmPeerReresolutions(before, after, names, scope) : [];
+  const diff = assertLockScope(
+    before,
+    after,
+    scope,
+    peerReresolved.flatMap((p) => p.records),
+  );
+  if (peerReresolved.length) diff.peerReresolved = peerReresolved;
   // Every package that moved resolved the version asked for, in every workspace declaring it.
   for (const workspace of upgrade.workspaces) {
     const json = JSON.parse(readFileSync(join(root, workspace, 'package.json'), 'utf8'));

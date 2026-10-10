@@ -8,9 +8,30 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { parseDocument } from 'yaml';
 import { workspacePackagesOf } from '../adapters/typescript/repo.js';
+import { compareVersions } from '../check/version.js';
 import { UptideError } from '../errors.js';
 import { installedManifest } from '../list/evidence.js';
 import { command } from './process.js';
+
+/** Check installed copies in every workspace before a plan can write manifests or install. */
+export function assertNoDowngrades(
+  root: string,
+  moves: readonly { name: string; to: string }[],
+): void {
+  const rejected = new Set<string>();
+  for (const workspace of workspacePackagesOf(root)) {
+    for (const move of moves) {
+      const from = installedManifest(root, workspace, move.name)?.version;
+      if (from && compareVersions(move.to, from) < 0)
+        rejected.add(`${move.name} ${from} → ${move.to} (${workspace})`);
+    }
+  }
+  if (rejected.size)
+    throw new UptideError(
+      'INCONSISTENT_UPGRADE',
+      `Refusing planned downgrades before install:\n${[...rejected].join('\n')}\nNothing was changed.`,
+    );
+}
 
 const sections = [
   'dependencies',

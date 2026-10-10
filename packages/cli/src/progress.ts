@@ -1,6 +1,7 @@
 import type { ProgressEvent } from '@uptide/core';
 import pc from 'picocolors';
 import type { Io, Ui } from './io.js';
+import { ellipsis } from './terminal.js';
 
 /** `850ms`, `4.2s`, `48s`, `1m 05s`: short enough to end every phase line. */
 export function elapsed(ms: number): string {
@@ -40,6 +41,7 @@ export function createProgress(io: Io, ui: Ui, options: ProgressOptions = {}): P
   const colors = pc.createColors(ui.color);
   const quiet = options.quiet === true;
   let activity = '';
+  const short = (text: string): string => ellipsis(text, Math.max(1, (io.columns ?? 80) - 1));
   return {
     event(event) {
       // `verify · types (core, ui, worker)`: the phase and what exactly it is doing.
@@ -65,17 +67,17 @@ export function createProgress(io: Io, ui: Ui, options: ProgressOptions = {}): P
         ? setInterval(() => {
             frame = (frame + 1) % FRAMES.length;
             io.err(
-              `\r\x1b[2K${colors.cyan(FRAMES[frame] ?? '')} ${activity || label} ${colors.dim(since())}`,
+              `\r\x1b[2K${colors.cyan(short(`${FRAMES[frame] ?? ''} ${activity || label} ${since()}`))}`,
             );
           }, 80)
         : quiet
           ? undefined
           : setInterval(
-              () => io.err(`… ${activity || label}, still working (${since()})\n`),
+              () => io.err(`${short(`… ${activity || label}, still working (${since()})`)}\n`),
               HEARTBEAT_MS,
             );
       tick?.unref?.();
-      if (ui.interactive) io.err(`${colors.cyan(FRAMES[0] ?? '')} ${label}`);
+      if (ui.interactive) io.err(colors.cyan(short(`${FRAMES[0] ?? ''} ${label}`)));
       const clear = (): void => {
         clearInterval(tick);
         if (ui.interactive) io.err('\r\x1b[2K');

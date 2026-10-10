@@ -45,7 +45,13 @@ import {
   testWorkspaces,
   typeResolutionFailure,
 } from './verify.js';
-import { bumpVersions, install, packageManager, validateVersionRanges } from './versions.js';
+import {
+  assertNoDowngrades,
+  bumpVersions,
+  install,
+  packageManager,
+  validateVersionRanges,
+} from './versions.js';
 
 export interface FixOptions {
   onProgress?: ProgressListener;
@@ -206,6 +212,7 @@ async function fixPackage(options: FixOptions, services: FixServices): Promise<F
   const target = resolved.version;
   if (!/^\d+\.\d+\.\d+(?:-[\w.-]+)?$/.test(target))
     throw new Error('target must be an exact version');
+  assertNoDowngrades(root, [{ name: pack.name, to: target }, ...(peerPlan?.companions ?? [])]);
   const branch = `uptide/${pack.name}-${target}`;
   packageManager(root);
   if (services.install === install) await assertManagerAvailable(root);
@@ -250,12 +257,10 @@ async function fixPackage(options: FixOptions, services: FixServices): Promise<F
     );
   const companions = [
     ...new Map(
-      [...packages.flatMap((p) => p.companions ?? []), ...(peerPlan?.companions ?? [])].map((c) => [
-        c.name,
-        c,
-      ]),
+      (peerPlan?.companions ?? packages.flatMap((p) => p.companions ?? [])).map((c) => [c.name, c]),
     ).values(),
   ].sort((a, b) => a.name.localeCompare(b.name));
+  assertNoDowngrades(root, [{ name: pack.name, to: target }, ...companions]);
   validateVersionRanges(root, [pack.name, ...companions.map((c) => c.name)]);
   const initialContext = {
     from:
@@ -333,13 +338,12 @@ async function fixPackage(options: FixOptions, services: FixServices): Promise<F
     ],
     workspaces: [...new Set(bumps.flatMap((b) => b.workspaces))],
   };
-  const moved = companions.map((c) => `${c.name} ${c.to}`).join(', ');
   const lockfile = await progress(
     options.onProgress,
     {
       phase: 'install',
       package: pack.name,
-      detail: `${pack.name} ${target}${moved ? ` with ${moved}` : ''}`,
+      detail: `${pack.name} ${target}${companions.length ? ` with ${companions.length} package${companions.length === 1 ? '' : 's'}` : ''}`,
     },
     () =>
       services.install(root, {
@@ -359,6 +363,7 @@ async function fixPackage(options: FixOptions, services: FixServices): Promise<F
           : {}),
       }),
   );
+  const moved = companions.map((c) => `${c.name} ${c.to}`).join(', ');
   commit(root, `chore: upgrade ${pack.name} to ${target}${moved ? ` with ${moved}` : ''}`, [
     ...bump.files,
     join(root, packageManager(root).lockfile),

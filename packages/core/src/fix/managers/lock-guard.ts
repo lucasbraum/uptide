@@ -75,19 +75,35 @@ export interface LockHousekeeping {
   deduped: { from: string; to: string; name: string; version: string }[];
   metadata: string[];
 }
+export interface PeerReresolution {
+  name: string;
+  from: string;
+  to: string;
+  peers: string[];
+  ranges: Record<string, string>;
+  records: string[];
+}
 export interface LockDiff {
   added: string[];
   removed: string[];
   changed: string[];
   allowed: string[];
   housekeeping?: LockHousekeeping;
+  peerReresolved?: PeerReresolution[];
 }
-/** Union authorized subtrees, then protect every outside dependent's actual resolution. */
-export function assertLockScope(before: LockGraph, after: LockGraph, target: Targets): LockDiff {
+/** Placements reachable from the authorized roots in either lockfile. */
+export function lockScope(
+  before: LockGraph,
+  after: LockGraph,
+  target: Targets,
+  extraRoots: readonly string[] = [],
+): Set<string> {
   const names = targetNames(target);
   const allowed = new Set<string>();
   for (const graph of [before, after]) {
-    const queue = [...graph.records].filter(([, r]) => names.includes(r.name)).map(([k]) => k);
+    const queue = [...graph.records]
+      .filter(([key, r]) => names.includes(r.name) || extraRoots.includes(key))
+      .map(([k]) => k);
     const visited = new Set<string>();
     for (const key of queue) {
       if (visited.has(key)) continue;
@@ -96,6 +112,18 @@ export function assertLockScope(before: LockGraph, after: LockGraph, target: Tar
       queue.push(...(graph.records.get(key)?.dependencies ?? []));
     }
   }
+  return allowed;
+}
+/** Union authorized subtrees, then protect every outside dependent's actual resolution. */
+export function assertLockScope(
+  before: LockGraph,
+  after: LockGraph,
+  target: Targets,
+  extraRoots: readonly string[] = [],
+): LockDiff {
+  const names = targetNames(target);
+  const originalScope = lockScope(before, after, target);
+  const allowed = lockScope(before, after, target, extraRoots);
   const diff: LockDiff = { added: [], removed: [], changed: [], allowed: [...allowed].sort() };
   const housekeeping: LockHousekeeping = { deduped: [], metadata: [] };
   const unexpected = new Set<string>();
@@ -122,7 +150,9 @@ export function assertLockScope(before: LockGraph, after: LockGraph, target: Tar
         b = right[name];
       if (a === undefined || b === undefined) return a === b;
       // Intended upgrades stay authorized; dedupe from an outside copy must still compare.
-      if (allowed.has(a) && allowed.has(b)) return true;
+      if (originalScope.has(a) && originalScope.has(b)) return true;
+      // Admitted peers may move; their transitive upgrades cannot change an outside consumer.
+      if (extraRoots.includes(a) && extraRoots.includes(b)) return true;
       return equivalent(a, b, seen);
     });
   for (const key of new Set([
@@ -139,7 +169,13 @@ export function assertLockScope(before: LockGraph, after: LockGraph, target: Tar
     reverse = false,
   ): string | undefined => {
     if (to.records.has(key)) return key;
-    if (to.relocate) return to.relocate(key, from);
+    if (to.relocate) {
+      const placed = to.relocate(key, from);
+      if (placed !== undefined && (reverse ? equivalent(placed, key) : equivalent(key, placed)))
+        return placed;
+      // npm can move an identical copy down into several dependents as well as hoist it.
+      // Root/edge checks above still require every outside dependent to resolve identically.
+    }
     // Logical lockfiles address descriptors/snapshots rather than physical placements.
     return [...to.records.keys()].find((other) =>
       reverse ? equivalent(other, key) : equivalent(key, other),

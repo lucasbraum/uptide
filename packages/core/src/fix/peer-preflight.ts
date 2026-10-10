@@ -1,12 +1,16 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { type Companion, companionsOf, peerConflictOf } from '../check/companions.js';
-import { compareVersions, parseVersion } from '../check/version.js';
+import {
+  type Companion,
+  companionsOf,
+  compatiblePeerVersion,
+  peerConflictOf,
+} from '../check/companions.js';
+import { parseVersion } from '../check/version.js';
 import type { PackageFetcher } from '../domain/io.js';
 import { UptideError } from '../errors.js';
 import { createNpmFetcher } from '../fetch/npm-fetcher.js';
 import { loadRegistryConfig } from '../fetch/npmrc.js';
-import { satisfies } from '../fetch/range.js';
 import type { Manifest } from '../list/evidence.js';
 import { activePack } from '../packs/index.js';
 import { UPTIDE_COMMAND } from '../version.js';
@@ -14,7 +18,7 @@ import { type ManagerKind, packageManager } from './managers/manager.js';
 import { fixDependencies } from './range-preflight.js';
 import type { FixOptions, FixServices } from './run.js';
 import { type ResolvedTarget, resolveTarget } from './target.js';
-import { validateVersionRanges } from './versions.js';
+import { assertNoDowngrades, validateVersionRanges } from './versions.js';
 
 export interface PeerBlocker {
   name: string;
@@ -83,27 +87,6 @@ export interface PeerPlan {
   conflicts: PeerBlocker[];
 }
 type Manifests = NonNullable<PackageFetcher['manifests']>;
-
-/** The lowest stable upgrade that explicitly declares support for this peer target. */
-export function compatiblePeerVersion(
-  versions: Awaited<ReturnType<Manifests>>,
-  installed: string,
-  peer: string,
-  target: string,
-): string | undefined {
-  return Object.keys(versions)
-    .filter(
-      (v) =>
-        parseVersion(v) !== undefined &&
-        parseVersion(v)?.pre === undefined &&
-        compareVersions(v, installed) > 0,
-    )
-    .sort(compareVersions)
-    .find((v) => {
-      const range = versions[v]?.peerDependencies?.[peer];
-      return range !== undefined && satisfies(target, range);
-    });
-}
 
 export const peerDescription = (p: PeerBlocker | PeerBlockerGroup): string =>
   `${p.name} ${p.version} declares ${('peers' in p ? p.peers : [p]).map((r) => `${r.peer} ${r.range}, which rejects ${r.target}`).join('; ')}`;
@@ -220,23 +203,12 @@ export async function peerPreflight(
       if (base.has(peer.name)) continue;
       const versions = await manifests(peer.name);
       const rejected = [...found.values()].filter((p) => p.name === peer.name);
-      peer.newer = Object.keys(versions)
-        .filter((v) => {
-          if (
-            !parseVersion(v) ||
-            parseVersion(v)?.pre !== undefined ||
-            compareVersions(v, peer.version) <= 0
-          )
-            return false;
-          const ranges = versions[v]?.peerDependencies ?? {};
-          return (
-            rejected.every((p) => ranges[p.peer] !== undefined) &&
-            [...moves.values()].every(
-              (m) => ranges[m.name] === undefined || satisfies(m.to, ranges[m.name] as string),
-            )
-          );
-        })
-        .sort(compareVersions)[0];
+      peer.newer = compatiblePeerVersion(
+        versions,
+        peer.version,
+        Object.fromEntries([...moves.values()].map((m) => [m.name, m.to])),
+        rejected.map((p) => p.peer),
+      );
     }
     return [...found.values()];
   };
@@ -254,6 +226,7 @@ export async function peerPreflight(
     const linked = await companionsOf({
       name: peer.name,
       target: to,
+      peerTargets: Object.fromEntries([...moves.values()].map((m) => [m.name, m.to])),
       installed: deps,
       manifests,
       lockstep: activePack(peer.name)?.companions?.map((c) => c.name) ?? [],
@@ -271,6 +244,7 @@ export async function peerPreflight(
     }
   };
   const actual = await resolveExtras(requested);
+  assertNoDowngrades(options.cwd, [...actual.moves.values()]);
   const invalid = [...requested].filter(
     (name) => !actual.moves.has(name) && !actual.peers.some((p) => p.name === name),
   );

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { companionsOf, type InstalledDependency } from './companions.js';
+import radix from './__fixtures__/radix-companions.json' with { type: 'json' };
+import { companionsOf, compatiblePeerVersion, type InstalledDependency } from './companions.js';
+import { compareVersions } from './version.js';
 
 type Versions = Record<
   string,
@@ -222,7 +224,7 @@ describe('companionsOf, react 18 → 19', () => {
     expect(plan.reason).toBe('peer link, types for react, react-dom');
   });
 
-  it('moves a lockstep companion even when its installed copy accepts the target', async () => {
+  it('leaves a release-pair companion whose installed peers already accept the target', async () => {
     const plan = await companionsOf({
       name: 'react',
       target: '19.2.1',
@@ -242,10 +244,7 @@ describe('companionsOf, react 18 → 19', () => {
             }
           : manifests(name),
     });
-    expect(plan.companions.map((c) => `${c.name} ${c.to}`)).toEqual([
-      '@types/react 19.2.7',
-      'react-dom 19.2.1',
-    ]);
+    expect(plan.companions.map((c) => `${c.name} ${c.to}`)).toEqual(['@types/react 19.2.7']);
   });
 
   it('leaves a package whose peer range rejects the target in place and reports it as a peer conflict', async () => {
@@ -286,7 +285,7 @@ describe('companionsOf, react 18 → 19', () => {
     expect(plan.companions.map((c) => `${c.name} ${c.to}`)).toEqual(['react-dom 19.2.1']);
   });
 
-  it('moves a package the pack names even when its installed peer range accepts the target', async () => {
+  it('leaves a named companion whose installed peer range already accepts the target', async () => {
     // No release of it at the target's version, so only the pack's list moves it.
     const wrapper = {
       '2.0.0': { peerDependencies: { react: '^18 || ^19' } },
@@ -305,9 +304,7 @@ describe('companionsOf, react 18 → 19', () => {
     expect(alone.companions).toEqual([]);
     expect(alone.peerConflicts).toEqual([]);
     const named = await companionsOf({ ...input, lockstep: ['react-wrapper'] });
-    expect(named.companions.map((c) => `${c.name} ${c.from} → ${c.to}`)).toEqual([
-      'react-wrapper 2.0.0 → 2.1.0',
-    ]);
+    expect(named.companions).toEqual([]);
   });
 
   it('leaves a types package declared in an unrelated workspace alone', async () => {
@@ -322,4 +319,59 @@ describe('companionsOf, react 18 → 19', () => {
     });
     expect(plan).toEqual({ companions: [], conflicts: [], peerConflicts: [] });
   });
+});
+
+const radixRegistry: Record<string, Versions> = radix.registry;
+const radixInstalled = Object.entries(radix.installed).map(([name, version]) => ({
+  name,
+  version,
+  manifest: radixRegistry[name]?.[version] ?? {},
+  workspaces: ['.'],
+}));
+it.each(['react', '@radix-ui/react-tabs', '@radix-ui/react-tooltip'])(
+  '%s keeps all five already-compatible Radix companions at their installed versions',
+  async (name) => {
+    const plan = await companionsOf({
+      name,
+      target: name === 'react' ? '19.3.0' : '1.1.0',
+      peerTargets: { react: '19.3.0', 'react-dom': '19.3.0' },
+      installed: radixInstalled,
+      manifests: async (pkg) => radixRegistry[pkg] ?? {},
+    });
+    expect(plan.conflicts).toEqual([]);
+    expect(plan.companions.filter((c) => c.name.startsWith('@radix-ui/'))).toEqual([]);
+  },
+);
+
+it('never lowers a planned companion across installed versions, registry order, pins and peer ranges', async () => {
+  for (const from of ['1.0.0', '1.1.0', '1.2.0', '2.0.0', '3.0.0']) {
+    for (const target of ['1.0.0', '1.1.0', '1.2.0', '2.0.0']) {
+      for (const pin of [false, true]) {
+        for (const reverse of [false, true]) {
+          const published = ['1.0.0', '1.1.0', '1.2.0', '2.0.0', '3.0.0'];
+          if (reverse) published.reverse();
+          const versions = Object.fromEntries(
+            published.map((v) => [v, { peerDependencies: { host: `^${v}` } }]),
+          );
+          const plan = await companionsOf({
+            name: 'host',
+            target,
+            installed: [
+              { name: 'host', version: '1.0.0', manifest: {}, workspaces: ['.'] },
+              { name: 'plugin', version: from, manifest: versions[from] ?? {}, workspaces: ['.'] },
+            ],
+            lockstep: ['plugin'],
+            manifests: async (name) =>
+              name === 'host'
+                ? { [target]: pin ? { dependencies: { plugin: target } } : {} }
+                : versions,
+          });
+          for (const c of plan.companions)
+            expect(compareVersions(c.to, c.from)).toBeGreaterThanOrEqual(0);
+          const peer = compatiblePeerVersion(versions, from, { host: target });
+          if (peer) expect(compareVersions(peer, from)).toBeGreaterThanOrEqual(0);
+        }
+      }
+    }
+  }
 });

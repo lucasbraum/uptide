@@ -110,6 +110,13 @@ that union, package names, versions and integrity must resolve identically for e
 For npm this follows Node's lookup from each placement up through `node_modules`; pnpm and
 Yarn use their locked dependency references. Unchanged dependent records are checked too.
 
+npm may also re-resolve an existing package that peers on a planned package. Uptide admits
+that package only when its new version stays in the same major, is newer, and satisfies every
+previously declared consumer range. Its subtree may change, but unchanged outside consumers
+must retain their transitive resolutions. The report and PR list these packages and ranges
+under **Re-resolved because a peer changed**. This exception is npm-only; it does not rewrite
+their manifest ranges or silently add them to the explicit upgrade plan.
+
 Same-content deduplication and descriptive metadata changes (such as `license`) are accepted.
 An outside package disappearing from the resolved graph, a changed resolution, or changes to
 execution/platform fields (`scripts`, `bin`, `os`, `cpu`) still stop the install. Importer

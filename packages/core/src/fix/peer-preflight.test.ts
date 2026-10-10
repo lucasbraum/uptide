@@ -10,12 +10,13 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, expect, it, vi } from 'vitest';
+import radix from '../check/__fixtures__/radix-companions.json' with { type: 'json' };
+import { compatiblePeerVersion } from '../check/companions.js';
 import type { PackageFetcher } from '../domain/io.js';
 import { isolatedFix } from './isolate.js';
 import type { ManagerKind } from './managers/manager.js';
 import {
   allowPeerOverrides,
-  compatiblePeerVersion,
   groupPeerBlockers,
   type PeerBlocker,
   PeerPreflightError,
@@ -77,8 +78,8 @@ function fixture(manager: 'npm' | 'pnpm' | 'yarn' = 'npm', newer = false) {
 }
 
 it('selects the lowest newer stable release with an accepting peer, not latest or a missing peer declaration', () => {
-  expect(compatiblePeerVersion(versions, '1.0.0', 'zod', '4.6.5')).toBe('1.2.0');
-  expect(compatiblePeerVersion(versions, '3.0.0', 'zod', '4.6.5')).toBeUndefined();
+  expect(compatiblePeerVersion(versions, '1.0.0', { zod: '4.6.5' })).toBe('1.2.0');
+  expect(compatiblePeerVersion(versions, '3.0.0', { zod: '4.6.5' })).toBe('3.0.0');
 });
 
 it.each([false, true])(
@@ -206,13 +207,17 @@ it('bumps an explicitly selected peer in the same upgrade and report', async () 
     );
     return services.install(dir, upgrade);
   });
+  const onProgress = vi.fn();
   const report = await fix(
-    { cwd: root, only: 'zod', target: '4.6.5', fixer: null, also: ['plugin'] },
+    { cwd: root, only: 'zod', target: '4.6.5', fixer: null, also: ['plugin'], onProgress },
     { ...services, install },
   );
   expect(install).toHaveBeenCalledOnce();
   expect(report.companions).toMatchObject([{ name: 'plugin', from: '1.0.0', to: '1.2.0' }]);
   expect(report.peerConflicts).toBeUndefined();
+  expect(onProgress.mock.calls.find(([e]) => e.phase === 'install')?.[0].detail).toBe(
+    'zod 4.6.5 with 1 package',
+  );
 });
 
 it('collects allowed, leader, companion and proposed-extra blockers, then prints one command that passes', async () => {
@@ -453,4 +458,99 @@ it('grouped JSON retains distinct ranges, targets and inspected versions without
     },
   ]);
   expect(groupPeerBlockers(grouped)).toEqual(grouped);
+});
+
+it('preflight and installation retain the same explicitly selected version, ignoring a second check resolution', async () => {
+  const { root, services } = fixture('pnpm', true);
+  const check = services.check;
+  services.check = async (options) => {
+    const report = await check(options);
+    (report.packages[0] as NonNullable<(typeof report.packages)[0]>).companions = [
+      { name: 'plugin', from: '1.0.0', to: '3.0.0', reason: 'later registry view' },
+    ];
+    return report;
+  };
+  const plan = await peerPreflight(
+    { cwd: root, only: 'zod', target: '4.6.5', also: ['plugin'] },
+    services,
+  );
+  const report = await fix(
+    { cwd: root, only: 'zod', target: '4.6.5', fixer: null, peerPlan: plan },
+    services,
+  );
+  expect(report.companions).toEqual(plan?.companions);
+  expect(report.companions?.[0]?.to).toBe('1.2.0');
+});
+
+it('uses the same lowest tooltip release in the suggested command and the complete Radix plan', async () => {
+  const { root, services } = fixture('npm');
+  const dependencies: Record<string, string> = {};
+  for (const [name, version] of Object.entries(radix.installed)) {
+    dependencies[name] = version;
+    mkdirSync(join(root, 'node_modules', name), { recursive: true });
+    writeFileSync(
+      join(root, 'node_modules', name, 'package.json'),
+      JSON.stringify({
+        name,
+        version,
+        ...(radix.registry as Record<string, Record<string, object>>)[name]?.[version],
+      }),
+    );
+  }
+  writeFileSync(join(root, 'package.json'), JSON.stringify({ dependencies }));
+  services.manifests = vi.fn(
+    async (name) => (radix.registry as Record<string, Record<string, object>>)[name] ?? {},
+  );
+  const options = { cwd: root, only: 'react', target: '19.3.0', fixer: null };
+  await expect(peerPreflight(options, services)).rejects.toThrow(
+    'upgrade to 1.1.0 (accepts react 19, react-dom 19): add @radix-ui/react-tooltip',
+  );
+  const plan = await peerPreflight(
+    { ...options, also: ['@radix-ui/react-tabs', '@radix-ui/react-tooltip'] },
+    services,
+  );
+  expect(plan?.companions.map((c) => [c.name, c.to])).toEqual([
+    ['react-dom', '19.3.0'],
+    ['@radix-ui/react-tabs', '1.1.0'],
+    ['@radix-ui/react-tooltip', '1.1.0'],
+  ]);
+  expect(plan?.conflicts).toEqual([]);
+});
+
+it('rejects every planned downgrade before branch creation, manifest writes or installation', async () => {
+  const { root, services } = fixture('pnpm');
+  const before = git(root, 'branch');
+  const install = vi.fn(services.install);
+  await expect(
+    fix(
+      {
+        cwd: root,
+        only: 'zod',
+        target: '4.6.5',
+        fixer: null,
+        peerPlan: {
+          target: '4.6.5',
+          targetSource: 'requested',
+          conflicts: [],
+          companions: [{ name: 'plugin', from: '0.0.1', to: '0.5.0', reason: 'invalid plan' }],
+        },
+      },
+      { ...services, install },
+    ),
+  ).rejects.toThrow('plugin 1.0.0 → 0.5.0');
+  expect(install).not.toHaveBeenCalled();
+  expect(git(root, 'branch')).toBe(before);
+  expect(git(root, 'status', '--porcelain')).toBe('');
+});
+
+it('rejects a leader downgrade before check or install even without peer dependencies', async () => {
+  const { root, services } = zodFixture(scratch);
+  const check = vi.fn(services.check),
+    install = vi.fn(services.install);
+  await expect(
+    fix({ cwd: root, only: 'zod', target: '3.0.0', fixer: null }, { ...services, check, install }),
+  ).rejects.toThrow('zod 3.25.76 → 3.0.0');
+  expect(check).not.toHaveBeenCalled();
+  expect(install).not.toHaveBeenCalled();
+  expect(git(root, 'status', '--porcelain')).toBe('');
 });

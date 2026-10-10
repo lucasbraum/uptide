@@ -655,6 +655,21 @@ export function renderMigration(
     lines.push(`> ${GENERIC_NOTE(report.package)}`, '');
   if (report.llm.disabled) lines.push('Assisted fixes disabled (--no-llm).', '');
   lines.push(...summaryRows(report), '');
+  if (report.lockfile?.peerReresolved?.length) {
+    lines.push(
+      '',
+      '### Re-resolved because a peer changed',
+      '',
+      ...report.lockfile.peerReresolved.map(
+        (p) =>
+          `- \`${cell(p.name)}\` ${cell(p.from)} → ${cell(p.to)}; peers on ${p.peers.map((name) => `\`${cell(name)}\``).join(', ')}. Existing ranges: ${Object.entries(
+            p.ranges,
+          )
+            .map(([source, range]) => `\`${cell(source)}: ${cell(range)}\``)
+            .join(', ')}.`,
+      ),
+    );
+  }
   const housekeeping = report.lockfile?.housekeeping;
   if (mode === 'full' && housekeeping) {
     const label = `Lockfile housekeeping · ${count(housekeeping.deduped.length, 'dedupe move')} · ${count(housekeeping.metadata.length, 'metadata-only change')}`;
