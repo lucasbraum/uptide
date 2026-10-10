@@ -5,6 +5,7 @@ import { GENERIC_NOTE } from '../packs/generic.js';
 import { UPTIDE_COMMAND } from '../version.js';
 import type { BehaviorResult } from './behavior.js';
 import { fitPieces, must, type Piece } from './budget.js';
+import { peerDescription } from './peer-preflight.js';
 import type { FixDiagnostic, FixReport, FixSite, ReviewSection } from './types.js';
 import { missingPackages } from './verify.js';
 
@@ -304,6 +305,7 @@ export function migrationRisk(report: FixReport): {
     return { level: 'Low', reason: 'no behaviour change: the explicit pin equals the SDK default' };
   const g = groups(report);
   const high = [
+    ...(report.peerConflicts?.length ? ['peer compatibility is not verified'] : []),
     ...(report.sites.some((s) => s.outcome === 'manual') ? ['manual sites left'] : []),
     ...(!report.verification.passed ||
     report.verification.newErrors.length ||
@@ -697,6 +699,20 @@ export function renderMigration(
     const label = g.outcome === 'mechanical' ? 'Example and files' : 'Diff and reasoning';
     lines.push(droppable(1, collapse(label, detail), label), '');
   });
+  if (report.peerConflicts?.length)
+    lines.push(
+      must(
+        [
+          '### Peer risks',
+          '',
+          ...report.peerConflicts.map(
+            (p) =>
+              `- ${peerDescription(p)}. ${p.allowed ? 'Explicitly allowed with `--allow-peer`; the manager override is in package.json.' : 'Not overridden; the package manager may warn.'} Runtime compatibility needs review.`,
+          ),
+        ].join('\n'),
+      ),
+      '',
+    );
   if (mode === 'compact')
     return `${lines
       .filter((l): l is string => typeof l === 'string')

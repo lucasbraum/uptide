@@ -111,3 +111,29 @@ fully answered ([concepts](concepts.md#exit-codes)).
 `fix` and `verify` keep their clone when the run failed, when `--keep` was passed, or when it
 holds commits that are nowhere else; its path is printed. `uptide clean` removes kept clones
 older than 7 days ([`uptide clean`](commands/fix.md#uptide-clean)).
+
+## Fix stops at peer planning
+
+`Peer blockers (before cloning)` names each package, its declared peer range and the target
+that range rejects. With npm, exit 2 means no clone, branch or install was started. If the
+message names a newer compatible release, include the package explicitly:
+`npx uptide fix react <peer-package>`. The planner selects the lowest compatible newer release.
+
+If none exists, `--allow-peer <package>` is an explicit compatibility exception. Repeat the
+flag for each package you intend to allow. It writes the package manager's scoped override to
+`package.json` and records the original range under PR risks. It cannot prove that the peer
+works at runtime. pnpm and Yarn keep going with a warning unless their own configuration
+rejects the install. See [fix](commands/fix.md#peer-planning-and-the-baseline-lockfile).
+
+## The lockfile does not match package.json
+
+Run `npm install` with the repository's intended Node/npm versions, review and commit the
+resulting manifest and lockfile, then rerun Uptide. Planning checks the committed files,
+so an uncommitted repair will not change the migration baseline.
+
+A synchronized baseline can still produce unrelated lockfile churn during an upgrade.
+For example, switching to `legacy-peer-deps` removes packages installed only as peers;
+changing peer constraints can also cause npm to re-resolve or deduplicate other subtrees.
+Uptide does not enable that mode and does not loosen the scope guard: an unrelated lockfile
+change stops the run before an upgrade commit. Reconcile the baseline separately instead of
+including unrelated dependency changes in the migration.

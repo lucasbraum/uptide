@@ -46,7 +46,10 @@ export function createProgress(io: Io, ui: Ui, options: ProgressOptions = {}): P
       const label = [event.phase, event.detail ?? event.package, event.workspace]
         .filter(Boolean)
         .join(' · ');
-      if (event.state === 'start') activity = label;
+      if (event.warning) {
+        if (ui.interactive) io.err('\r\x1b[2K');
+        io.err(`  ${event.detail ?? label}\n`);
+      } else if (event.state === 'start') activity = label;
       else if (quiet) activity = '';
       else {
         if (ui.interactive) io.err('\r\x1b[2K');

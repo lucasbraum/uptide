@@ -16,6 +16,8 @@ export interface ProgressEvent {
   detail?: string;
   state: 'start' | 'done';
   ms?: number;
+  /** Planning warnings remain visible even without verbose progress. */
+  warning?: boolean;
 }
 export type ProgressListener = (event: ProgressEvent) => void;
 /** End events are paired even on failure; they describe elapsed work, not success. */

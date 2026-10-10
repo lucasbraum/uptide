@@ -30,36 +30,7 @@ export async function rangePreflight(
     return text;
   };
   validateVersionRanges(root, [options.only], read);
-  const installed = new Map<string, InstalledDependency>();
-  const names = new Set<string>();
-  const workspaces = workspacePackagesOf(root);
-  const workspaceDirs = new Set(workspaces.map((w) => realpathSync(join(root, w))));
-  for (const workspace of workspaces) {
-    const manifest = JSON.parse(read(join(workspace, 'package.json'))) as Manifest;
-    for (const [name, spec] of Object.entries({
-      ...manifest.dependencies,
-      ...manifest.devDependencies,
-      ...manifest.optionalDependencies,
-      ...manifest.peerDependencies,
-    })) {
-      if (/^(workspace|link|file):/.test(spec)) continue;
-      const dir = hoistedPackageDir(join(root, workspace), name);
-      if (dir && workspaceDirs.has(realpathSync(dir))) continue;
-      names.add(name);
-      const local = installedManifest(root, workspace, name);
-      if (!local?.version) continue;
-      const key = `${name}@${local.version}`;
-      const known = installed.get(key);
-      if (known) known.workspaces.push(workspace);
-      else
-        installed.set(key, {
-          name,
-          version: local.version,
-          manifest: local,
-          workspaces: [workspace],
-        });
-    }
-  }
+  const { installed, names } = fixDependencies(root, read);
   const unsupported = new Map<string, UptideError>();
   for (const name of names) {
     try {
@@ -92,4 +63,39 @@ export async function rangePreflight(
     if (error) throw error;
   }
   return target;
+}
+
+/** Direct installed dependencies, excluding local workspace links. */
+export function fixDependencies(root: string, read: (file: string) => string) {
+  const installed = new Map<string, InstalledDependency>();
+  const names = new Set<string>();
+  const workspaces = workspacePackagesOf(root);
+  const workspaceDirs = new Set(workspaces.map((w) => realpathSync(join(root, w))));
+  for (const workspace of workspaces) {
+    const manifest = JSON.parse(read(join(workspace, 'package.json'))) as Manifest;
+    for (const [name, spec] of Object.entries({
+      ...manifest.dependencies,
+      ...manifest.devDependencies,
+      ...manifest.optionalDependencies,
+      ...manifest.peerDependencies,
+    })) {
+      if (/^(workspace|link|file):/.test(spec)) continue;
+      const dir = hoistedPackageDir(join(root, workspace), name);
+      if (dir && workspaceDirs.has(realpathSync(dir))) continue;
+      names.add(name);
+      const local = installedManifest(root, workspace, name);
+      if (!local?.version) continue;
+      const key = `${name}@${local.version}`;
+      const known = installed.get(key);
+      if (known) known.workspaces.push(workspace);
+      else
+        installed.set(key, {
+          name,
+          version: local.version,
+          manifest: local,
+          workspaces: [workspace],
+        });
+    }
+  }
+  return { installed, names };
 }

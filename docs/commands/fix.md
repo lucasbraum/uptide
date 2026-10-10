@@ -59,6 +59,46 @@ subscription has several).
 The one type error left in both runs is the fixture's own, there on purpose: errors a
 repository already had are subtracted, never blamed on the upgrade.
 
+## Peer planning and the baseline lockfile
+
+Before cloning, `fix` checks the installed direct dependencies' peer ranges against the
+upgrade and its lockstep companions, using the same conflict rule as `check`. For each
+conflict it looks for the **lowest newer stable release** declaring a compatible peer range.
+It suggests an explicit group upgrade; it never adds that package silently:
+
+```sh
+npx uptide fix react some-react-plugin --no-llm
+```
+
+The extra names must be peer upgrades suggested by the plan. They move in the same install
+and commit, and appear under companions in the report. Review their own API changes too.
+
+With npm, an unresolved peer conflict stops with exit **2**, before cloning, installing,
+creating a branch or calling the LLM. If there is no compatible release, explicitly accept
+that package's compatibility risk with repeatable `--allow-peer`:
+
+```sh
+npx uptide fix react --no-llm --allow-peer @emoji-mart/react
+npx uptide fix react --allow-peer plugin-a --allow-peer plugin-b
+```
+
+The override is committed in the root `package.json`: npm `overrides` scoped to that package,
+pnpm `pnpm.peerDependencyRules.allowedVersions` with a `package>peer` selector, or Yarn
+`resolutions` with a `package/peer` selector. Existing unrelated configuration is preserved.
+The PR's **Peer risks** lists every conflict, the original peer range and whether you allowed
+it. An override permits dependency resolution; it does not establish runtime compatibility.
+Uptide never adds `--legacy-peer-deps` or `--force`.
+
+For pnpm and Yarn, conflicts are reported but do not stop planning. Their own settings may
+still reject the install (for example strict peer checking). `--allow-peer` writes the native
+setting when requested; Yarn resolutions select a version but may still leave peer warnings.
+
+For npm, Uptide also compares the committed root and workspace declarations with their
+lockfile importers and locked direct versions. If they disagree it exits **2** before cloning:
+`the lockfile does not match package.json; run npm install first`. This is a read-only check;
+it does not normalize the lockfile. The existing scope guard still rejects unrelated lockfile
+changes during the upgrade.
+
 ## Step by step
 
 `fix` never works in your checkout. Everything happens in a temporary clone of your

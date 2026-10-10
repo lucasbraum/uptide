@@ -3,6 +3,35 @@ import { formatFixSummary } from './format-fix.js';
 import { fixReport } from './test-utils.js';
 
 describe('formatFixSummary', () => {
+  it('shows allowed and unallowed peer risks with their declared ranges', () => {
+    const out = formatFixSummary({
+      ...fixReport(true),
+      peerConflicts: [
+        {
+          name: 'plugin',
+          version: '1.0.0',
+          peer: 'react',
+          range: '^18',
+          target: '19.0.0',
+          allowed: true,
+        },
+        {
+          name: 'other',
+          version: '1.0.0',
+          peer: 'react',
+          range: '^18',
+          target: '19.0.0',
+          allowed: false,
+        },
+      ],
+    });
+    expect(out).toContain('Peer risks');
+    expect(out).toContain(
+      'plugin 1.0.0: react ^18 rejects 19.0.0 · explicitly allowed in package.json',
+    );
+    expect(out).toContain('other 1.0.0: react ^18 rejects 19.0.0');
+  });
+
   it('says the five facts, where the branch is, and the exact next commands', () => {
     const report = {
       ...fixReport(true),

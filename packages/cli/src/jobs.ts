@@ -29,6 +29,8 @@ export interface FixRequest {
   model?: string;
   cwd: string;
   only: string;
+  also?: string[];
+  allowPeer?: string[];
   /** `--max-cost`: where the agent stops, in USD. */
   maxCostUsd?: number;
   target?: string;

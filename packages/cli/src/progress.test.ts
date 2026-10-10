@@ -15,6 +15,18 @@ describe('elapsed', () => {
 });
 
 describe('progress', () => {
+  it('keeps planning warnings visible in quiet mode', () => {
+    const io = memoryIo();
+    const progress = createProgress(io, uiOf(io, {}), { quiet: true });
+    progress.event({
+      phase: 'resolve',
+      state: 'done',
+      warning: true,
+      detail: 'plugin rejects react 19',
+    });
+    expect(io.stderr()).toBe('  plugin rejects react 19\n');
+  });
+
   it('ends a phase with one line carrying its detail and elapsed time', async () => {
     let clock = 0;
     const io = memoryIo({ now: () => clock });

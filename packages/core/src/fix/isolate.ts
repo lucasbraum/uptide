@@ -19,6 +19,8 @@ import { UptideError } from '../errors.js';
 import { ACCEPTED_KEYS, selectLlm } from '../llm/config.js';
 import { activePack } from '../packs/index.js';
 import { uptideVersionInfo } from '../version.js';
+import { assertNpmLockSync } from './managers/npm-sync.js';
+import { peerPreflight } from './peer-preflight.js';
 import { git, projectRoot } from './process.js';
 import { rangePreflight } from './range-preflight.js';
 import { prBody } from './report.js';
@@ -483,6 +485,14 @@ export async function isolatedFix(
     git(source, 'show', `${preflight.head}:${join(project, file)}`),
   );
   if (target) options = { ...options, target };
+  if (!options.pinCurrentApi)
+    assertNpmLockSync(options.cwd, (file) =>
+      git(source, 'show', `${preflight.head}:${join(project, file)}`),
+    );
+  const peerPlan = await peerPreflight(options, services, (file) =>
+    git(source, 'show', `${preflight.head}:${join(project, file)}`),
+  );
+  if (peerPlan) options = { ...options, target: peerPlan.target, peerPlan };
   const before = snapshot(source);
   const base = options.base ?? remoteDefaultBranch(source)?.name;
   const clone = isolate(source, undefined, project);

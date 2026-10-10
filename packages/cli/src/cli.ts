@@ -702,7 +702,7 @@ ${EXIT_CODES('a plan was made', 'not used', ';\n     or a dependency failed to a
 
   shared(
     program
-      .command('fix [package]')
+      .command('fix [package] [peers...]')
       .allowExcessArguments(false)
       .description('Upgrade one dependency on a new branch and migrate your code, verified')
       .option(
@@ -725,6 +725,12 @@ ${EXIT_CODES('a plan was made', 'not used', ';\n     or a dependency failed to a
         'LLM provider: anthropic, openai or gemini (experimental) (also UPTIDE_PROVIDER)',
       )
       .option('--model <id>', 'LLM model ID (also UPTIDE_MODEL)')
+      .option(
+        '--allow-peer <package>',
+        'explicitly allow a conflicting peer through a manifest override (repeatable)',
+        (value: string, previous: string[]) => [...previous, value],
+        [],
+      )
       .option('--no-llm', 'rule-based fixes only: never send code to the LLM provider')
       .option(
         '--max-cost <usd>',
@@ -785,9 +791,11 @@ ${PRIVACY}`,
     .action(
       (
         packageName: string | undefined,
+        peers: string[],
         flags: Shared & {
           only?: string;
           target?: string;
+          allowPeer?: string[];
           includeDeprecated?: boolean;
           pinCurrentApi?: boolean;
           llm?: boolean;
@@ -918,6 +926,8 @@ ${PRIVACY}`,
                     only,
                     target: flags.target,
                     includeDeprecated: flags.includeDeprecated,
+                    ...(peers.length ? { also: peers } : {}),
+                    ...(flags.allowPeer?.length ? { allowPeer: flags.allowPeer } : {}),
                     ...(flags.pinCurrentApi ? { pinCurrentApi: true } : {}),
                     llm,
                     provider: selection.provider,
