@@ -3,6 +3,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { workspacePackagesOf } from '../adapters/typescript/repo.js';
 import { type CheckOptions, check } from '../check/check.js';
 import { compareVersions } from '../check/version.js';
+import type { PackageFetcher } from '../domain/io.js';
 import { type ProgressListener, progress } from '../domain/progress.js';
 import type { CheckReport, Finding } from '../domain/report.js';
 import { UptideError } from '../errors.js';
@@ -37,7 +38,7 @@ import {
   testWorkspaces,
   typeResolutionFailure,
 } from './verify.js';
-import { bumpVersions, install, packageManager } from './versions.js';
+import { bumpVersions, install, packageManager, validateVersionRanges } from './versions.js';
 
 export interface FixOptions {
   onProgress?: ProgressListener;
@@ -93,6 +94,8 @@ export interface FixServices {
   generate?(root: string, workspaces: string[]): Promise<Generated[]>;
   /** A dist-tag to an exact version (`latest`); the registry by default. */
   resolve?(name: string, tag: string): Promise<string>;
+  /** Registry manifests for companion range preflight, before cloning. */
+  manifests?: PackageFetcher['manifests'];
   /** The publish step of a `--pr` run; `publishVerified` by default. */
   publish?(
     result: FixReport,
@@ -183,6 +186,7 @@ async function fixPackage(options: FixOptions, services: FixServices): Promise<F
       'DIRTY_UPTIDE_TREE',
       `uptide fix --pr refuses to run from an Uptide checkout with uncommitted changes (at ${tool.uptideCommit.slice(0, 12)}); commit or stash them, rebuild, and run again`,
     );
+  validateVersionRanges(root, [pack.name]);
   const resolved = await resolveTarget(pack, options.target, services.resolve);
   const target = resolved.version;
   if (!/^\d+\.\d+\.\d+(?:-[\w.-]+)?$/.test(target))
@@ -232,6 +236,7 @@ async function fixPackage(options: FixOptions, services: FixServices): Promise<F
   const companions = [
     ...new Map(packages.flatMap((p) => p.companions ?? []).map((c) => [c.name, c])).values(),
   ].sort((a, b) => a.name.localeCompare(b.name));
+  validateVersionRanges(root, [pack.name, ...companions.map((c) => c.name)]);
   const initialContext = {
     from:
       [...packages].sort((a, b) => compareVersions(a.installed, b.installed))[0]?.installed ?? '',

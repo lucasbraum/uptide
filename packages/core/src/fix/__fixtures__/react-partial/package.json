@@ -1,0 +1,12 @@
+{
+  "name": "react-partial-fixture",
+  "private": true,
+  "dependencies": {
+    "react": "^18",
+    "react-dom": "^18"
+  },
+  "devDependencies": {
+    "@types/react": "~18.2",
+    "@types/react-dom": "18.2.x"
+  }
+}

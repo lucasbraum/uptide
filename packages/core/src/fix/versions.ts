@@ -5,9 +5,11 @@ import type { InstallReport, Upgrade } from './managers/upgrade.js';
 export { packageManager } from './managers/manager.js';
 
 import { readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
+import { parseDocument } from 'yaml';
 import { workspacePackagesOf } from '../adapters/typescript/repo.js';
 import { UptideError } from '../errors.js';
+import { installedManifest } from '../list/evidence.js';
 import { command } from './process.js';
 
 const sections = [
@@ -16,48 +18,107 @@ const sections = [
   'optionalDependencies',
   'peerDependencies',
 ] as const;
-/** Keep the manifest's chosen range operator; unusual ranges need an explicit policy. */
+/** Keep the operator, precision and trailing wildcards, including simple npm aliases. */
 export function versionRange(before: string, version: string): string {
-  const match = /^(\s*[~^]?\s*)(?:v)?\d+\.\d+\.\d+(?:-[\w.-]+)?(?:\+[\w.-]+)?\s*$/.exec(before);
-  if (!match)
+  const alias = /^(npm:(?:@[^/\s]+\/)?[^@\s]+@)(.+)$/.exec(before);
+  if (alias) return `${alias[1]}${versionRange(alias[2] as string, version)}`;
+  const match = /^(\s*[~^]?\s*v?)(\d+(?:\.(?:\d+|[xX*])){0,2})(-[\w.-]+)?(\+[\w.-]+)?\s*$/.exec(
+    before,
+  );
+  const parts = match?.[2]?.split('.');
+  if (
+    !match ||
+    !parts ||
+    ((match[3] || match[4]) && (parts.length !== 3 || !parts.every((p) => /^\d+$/.test(p)))) ||
+    parts.some((p, i) => /[xX*]/.test(p) && parts.slice(i + 1).some((q) => /^\d+$/.test(q)))
+  )
     throw new UptideError(
       'UNSUPPORTED_VERSION_RANGE',
       `Cannot preserve version range ${JSON.stringify(before)}; use an exact, ^ or ~ range before fixing.`,
     );
-  return `${match[1]}${version}`;
+  const target = version.split('.');
+  const full = parts.length === 3 && parts.every((p) => /^\d+$/.test(p));
+  return `${match[1]}${full ? version : parts.map((p, i) => (/^[xX*]$/.test(p) ? p : target[i])).join('.')}`;
 }
-/** Update catalog entries in place so comments and catalog names survive. */
-export function bumpCatalog(yaml: string, name: string, version: string, catalog: string): string {
-  const lines = yaml.split('\n');
-  let top = '';
-  let named = '';
-  let changed = false;
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] ?? '';
-    const header = /^([\w-]+):/.exec(line);
-    if (header) {
-      top = header[1] ?? '';
-      named = '';
-    }
-    const sub = /^ {2}([\w-]+):\s*(?:#.*)?$/.exec(line);
-    if (top === 'catalogs' && sub) named = sub[1] ?? '';
-    const applies = catalog === '' ? top === 'catalog' : top === 'catalogs' && named === catalog;
-    if (!applies) continue;
-    const entry = /^(\s+)(?:'([^']+)'|"([^"]+)"|([^:#]+)):\s*([^#]*)(#.*)?$/.exec(line);
-    if (!entry || (entry[2] ?? entry[3] ?? entry[4]?.trim()) !== name) continue;
-    const keyEnd = line.indexOf(':', line.indexOf(name) + name.length);
-    lines[i] =
-      `${line.slice(0, keyEnd + 1)} ${versionRange((entry[5] ?? '').trim().replace(/^['"]|['"]$/g, ''), version)}${entry[6] ? ` ${entry[6]}` : ''}`;
-    changed = true;
+
+function declaredRange(
+  before: string,
+  version: string,
+  file: string,
+  field: string,
+  name: string,
+  installed: string | null | undefined,
+): string {
+  try {
+    return versionRange(before, version);
+  } catch (error) {
+    if (!(error instanceof UptideError) || error.code !== 'UNSUPPORTED_VERSION_RANGE') throw error;
+    const alias = /^(npm:(?:@[^/\s]+\/)?[^@\s]+@)/.exec(before)?.[1] ?? '';
+    const suggestion = installed
+      ? JSON.stringify(`${alias}^${installed}`)
+      : 'an exact, ^ or ~ range matching the installed version';
+    throw new UptideError(
+      'UNSUPPORTED_VERSION_RANGE',
+      `${file}: ${field} declares ${JSON.stringify(before)}, which cannot be rewritten safely. Change ${JSON.stringify(name)}: ${JSON.stringify(before)} in ${file} (${field}) to ${suggestion}, then rerun.`,
+    );
   }
-  if (!changed) throw new Error(`catalog ${catalog || '(default)'} has no entry for ${name}`);
-  return lines.join('\n');
+}
+
+/** Update only the catalog scalar, preserving YAML comments and quoting. */
+export function bumpCatalog(
+  yaml: string,
+  name: string,
+  version: string,
+  catalog: string,
+  installed: string | null = version,
+): string {
+  const doc = parseDocument(yaml);
+  if (doc.errors.length) throw doc.errors[0];
+  const path = catalog ? ['catalogs', catalog, name] : ['catalog', name];
+  const before = doc.getIn(path);
+  if (typeof before !== 'string')
+    throw new Error(`catalog ${catalog || '(default)'} has no entry for ${name}`);
+  doc.setIn(
+    path,
+    declaredRange(before, version, 'pnpm-workspace.yaml', path.join('.'), name, installed),
+  );
+  return doc.toString();
+}
+
+/** The same rewrite as the writer, without touching files. `read` can read the committed ref. */
+export function validateVersionRanges(
+  root: string,
+  names: readonly string[],
+  read = (file: string) => readFileSync(join(root, file), 'utf8'),
+): void {
+  for (const workspace of workspacePackagesOf(root)) {
+    const file = join(workspace, 'package.json');
+    const json = JSON.parse(read(file));
+    for (const name of names) {
+      for (const section of sections) {
+        const before = json[section]?.[name];
+        if (typeof before !== 'string') continue;
+        const installed = installedManifest(root, workspace, name)?.version;
+        if (before.startsWith('catalog:'))
+          bumpCatalog(
+            read('pnpm-workspace.yaml'),
+            name,
+            installed ?? '0.0.0',
+            before.slice(8),
+            installed ?? null,
+          );
+        else
+          declaredRange(before, installed ?? '0.0.0', file, `${section}.${name}`, name, installed);
+      }
+    }
+  }
 }
 export function bumpVersions(
   root: string,
   name: string,
   version: string,
 ): { files: string[]; workspaces: string[] } {
+  validateVersionRanges(root, [name]);
   const files: string[] = [];
   const workspaces: string[] = [];
   const catalogs = new Set<string>();
@@ -70,11 +131,17 @@ export function bumpVersions(
     for (const section of sections) {
       const before = json[section]?.[name];
       if (typeof before !== 'string') continue;
-      if (/^(workspace|link|file):/.test(before)) continue;
       declared = true;
       if (before.startsWith('catalog:')) catalogs.add(before.slice('catalog:'.length));
       else {
-        json[section][name] = versionRange(before, version);
+        json[section][name] = declaredRange(
+          before,
+          version,
+          relative(root, file),
+          `${section}.${name}`,
+          name,
+          installedManifest(root, workspace, name)?.version ?? version,
+        );
         changed = true;
       }
     }
