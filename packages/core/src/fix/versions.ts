@@ -95,10 +95,10 @@ export function validateVersionRanges(
     const file = join(workspace, 'package.json');
     const json = JSON.parse(read(file));
     for (const name of names) {
-      const installed = installedManifest(root, workspace, name)?.version;
       for (const section of sections) {
         const before = json[section]?.[name];
         if (typeof before !== 'string') continue;
+        const installed = installedManifest(root, workspace, name)?.version;
         if (before.startsWith('catalog:'))
           bumpCatalog(
             read('pnpm-workspace.yaml'),

@@ -15,10 +15,19 @@ import { validateVersionRanges } from './versions.js';
 export async function rangePreflight(
   options: FixOptions,
   services?: FixServices,
-  read = (file: string) => readFileSync(join(options.cwd, file), 'utf8'),
+  load = (file: string) => readFileSync(join(options.cwd, file), 'utf8'),
 ): Promise<string | undefined> {
   if (options.pinCurrentApi) return;
   const root = options.cwd;
+  const files = new Map<string, string>();
+  const read = (file: string): string => {
+    let text = files.get(file);
+    if (text === undefined) {
+      text = load(file);
+      files.set(file, text);
+    }
+    return text;
+  };
   validateVersionRanges(root, [options.only], read);
   const installed = new Map<string, InstalledDependency>();
   const names = new Set<string>();

@@ -270,3 +270,10 @@ it('rejects a complex named catalog before cloning, with the catalog field and i
   );
   expect(check).not.toHaveBeenCalled();
 });
+
+it('reads each committed manifest once during range planning', async () => {
+  const { root } = reactFixture();
+  const read = vi.fn((file: string) => readFileSync(join(root, file), 'utf8'));
+  await rangePreflight({ cwd: root, only: 'react' }, undefined, read);
+  expect(read.mock.calls).toEqual([['package.json']]);
+});
