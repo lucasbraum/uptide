@@ -10,25 +10,25 @@ describe('formatFixSummary', () => {
         {
           name: 'plugin',
           version: '1.0.0',
-          peer: 'react',
-          range: '^18',
-          target: '19.0.0',
+          peers: [
+            { peer: 'react', range: '^18', target: '19.0.0', version: '1.0.0' },
+            { peer: 'react-dom', range: '^18', target: '19.0.0', version: '1.0.0' },
+          ],
           allowed: true,
         },
         {
           name: 'other',
           version: '1.0.0',
-          peer: 'react',
-          range: '^18',
-          target: '19.0.0',
+          peers: [{ peer: 'react', range: '^18', target: '19.0.0', version: '1.0.0' }],
           allowed: false,
         },
       ],
     });
     expect(out).toContain('Peer risks');
     expect(out).toContain(
-      'plugin 1.0.0: react ^18 rejects 19.0.0 · explicitly allowed in package.json',
+      'plugin 1.0.0: react ^18 rejects 19.0.0; react-dom ^18 rejects 19.0.0 · explicitly allowed in package.json',
     );
+    expect(out.split('\n').filter((line) => line.trim().startsWith('plugin '))).toHaveLength(1);
     expect(out).toContain('other 1.0.0: react ^18 rejects 19.0.0');
   });
 

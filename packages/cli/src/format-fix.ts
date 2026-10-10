@@ -1,5 +1,5 @@
 import { isAbsolute, relative } from 'node:path';
-import { type FixReport, summaryCells } from '@uptide/core';
+import { type FixReport, groupPeerBlockers, summaryCells } from '@uptide/core';
 import pc from 'picocolors';
 import { elapsed } from './progress.js';
 
@@ -61,9 +61,9 @@ export function formatFixSummary(report: FixReport, opts: FormatFixOptions = {})
   ];
   if (report.peerConflicts?.length) {
     lines.push(colors.bold('Peer risks'));
-    for (const peer of report.peerConflicts)
+    for (const peer of groupPeerBlockers(report.peerConflicts))
       lines.push(
-        `  ${peer.name} ${peer.version}: ${peer.peer} ${peer.range} rejects ${peer.target}${peer.allowed ? ' · explicitly allowed in package.json' : ''}`,
+        `  ${peer.name} ${peer.version}: ${peer.peers.map((p) => `${p.peer} ${p.range} rejects ${p.target}`).join('; ')}${peer.allowed ? ' · explicitly allowed in package.json' : ''}`,
       );
     lines.push('');
   }

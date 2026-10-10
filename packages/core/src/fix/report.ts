@@ -5,7 +5,7 @@ import { GENERIC_NOTE } from '../packs/generic.js';
 import { UPTIDE_COMMAND } from '../version.js';
 import type { BehaviorResult } from './behavior.js';
 import { fitPieces, must, type Piece } from './budget.js';
-import { peerDescription } from './peer-preflight.js';
+import { groupPeerBlockers, peerDescription } from './peer-preflight.js';
 import type { FixDiagnostic, FixReport, FixSite, ReviewSection } from './types.js';
 import { missingPackages } from './verify.js';
 
@@ -725,7 +725,7 @@ export function renderMigration(
         [
           '### Peer risks',
           '',
-          ...report.peerConflicts.map(
+          ...groupPeerBlockers(report.peerConflicts).map(
             (p) =>
               `- ${peerDescription(p)}. ${p.allowed ? 'Explicitly allowed with `--allow-peer`; the manager override is in package.json.' : 'Not overridden; the package manager may warn.'} Runtime compatibility needs review.`,
           ),

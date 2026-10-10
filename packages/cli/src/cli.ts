@@ -5,6 +5,7 @@ import {
   activePacks,
   formatFix,
   isFailure,
+  PeerPreflightError,
   PRICE_DATE,
   priceFor,
   registeredPacks,
@@ -183,7 +184,13 @@ export async function run(
         cwd: resolve(io.cwd, flags.cwd ?? '.'),
       });
     } catch (err) {
-      io.err(renderError(err, ui.color));
+      if (flags.json && err instanceof PeerPreflightError)
+        emit({
+          error: { code: err.code, message: err.message },
+          peerConflicts: err.peerConflicts,
+          next: err.next,
+        });
+      else io.err(renderError(err, ui.color));
       code = err instanceof CliError ? (err.options.exitCode ?? EXIT.error) : EXIT.error;
     }
   };

@@ -116,6 +116,11 @@ export {
   runsRoot,
   storedRunFile,
 } from './fix/isolate.js';
+export {
+  groupPeerBlockers,
+  type PeerBlockerGroup,
+  PeerPreflightError,
+} from './fix/peer-preflight.js';
 export { planPackage } from './fix/plan.js';
 export { openPr, type PrOptions } from './fix/pr.js';
 export { updatePrBody } from './fix/pr-body.js';
