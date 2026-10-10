@@ -8,6 +8,8 @@ export interface PackageManager {
   lockfile: string;
   args: string[];
   env?: Record<string, string>;
+  /** Set when `bin` is corepack running the pinned Yarn (`args` then start with `yarn`); see availability.ts. */
+  via?: 'corepack';
   requestedVersion?: string;
   /** Why this manager, when the repository could have meant another: other lockfiles present. */
   chosen?: string;
@@ -99,6 +101,10 @@ export function packageManager(root: string): PackageManager {
 }
 /** Manifests have already been updated, so npm can preserve dependency sections with no add/save flags. */
 export function updateArgs(pm: PackageManager, root: string, workspaces: string[]): string[] {
+  const args = managerArgs(pm, root, workspaces);
+  return pm.via === 'corepack' ? ['yarn', ...args] : args;
+}
+function managerArgs(pm: PackageManager, root: string, workspaces: string[]): string[] {
   switch (pm.kind) {
     case 'npm': {
       const version = JSON.parse(readFileSync(join(root, pm.lockfile), 'utf8')).lockfileVersion;

@@ -1,0 +1,8 @@
+{
+  "name": "yarn-berry-pinned",
+  "private": true,
+  "packageManager": "yarn@4.7.0",
+  "dependencies": {
+    "zod": "3.25.76"
+  }
+}
