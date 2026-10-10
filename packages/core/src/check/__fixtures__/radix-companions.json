@@ -1,0 +1,189 @@
+{
+  "installed": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "@radix-ui/react-avatar": "1.1.11",
+    "@radix-ui/react-context-menu": "2.2.16",
+    "@radix-ui/react-dialog": "1.1.15",
+    "@radix-ui/react-slot": "1.2.3",
+    "@radix-ui/react-switch": "1.2.6",
+    "@radix-ui/react-tabs": "1.0.7",
+    "@radix-ui/react-tooltip": "1.0.7"
+  },
+  "registry": {
+    "react": {
+      "18.3.1": {},
+      "19.3.0": {}
+    },
+    "react-dom": {
+      "18.3.1": {
+        "peerDependencies": {
+          "react": "^18"
+        }
+      },
+      "19.3.0": {
+        "peerDependencies": {
+          "react": "^19.3.0"
+        }
+      }
+    },
+    "@radix-ui/react-avatar": {
+      "1.1.11": {
+        "peerDependencies": {
+          "react": "^16.8 || ^17 || ^18 || ^19",
+          "react-dom": "^16.8 || ^17 || ^18 || ^19"
+        },
+        "dependencies": {
+          "@radix-ui/react-primitive": "2.0.0"
+        }
+      },
+      "1.1.1": {
+        "peerDependencies": {
+          "react": "^16.8 || ^17 || ^18 || ^19",
+          "react-dom": "^16.8 || ^17 || ^18 || ^19"
+        },
+        "dependencies": {
+          "@radix-ui/react-primitive": "1.1.0"
+        }
+      }
+    },
+    "@radix-ui/react-context-menu": {
+      "2.2.16": {
+        "peerDependencies": {
+          "react": "^16.8 || ^17 || ^18 || ^19",
+          "react-dom": "^16.8 || ^17 || ^18 || ^19"
+        },
+        "dependencies": {
+          "@radix-ui/react-primitive": "2.0.0"
+        }
+      },
+      "2.2.2": {
+        "peerDependencies": {
+          "react": "^16.8 || ^17 || ^18 || ^19",
+          "react-dom": "^16.8 || ^17 || ^18 || ^19"
+        },
+        "dependencies": {
+          "@radix-ui/react-primitive": "1.1.0"
+        }
+      }
+    },
+    "@radix-ui/react-dialog": {
+      "1.1.15": {
+        "peerDependencies": {
+          "react": "^16.8 || ^17 || ^18 || ^19",
+          "react-dom": "^16.8 || ^17 || ^18 || ^19"
+        },
+        "dependencies": {
+          "@radix-ui/react-primitive": "2.0.0"
+        }
+      },
+      "1.1.0": {
+        "peerDependencies": {
+          "react": "^16.8 || ^17 || ^18 || ^19",
+          "react-dom": "^16.8 || ^17 || ^18 || ^19"
+        },
+        "dependencies": {
+          "@radix-ui/react-primitive": "1.1.0"
+        }
+      }
+    },
+    "@radix-ui/react-slot": {
+      "1.2.3": {
+        "peerDependencies": {
+          "react": "^16.8 || ^17 || ^18 || ^19",
+          "react-dom": "^16.8 || ^17 || ^18 || ^19"
+        },
+        "dependencies": {
+          "@radix-ui/react-primitive": "2.0.0"
+        }
+      },
+      "1.1.0": {
+        "peerDependencies": {
+          "react": "^16.8 || ^17 || ^18 || ^19",
+          "react-dom": "^16.8 || ^17 || ^18 || ^19"
+        },
+        "dependencies": {
+          "@radix-ui/react-primitive": "1.1.0"
+        }
+      }
+    },
+    "@radix-ui/react-switch": {
+      "1.2.6": {
+        "peerDependencies": {
+          "react": "^16.8 || ^17 || ^18 || ^19",
+          "react-dom": "^16.8 || ^17 || ^18 || ^19"
+        },
+        "dependencies": {
+          "@radix-ui/react-primitive": "2.0.0"
+        }
+      },
+      "1.1.1": {
+        "peerDependencies": {
+          "react": "^16.8 || ^17 || ^18 || ^19",
+          "react-dom": "^16.8 || ^17 || ^18 || ^19"
+        },
+        "dependencies": {
+          "@radix-ui/react-primitive": "1.1.0"
+        }
+      }
+    },
+    "@radix-ui/react-tabs": {
+      "1.0.7": {
+        "peerDependencies": {
+          "react": "^16.8 || ^17 || ^18",
+          "react-dom": "^16.8 || ^17 || ^18"
+        },
+        "dependencies": {
+          "@radix-ui/react-primitive": "1.0.0"
+        }
+      },
+      "1.1.0": {
+        "peerDependencies": {
+          "react": "^16.8 || ^17 || ^18 || ^19",
+          "react-dom": "^16.8 || ^17 || ^18 || ^19"
+        },
+        "dependencies": {
+          "@radix-ui/react-primitive": "1.1.0"
+        }
+      },
+      "1.1.2": {
+        "peerDependencies": {
+          "react": "^16.8 || ^17 || ^18 || ^19",
+          "react-dom": "^16.8 || ^17 || ^18 || ^19"
+        },
+        "dependencies": {
+          "@radix-ui/react-primitive": "1.1.0"
+        }
+      }
+    },
+    "@radix-ui/react-tooltip": {
+      "1.0.7": {
+        "peerDependencies": {
+          "react": "^16.8 || ^17 || ^18",
+          "react-dom": "^16.8 || ^17 || ^18"
+        },
+        "dependencies": {
+          "@radix-ui/react-primitive": "1.0.0"
+        }
+      },
+      "1.1.0": {
+        "peerDependencies": {
+          "react": "^16.8 || ^17 || ^18 || ^19",
+          "react-dom": "^16.8 || ^17 || ^18 || ^19"
+        },
+        "dependencies": {
+          "@radix-ui/react-primitive": "1.1.0"
+        }
+      },
+      "1.1.2": {
+        "peerDependencies": {
+          "react": "^16.8 || ^17 || ^18 || ^19",
+          "react-dom": "^16.8 || ^17 || ^18 || ^19"
+        },
+        "dependencies": {
+          "@radix-ui/react-primitive": "1.1.0"
+        }
+      }
+    }
+  }
+}

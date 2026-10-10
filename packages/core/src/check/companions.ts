@@ -5,31 +5,7 @@ import type { ListedDependency } from '../list/list.js';
 import { typedPackageOf, typesReleaseFor } from './types-release.js';
 import { compareVersions, parseVersion } from './version.js';
 
-/**
- * The packages that have to move with one upgrade. `ai` and the `@ai-sdk/*` packages a
- * repository installs pin the same `@ai-sdk/provider`: `ai` 7 next to `@ai-sdk/react` 3 is
- * an install no lockfile of the upgrade has, with two copies of the provider's types. The
- * group is the one `list` shows (`dependencyGroups`: family, peer link, shared pin); the
- * version each companion moves to is the one that agrees with the target:
- * - the version the target pins exactly (`ai@7.0.9` → `@ai-sdk/provider` 4.0.1);
- * - else its release at the target's own version, when that release asks for the target
- *   (`react-dom` 19.0.0 peer-requires `react` ^19.0.0: released in lockstep);
- * - else the installed one, when its range for the target already accepts it
- *   (`@modelcontextprotocol/sdk` 1.28.0 takes `zod` `^3.25 || ^4.0`: nothing to move);
- * - else its newest release that pins the target exactly, or whose range for it accepts
- *   the target (`@ai-sdk/react@4.0.10` → `ai` 7.0.9);
- * - else its newest release whose exact pins agree with every exact pin of the target
- *   (`@ai-sdk/openai` on `@ai-sdk/provider`).
- * A package that only peers on the lead moves when it is released in lockstep with it (a
- * release at the target's own version: `react-dom`, `@types/react`) or the pack names it in
- * `companions`; either way even when its installed range already accepts the target. Any
- * other package whose installed peer range rejects the target stays where it is, is never
- * compiled at another version, and is reported as a peer conflict (`peerConflicts`): real
- * upgrades often leave one in place, and what that breaks is for a person to judge.
- * `@types/<pkg>` moves with `<pkg>` by name (nothing in its manifest says so): to the release
- * that types the version `<pkg>` moves to (`types-release.ts`). A companion can move with a
- * companion: `@types/react-dom` with `react-dom`, which moves with `react`.
- */
+/** Packages that must move with an upgrade: exact dependency pins, release pairs and runtime types. */
 export interface Companion {
   name: string;
   from: string;
@@ -78,6 +54,27 @@ const accepts = (range: string, version: string): boolean => {
 const exactPins = (m: Pick<Manifest, 'dependencies'>): Map<string, string> =>
   new Map(Object.entries(m.dependencies ?? {}).filter(([, v]) => EXACT.test(v)));
 
+/** Lowest stable compatible peer release, never below the installed version. */
+export function compatiblePeerVersion(
+  versions: Manifests,
+  installed: string,
+  targets: Record<string, string>,
+  required: readonly string[] = Object.keys(targets),
+): string | undefined {
+  return Object.keys(versions)
+    .filter((v) => stable(v) && compareVersions(v, installed) >= 0)
+    .sort(compareVersions)
+    .find((v) => {
+      const ranges = versions[v]?.peerDependencies ?? {};
+      return (
+        required.every((name) => ranges[name] !== undefined) &&
+        Object.entries(targets).every(
+          ([name, target]) => ranges[name] === undefined || accepts(ranges[name], target),
+        )
+      );
+    });
+}
+
 /** Whether `other` is plausibly in `lead`'s group, from what is installed: worth asking the registry about. */
 function related(lead: InstalledDependency, other: InstalledDependency): boolean {
   if (!lead.workspaces.some((w) => other.workspaces.includes(w))) return false;
@@ -110,7 +107,7 @@ export function peerConflictOf(
   lockstep: readonly string[] = [],
 ): string | undefined {
   if (lockstep.includes(installed.name) || releasedWith(host, target, versions)) return undefined;
-  const current = versions[installed.version] ?? installed.manifest;
+  const current = installed.manifest;
   // A dependency (an exact pin) is moved by the pin logic; only a bare peer is left alone.
   if (current.dependencies?.[host] !== undefined) return undefined;
   const range = current.peerDependencies?.[host];
@@ -125,31 +122,48 @@ function agreeing(
   target: string,
   targetManifest: Pick<Manifest, 'dependencies'>,
   versions: Manifests,
-  lockstep: readonly string[] = [],
 ): { version: string; reason: string } | undefined {
   const name = installed.name;
-  const pinned = targetManifest.dependencies?.[name];
-  if (pinned && EXACT.test(pinned) && versions[pinned])
-    return { version: pinned, reason: `${lead} ${target} pins ${name} ${pinned}` };
-  // Released in lockstep: its release at the target's own version asks for the target
-  // (react-dom 19.0.0 peer-requires react ^19.0.0). The installed copy may accept the target
-  // too (`^18 || ^19`), but the upgrade the repository makes moves both.
-  const same = versions[target];
-  const sameRange = same?.dependencies?.[lead] ?? same?.peerDependencies?.[lead];
-  if (same && sameRange !== undefined && accepts(sameRange, target) && target !== installed.version)
-    return {
-      version: target,
-      reason: `${name} ${target} is released with ${lead} ${target} (${EXACT.test(sameRange) ? 'pins' : 'peer'} ${sameRange})`,
-    };
-  const current = versions[installed.version] ?? installed.manifest;
+  const current = installed.manifest;
   const range = current.dependencies?.[lead] ?? current.peerDependencies?.[lead];
-  // A package the pack names moves even when the installed copy accepts the target.
-  if (range !== undefined && accepts(range, target) && !lockstep.includes(name))
+  if (range !== undefined && accepts(range, target))
     return {
       version: installed.version,
       reason: `${name} ${installed.version} accepts ${lead} ${target}`,
     };
-  const candidates = Object.keys(versions).filter(stable).sort(compareVersions).reverse();
+  const pinned = targetManifest.dependencies?.[name];
+  if (pinned && EXACT.test(pinned) && versions[pinned])
+    return compareVersions(pinned, installed.version) >= 0
+      ? { version: pinned, reason: `${lead} ${target} pins ${name} ${pinned}` }
+      : undefined;
+  // Actual release pairs (react/react-dom) must still use matching runtime versions.
+  const same = versions[target];
+  const sameRange = same?.dependencies?.[lead] ?? same?.peerDependencies?.[lead];
+  if (
+    same &&
+    sameRange !== undefined &&
+    accepts(sameRange, target) &&
+    compareVersions(target, installed.version) >= 0
+  )
+    return {
+      version: target,
+      reason: `${name} ${target} is released with ${lead} ${target} (${EXACT.test(sameRange) ? 'pins' : 'peer'} ${sameRange})`,
+    };
+  if (
+    current.peerDependencies?.[lead] !== undefined &&
+    current.dependencies?.[lead] === undefined
+  ) {
+    const version = compatiblePeerVersion(versions, installed.version, { [lead]: target });
+    return version === undefined
+      ? undefined
+      : {
+          version,
+          reason: `${name} ${version} accepts ${lead} ${target} (${versions[version]?.peerDependencies?.[lead]})`,
+        };
+  }
+  const candidates = Object.keys(versions)
+    .filter((v) => stable(v) && compareVersions(v, installed.version) >= 0)
+    .sort(compareVersions);
   for (const version of candidates) {
     const m = versions[version] ?? {};
     const range = m.dependencies?.[lead] ?? m.peerDependencies?.[lead];
@@ -207,8 +221,10 @@ export async function companionsOf(input: {
   target: string;
   installed: InstalledDependency[];
   manifests: (name: string) => Promise<Manifests>;
-  /** Packages the pack says always move with the lead (`MigrationPack.companions`). */
+  /** Known companions eligible to move when their installed peer range rejects the target. */
   lockstep?: readonly string[];
+  /** Targets already planned before an explicitly requested peer upgrade. */
+  peerTargets?: Record<string, string>;
 }): Promise<CompanionPlan> {
   const none: CompanionPlan = { companions: [], conflicts: [], peerConflicts: [] };
   const lead = input.installed.find((d) => d.name === input.name);
@@ -278,7 +294,39 @@ export async function companionsOf(input: {
         );
         if (move) typesLinked.add(c.name);
       } else {
-        for (const [host, at] of decided) {
+        // A shared pin cannot move a peer that already supports the planned runtime, or
+        // silently upgrade a blocker that the user has not added to the command.
+        const peers = Object.entries({ ...input.peerTargets, [lead.name]: input.target }).filter(
+          ([host]) =>
+            c.manifest.peerDependencies?.[host] !== undefined &&
+            c.manifest.dependencies?.[host] === undefined,
+        );
+        if (peers.length) {
+          const rejected = peers.filter(
+            ([host, target]) => !accepts(c.manifest.peerDependencies?.[host] as string, target),
+          );
+          if (!rejected.length) {
+            move = {
+              version: c.version,
+              reason: `${c.name} ${c.version} accepts the planned peers`,
+            };
+          } else if (
+            rejected.some(
+              ([host, target]) =>
+                peerConflictOf(c, host, target, versions, input.lockstep) !== undefined,
+            )
+          ) {
+            peerConflicts.set(
+              c.name,
+              rejected
+                .map(([host, target]) => peerConflictOf(c, host, target, versions, input.lockstep))
+                .filter(Boolean)
+                .join('; '),
+            );
+            continue;
+          }
+        }
+        for (const [host, at] of move ? [] : decided) {
           const hostDep = input.installed.find((d) => d.name === host);
           if (!hostDep || !related(hostDep, c)) continue;
           const left = peerConflictOf(c, host, at.version, versions, input.lockstep);
@@ -286,7 +334,7 @@ export async function companionsOf(input: {
             peerConflicts.set(c.name, left);
             continue;
           }
-          move = agreeing(c, host, at.version, at.manifest, versions, input.lockstep);
+          move = agreeing(c, host, at.version, at.manifest, versions);
           if (move) {
             peerConflicts.delete(c.name);
             break;

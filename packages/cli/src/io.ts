@@ -73,5 +73,5 @@ export function uiOf(io: Io, flags: UiFlags): Ui {
   const noColor = io.env.NO_COLOR !== undefined && io.env.NO_COLOR !== '';
   const forced = io.env.FORCE_COLOR !== undefined && io.env.FORCE_COLOR !== '0';
   const color = !ci && flags.color !== false && !noColor && (io.outTty || forced);
-  return { color, interactive: !ci && io.errTty && io.env.TERM !== 'dumb' };
+  return { color, interactive: !ci && io.outTty && io.errTty && io.env.TERM !== 'dumb' };
 }

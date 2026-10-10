@@ -1,3 +1,4 @@
+import { stripVTControlCharacters } from 'node:util';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { uiOf } from './io.js';
 import { createProgress, elapsed, HEARTBEAT_MS } from './progress.js';
@@ -168,4 +169,38 @@ it('prints engine phase timings on stderr with package and workspace context', (
   p.event({ phase: 'compile', package: 'zod', workspace: 'packages/api', state: 'done', ms: 1500 });
   expect(io.stderr()).toBe('  compile · zod · packages/api (1.5s)\n');
   expect(io.stdout()).toBe('');
+});
+
+it.each([20, 80, undefined])(
+  'clips every spinner frame to terminal columns (%s)',
+  async (columns) => {
+    vi.useFakeTimers();
+    const io = memoryIo({ errTty: true, outTty: true, columns });
+    const progress = createProgress(io, uiOf(io, {}), { quiet: true });
+    const phase = progress.phase('x'.repeat(200), async () => {
+      progress.event({
+        phase: 'install',
+        state: 'start',
+        detail: 'react 19.3.0 with 11 packages '.repeat(20),
+      });
+      await new Promise((r) => setTimeout(r, 400));
+    });
+    await vi.advanceTimersByTimeAsync(400);
+    await phase;
+    for (const frame of io.stderr().split('\r'))
+      expect(Array.from(stripVTControlCharacters(frame)).length).toBeLessThan(columns ?? 80);
+    expect(io.stderr()).toContain('…');
+  },
+);
+
+it('does not animate when stdout is piped even if stderr is a terminal', async () => {
+  vi.useFakeTimers();
+  const io = memoryIo({ errTty: true, outTty: false });
+  const progress = createProgress(io, uiOf(io, {}));
+  const phase = progress.phase('Install', () => new Promise((r) => setTimeout(r, 400)));
+  await vi.advanceTimersByTimeAsync(400);
+  await phase;
+  expect(io.stderr()).not.toContain('\r');
+  expect(io.stderr()).not.toContain(ESC);
+  expect(io.stderr().trim().split('\n')).toHaveLength(1);
 });
