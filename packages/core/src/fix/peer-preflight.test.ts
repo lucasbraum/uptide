@@ -503,7 +503,7 @@ it('uses the same lowest tooltip release in the suggested command and the comple
   );
   const options = { cwd: root, only: 'react', target: '19.3.0', fixer: null };
   await expect(peerPreflight(options, services)).rejects.toThrow(
-    'upgrade to 1.1.0 (accepts react 19): add @radix-ui/react-tooltip',
+    'upgrade to 1.1.0 (accepts react 19, react-dom 19): add @radix-ui/react-tooltip',
   );
   const plan = await peerPreflight(
     { ...options, also: ['@radix-ui/react-tabs', '@radix-ui/react-tooltip'] },
