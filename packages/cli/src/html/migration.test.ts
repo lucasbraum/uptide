@@ -70,3 +70,37 @@ it('is a complete page titled by the run', () => {
   expect(page).toContain('Content-Security-Policy');
   expect(page).not.toContain('<script');
 });
+
+it('renders accepted lockfile housekeeping collapsed in the fix report', async () => {
+  const { fixReport } = await import('../test-utils.js');
+  const report = fixReport(true);
+  report.lockfile = {
+    manager: 'npm',
+    file: 'package-lock.json',
+    added: [],
+    removed: [],
+    changed: [],
+    allowed: [],
+    housekeeping: {
+      deduped: [
+        {
+          from: 'node_modules/a/node_modules/b',
+          to: 'node_modules/b',
+          name: 'b',
+          version: '1.0.0',
+        },
+      ],
+      metadata: ['node_modules/c'],
+    },
+  };
+  const page = renderMigrationHtml(report, {
+    version: '1.0.0',
+    date: '2026-10-10T12:00:00.000Z',
+    timeZone: 'UTC',
+  });
+  expect(page).toContain(
+    '<details><summary>Lockfile housekeeping · 1 dedupe move · 1 metadata-only change</summary>',
+  );
+  expect(page).toContain('<code>node_modules/a/node_modules/b</code>');
+  expect(page).not.toContain('<details open');
+});

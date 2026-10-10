@@ -99,11 +99,21 @@ setting when requested; Yarn resolutions select a version but may still leave pe
 For npm, Uptide also compares the committed root and workspace declarations with their
 lockfile importers and locked direct versions. If they disagree it exits **2** before cloning:
 `the lockfile does not match package.json; run npm install first`. This is a read-only check;
-it does not normalize the lockfile. The scope guard permits only the union of the resolved
-subtrees of the leader, companions, explicit extras and allowed-peer overrides in the old and new lockfile. Shared transitive
-records reachable from that union are included; another copy with the same name or scope is
-not automatically included. Importer ranges can change only for packages actually upgraded.
-Every changed record outside that union still stops the install.
+it does not normalize the lockfile. The scope guard unions the resolved subtrees of the
+leader, companions, explicit extras and allowed-peer overrides in both lockfiles. Outside
+that union, package names, versions and integrity must resolve identically for every dependent.
+For npm this follows Node's lookup from each placement up through `node_modules`; pnpm and
+Yarn use their locked dependency references. Unchanged dependent records are checked too.
+
+Same-content deduplication and descriptive metadata changes (such as `license`) are accepted.
+An outside package disappearing from the resolved graph, a changed resolution, or changes to
+execution/platform fields (`scripts`, `bin`, `os`, `cpu`) still stop the install. Importer
+ranges remain protected except for packages actually upgraded. When an integrity hash is
+absent, the source locator must remain unchanged too.
+
+Accepted changes appear under a collapsed **Lockfile housekeeping** section in the PR body
+and HTML report, with dedupe and metadata counts and the affected lockfile placements. The
+terminal shows counts; the stored JSON retains the full list.
 
 ## Step by step
 

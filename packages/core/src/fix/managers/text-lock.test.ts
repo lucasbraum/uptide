@@ -209,3 +209,94 @@ describe('alias entries (@isaacs/cliui style) survive a manager re-quoting them'
     ).toThrow('outside @art/core');
   });
 });
+
+it.each(['pnpm', 'yarn'] as const)(
+  '%s accepts only metadata housekeeping and equivalent dependency descriptors',
+  (manager) => {
+    const text =
+      manager === 'pnpm'
+        ? `lockfileVersion: '9.0'
+importers:
+  .: {}
+packages:
+  parent@1.0.0:
+    resolution: {integrity: sha512-parent}
+    license: null
+  child@1.0.0:
+    resolution: {integrity: sha512-child}
+snapshots:
+  parent@1.0.0:
+    dependencies:
+      child: 1.0.0
+  child@1.0.0: {}
+`
+        : `parent@^1:
+  version "1.0.0"
+  integrity sha512-parent
+  license null
+  dependencies:
+    child "^1"
+child@^1, child@~1:
+  version "1.0.0"
+  integrity sha512-child
+`;
+    const graph = manager === 'pnpm' ? pnpmGraph : yarnGraph;
+    const before = graph(text, 'target');
+    expect(
+      assertLockScope(
+        before,
+        graph(
+          text.replace('license: null', 'license: MIT').replace('license null', 'license MIT'),
+          'target',
+        ),
+        'target',
+      ).housekeeping?.metadata.length,
+    ).toBe(1);
+    for (const next of [
+      text.replace('sha512-child', 'tampered'),
+      text.replace('license', 'scripts'),
+      text
+        .replaceAll('child@1.0.0', 'child@2.0.0')
+        .replace('child: 1.0.0', 'child: 2.0.0')
+        .replace(
+          'version "1.0.0"\n  integrity sha512-child',
+          'version "2.0.0"\n  integrity sha512-child',
+        ),
+    ]) {
+      expect(() => assertLockScope(before, graph(next, 'target'), 'target')).toThrow(
+        'outside target',
+      );
+    }
+    if (manager === 'yarn') {
+      const regrouped = text
+        .replace('child "^1"', 'child "~1"')
+        .replace('child@^1, child@~1:', 'child@~1:');
+      expect(
+        assertLockScope(before, graph(regrouped, 'target'), 'target').housekeeping?.deduped,
+      ).toMatchObject([{ from: 'child@^1', to: 'child@~1' }]);
+    }
+  },
+);
+
+it('protects resolutions in older pnpm inline-package graphs too', () => {
+  const before = `lockfileVersion: '6.0'
+importers:
+  .: {}
+packages:
+  /parent@1.0.0:
+    resolution: {integrity: sha512-parent}
+    dependencies:
+      child: 1.0.0
+  /child@1.0.0:
+    resolution: {integrity: sha512-child1}
+  /child@2.0.0:
+    resolution: {integrity: sha512-child2}
+`;
+  expect(() =>
+    assertLockScope(
+      pnpmGraph(before, 'target'),
+      pnpmGraph(before.replace('child: 1.0.0', 'child: 2.0.0'), 'target'),
+      'target',
+    ),
+  ).toThrow('packages:parent@1.0.0');
+});

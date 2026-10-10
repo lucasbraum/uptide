@@ -889,3 +889,34 @@ describe('a bump that needed no code changes', () => {
     expect(body).toContain('in `web`, `worker` and `api`.');
   });
 });
+
+it('keeps accepted lockfile housekeeping collapsed with counts and exact placements', () => {
+  const report = fixture('storefront-zod');
+  report.lockfile = {
+    manager: 'npm',
+    file: 'package-lock.json',
+    added: [],
+    removed: ['node_modules/parent/node_modules/shared'],
+    changed: ['node_modules/stable'],
+    allowed: [],
+    housekeeping: {
+      deduped: [
+        {
+          from: 'node_modules/parent/node_modules/shared',
+          to: 'node_modules/shared',
+          name: 'shared',
+          version: '1.0.0',
+        },
+      ],
+      metadata: ['node_modules/stable'],
+    },
+  };
+  const body = prBody(report);
+  expect(body).toContain(
+    '<details><summary>Lockfile housekeeping · 1 dedupe move · 1 metadata-only change</summary>',
+  );
+  expect(body).toContain('`node_modules/parent/node_modules/shared` → `node_modules/shared`');
+  expect(body).toContain('Metadata only: `node_modules/stable`');
+  expect(visible(body)).not.toContain('node_modules/');
+  expect(migrationBody(report)).toContain('Lockfile housekeeping');
+});

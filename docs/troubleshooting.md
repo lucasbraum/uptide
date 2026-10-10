@@ -139,3 +139,12 @@ changing peer constraints can also cause npm to re-resolve or deduplicate other 
 Uptide does not enable that mode and does not loosen the scope guard: an unrelated lockfile
 change stops the run before an upgrade commit. Reconcile the baseline separately instead of
 including unrelated dependency changes in the migration.
+
+
+### Lockfile housekeeping versus an out-of-scope resolution
+
+A nested copy removed in favor of the same name, version and integrity is housekeeping only
+when every outside dependent still resolves the same contents. License metadata alone is also
+allowed. The fix report and PR description show accepted moves in a collapsed **Lockfile
+housekeeping** section. Changed outside resolutions, removed packages, and executable or
+platform metadata changes remain blocked; a shared package name is not sufficient evidence.

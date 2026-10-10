@@ -90,3 +90,29 @@ describe('formatFixSummary', () => {
     expect(published).toMatch(/https:\/\/github\.com\/o\/r\/pull\/9 +the pull request/);
   });
 });
+
+it('summarizes lockfile housekeeping without expanding placements in the terminal', () => {
+  const report = fixReport(true);
+  report.lockfile = {
+    manager: 'npm',
+    file: 'package-lock.json',
+    added: [],
+    removed: [],
+    changed: [],
+    allowed: [],
+    housekeeping: {
+      deduped: [
+        {
+          from: 'node_modules/a/node_modules/b',
+          to: 'node_modules/b',
+          name: 'b',
+          version: '1.0.0',
+        },
+      ],
+      metadata: [],
+    },
+  };
+  const out = formatFixSummary(report, { color: false });
+  expect(out).toContain('Lockfile housekeeping · 1 dedupe move · 0 metadata-only changes');
+  expect(out).not.toContain('node_modules/');
+});

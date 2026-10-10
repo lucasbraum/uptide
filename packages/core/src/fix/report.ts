@@ -655,6 +655,26 @@ export function renderMigration(
     lines.push(`> ${GENERIC_NOTE(report.package)}`, '');
   if (report.llm.disabled) lines.push('Assisted fixes disabled (--no-llm).', '');
   lines.push(...summaryRows(report), '');
+  const housekeeping = report.lockfile?.housekeeping;
+  if (mode === 'full' && housekeeping) {
+    const label = `Lockfile housekeeping · ${count(housekeeping.deduped.length, 'dedupe move')} · ${count(housekeeping.metadata.length, 'metadata-only change')}`;
+    lines.push(
+      droppable(
+        2,
+        collapse(label, [
+          'Outside resolutions retain the same package name, version and integrity; execution and platform fields are unchanged.',
+          '',
+          ...housekeeping.deduped.map(
+            (d) =>
+              `- \`${cell(d.name)}@${cell(d.version)}\`: \`${cell(d.from)}\` → \`${cell(d.to)}\`.`,
+          ),
+          ...housekeeping.metadata.map((key) => `- Metadata only: \`${cell(key)}\`.`),
+        ]),
+        label,
+      ),
+      '',
+    );
+  }
   if (groups(report).length) lines.push('### What changed', '');
   groups(report).forEach((g, i) => {
     lines.push(heading(g, report, i));
