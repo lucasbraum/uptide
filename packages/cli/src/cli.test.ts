@@ -1,7 +1,7 @@
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { type FixReport, UptideError } from '@uptide/core';
+import { type FixReport, PeerPreflightError, UptideError } from '@uptide/core';
 import { describe, expect, it } from 'vitest';
 import { run } from './cli.js';
 import {
@@ -339,6 +339,39 @@ describe('uptide fix', () => {
       allowPeer: ['old-plugin', 'another-plugin'],
       llm: false,
     });
+  });
+
+  it('emits grouped peer blockers and the full Next command as JSON with exit 2', async () => {
+    const peerConflicts = [
+      {
+        name: 'plugin',
+        version: '1.0.0',
+        allowed: false,
+        newer: '1.2.0',
+        peers: [
+          { peer: 'react', range: '^18', target: '19.3.0', version: '1.0.0' },
+          { peer: 'react-dom', range: '^18', target: '19.3.0', version: '1.0.0' },
+        ],
+      },
+    ];
+    const next = 'npx uptide fix react plugin --target 19.3.0';
+    const error = new PeerPreflightError(peerConflicts, next, 'Peer blockers (before cloning)');
+    const engine = fakeEngine({
+      fix: async () => {
+        throw error;
+      },
+    });
+    const io = memoryIo({ cwd: pnpmGitRepo() });
+    expect(await run(['fix', 'zod', '--no-llm', '--json'], io, engine)).toBe(2);
+    expect(JSON.parse(io.stdout())).toEqual({
+      error: { code: 'INCONSISTENT_UPGRADE', message: error.message },
+      peerConflicts,
+      next,
+    });
+    expect(io.stderr()).not.toContain('error:');
+    const plain = memoryIo({ cwd: pnpmGitRepo() });
+    expect(await run(['fix', 'zod', '--no-llm'], plain, engine)).toBe(2);
+    expect(plain.stderr()).toContain(error.message);
   });
 
   it('prints the FixReport with --json', async () => {

@@ -25,6 +25,57 @@ export interface PeerBlocker {
   newer?: string;
   allowed: boolean;
 }
+export interface PeerBlockerGroup {
+  name: string;
+  version: string;
+  peers: Pick<PeerBlocker, 'peer' | 'range' | 'target' | 'version'>[];
+  newer?: string;
+  allowed: boolean;
+}
+
+/** One row per package, retaining every rejected peer (including look-ahead versions). */
+export function groupPeerBlockers(
+  peers: readonly (PeerBlocker | PeerBlockerGroup)[],
+): PeerBlockerGroup[] {
+  const groups = new Map<string, PeerBlockerGroup>();
+  for (const p of peers) {
+    let group = groups.get(p.name);
+    if (!group) {
+      group = { name: p.name, version: p.version, peers: [], allowed: p.allowed };
+      groups.set(p.name, group);
+    }
+    if (p.newer) group.newer = p.newer;
+    for (const peer of 'peers' in p ? p.peers : [p]) {
+      const rejection = {
+        peer: peer.peer,
+        range: peer.range,
+        target: peer.target,
+        version: peer.version,
+      };
+      if (
+        !group.peers.some(
+          (r) =>
+            r.peer === rejection.peer &&
+            r.range === rejection.range &&
+            r.target === rejection.target &&
+            r.version === rejection.version,
+        )
+      )
+        group.peers.push(rejection);
+    }
+  }
+  return [...groups.values()];
+}
+
+export class PeerPreflightError extends UptideError {
+  constructor(
+    readonly peerConflicts: PeerBlockerGroup[],
+    readonly next: string,
+    message: string,
+  ) {
+    super('INCONSISTENT_UPGRADE', message);
+  }
+}
 export interface PeerPlan {
   target: string;
   targetSource: ResolvedTarget['source'];
@@ -54,8 +105,21 @@ export function compatiblePeerVersion(
     });
 }
 
-export const peerDescription = (p: PeerBlocker): string =>
-  `${p.name} ${p.version} declares ${p.peer} ${p.range}, which rejects ${p.target}`;
+export const peerDescription = (p: PeerBlocker | PeerBlockerGroup): string =>
+  `${p.name} ${p.version} declares ${('peers' in p ? p.peers : [p]).map((r) => `${r.peer} ${r.range}, which rejects ${r.target}`).join('; ')}`;
+
+function describe(p: PeerBlockerGroup): string {
+  const ranges = new Map<string, string[]>();
+  for (const peer of p.peers) {
+    const range = `${peer.range}${peer.version !== p.version ? ` (at ${peer.version})` : ''}`;
+    ranges.set(range, [...(ranges.get(range) ?? []), peer.peer]);
+  }
+  const peers = [...ranges].map(([range, names]) => `${names.join(', ')} ${range}`).join('; ');
+  const accepts = p.peers
+    .map((r) => `${r.peer} ${parseVersion(r.target)?.major ?? r.target}`)
+    .join(', ');
+  return `${p.name} ${p.version}  ${p.peers.length === 1 ? 'peer' : 'peers'} ${peers}  →  ${p.allowed ? 'Explicitly allowed; a manifest override will be written.' : p.newer ? `upgrade to ${p.newer} (accepts ${accepts}): add ${p.name} to the command` : `no release accepts ${accepts}: use --allow-peer ${p.name}`}`;
+}
 
 /** Read-only planning, shared by direct callers and the CLI before its private clone. */
 export async function peerPreflight(
@@ -227,24 +291,28 @@ export async function peerPreflight(
     companions.map((c) => c.name),
     read,
   );
-  const describe = (p: PeerBlocker) => {
-    const accepts = `${p.peer} ${parseVersion(p.target)?.major ?? p.target}`;
-    return `${peerDescription(p)}. ${p.allowed ? 'Explicitly allowed; a manifest override will be written.' : p.newer ? `upgrade to ${p.newer} (accepts ${accepts}): add ${p.name} to the command` : `no release accepts ${accepts}: use --allow-peer ${p.name}`}`;
-  };
   if (packageManager(options.cwd).kind === 'npm' && actual.peers.some((p) => !p.allowed)) {
     // Look ahead through suggested upgrades so the one command includes their blockers as well.
     const extras = new Set(requested);
     const allowances = new Set(allowed);
     for (;;) {
       const preview = await resolveExtras(extras);
+      // A suggested extra can pull another blocker in as a companion. Keep every advertised
+      // upgrade explicit, then replay the whole command before considering it complete.
+      const advertised = [...history.values()].filter(
+        (p) => p.newer && !allowances.has(p.name) && !extras.has(p.name),
+      );
+      if (advertised.length) {
+        for (const p of advertised) extras.add(p.name);
+        continue;
+      }
       const next = preview.peers.find((p) => !allowances.has(p.name));
       if (!next) {
         for (const name of allowances)
           if (!preview.peers.some((p) => p.name === name)) allowances.delete(name);
         break;
       }
-      if (next.newer && !extras.has(next.name)) extras.add(next.name);
-      else allowances.add(next.name);
+      allowances.add(next.name);
     }
     const command = [
       UPTIDE_COMMAND,
@@ -256,12 +324,14 @@ export async function peerPreflight(
       ...(options.fixer === null ? ['--no-llm'] : []),
       ...[...allowances].flatMap((name) => ['--allow-peer', name]),
     ].join(' ');
-    throw new UptideError(
-      'INCONSISTENT_UPGRADE',
-      `Peer blockers (before cloning):\n${[...history.values()].map(describe).join('\n')}\n\nNext: ${command}`,
+    const blockers = groupPeerBlockers([...history.values()]);
+    throw new PeerPreflightError(
+      blockers,
+      command,
+      `Peer blockers (before cloning):\n${blockers.map(describe).join('\n')}\n\nNext: ${command}`,
     );
   }
-  for (const peer of actual.peers)
+  for (const peer of groupPeerBlockers(actual.peers))
     options.onProgress?.({
       phase: 'resolve',
       state: 'done',

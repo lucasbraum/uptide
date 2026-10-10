@@ -21,7 +21,12 @@ import { type Generated, generateClients } from './generate.js';
 import { assertManagerAvailable } from './managers/availability.js';
 import { assertNpmLockSync } from './managers/npm-sync.js';
 import type { InstallReport, Upgrade } from './managers/upgrade.js';
-import { type PeerPlan, peerPreflight, writePeerOverrides } from './peer-preflight.js';
+import {
+  groupPeerBlockers,
+  type PeerPlan,
+  peerPreflight,
+  writePeerOverrides,
+} from './peer-preflight.js';
 import { pinCurrentApi } from './pin.js';
 import { command, git, projectRoot } from './process.js';
 import { publicationBlockers } from './publish.js';
@@ -512,7 +517,7 @@ async function fixPackage(options: FixOptions, services: FixServices): Promise<F
     target,
     targetSource: resolved.source,
     ...(companions.length ? { companions } : {}),
-    ...(peerPlan?.conflicts.length ? { peerConflicts: peerPlan.conflicts } : {}),
+    ...(peerPlan?.conflicts.length ? { peerConflicts: groupPeerBlockers(peerPlan.conflicts) } : {}),
     ...tool,
     verifiedAt: new Date().toISOString(),
     head: git(root, 'rev-parse', 'HEAD'),

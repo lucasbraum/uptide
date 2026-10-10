@@ -67,6 +67,11 @@ conflict it looks for the **lowest newer stable release** declaring a compatible
 It reports all conflicts together, including already allowed peers, and looks ahead through
 proposed peer upgrades and their lockstep companions. It ends with one full command containing
 all proposed extras, required `--allow-peer` flags, the resolved target and `--no-llm` when set.
+Every package the list says to add appears in that command, even when another extra would
+already bring it along as a companion. Each package has one row listing all rejected peers.
+With `--json`, both a blocked preflight and the completed fix report expose `peerConflicts`
+with one entry per package and a `peers` array retaining every range, target and inspected
+version; a blocked preflight also includes `next` and exits 2.
 It never adds an unrequested peer upgrade silently:
 
 ```sh

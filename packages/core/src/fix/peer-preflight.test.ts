@@ -16,7 +16,9 @@ import type { ManagerKind } from './managers/manager.js';
 import {
   allowPeerOverrides,
   compatiblePeerVersion,
+  groupPeerBlockers,
   type PeerBlocker,
+  PeerPreflightError,
   peerPreflight,
 } from './peer-preflight.js';
 import { git } from './process.js';
@@ -98,7 +100,7 @@ it.each([false, true])(
       ).rejects.toThrow(
         newer
           ? 'upgrade to 1.2.0 (accepts zod 4): add plugin to the command'
-          : 'plugin 1.0.0 declares zod ^3, which rejects 4.6.5. no release accepts zod 4',
+          : 'plugin 1.0.0  peer zod ^3  →  no release accepts zod 4',
       );
       expect(check).not.toHaveBeenCalled();
       expect(install).not.toHaveBeenCalled();
@@ -182,7 +184,7 @@ it('allowed peers are committed with the upgrade and listed under PR risks with 
     { cwd: root, only: 'zod', target: '4.6.5', fixer: null, allowPeer: ['plugin'] },
     { ...services, install },
   );
-  expect(result.peerConflicts).toMatchObject([{ ...blocker }]);
+  expect(result.peerConflicts).toEqual(groupPeerBlockers([blocker]));
   expect(prBody(result)).toContain('### Peer risks');
   expect(prBody(result)).toContain('plugin 1.0.0 declares zod ^3');
   expect(git(root, 'show', 'HEAD:package.json')).toContain('plugin>zod');
@@ -254,11 +256,11 @@ it('collects allowed, leader, companion and proposed-extra blockers, then prints
   } catch (e) {
     message = (e as Error).message;
   }
-  expect(message).toContain('blocked 1.0.0 declares zod ^3');
+  expect(message).toContain('blocked 1.0.0  peer zod ^3');
   expect(message).toContain('Explicitly allowed');
-  expect(message).toContain('plugin 1.0.0 declares zod ^3');
-  expect(message).toContain('runtimePlugin 1.0.0 declares runtime ^3');
-  expect(message).toContain('observer 1.0.0 declares plugin <1.2');
+  expect(message).toContain('plugin 1.0.0  peer zod ^3');
+  expect(message).toContain('runtimePlugin 1.0.0  peer runtime ^3');
+  expect(message).toContain('observer 1.0.0  peer plugin <1.2');
   expect(message.match(/Next:/g)).toHaveLength(1);
   expect(message).toContain(
     'Next: npx uptide fix zod plugin --target 4.6.5 --no-llm --allow-peer blocked --allow-peer runtimePlugin --allow-peer observer',
@@ -325,5 +327,130 @@ it('finds a types-companion blocker even when no installed package peers on the 
   });
   await expect(
     peerPreflight({ cwd: root, only: 'zod', target: '4.6.5' }, services),
-  ).rejects.toThrow('plugin 1.0.0 declares @types/zod ^3, which rejects 4.6.5');
+  ).rejects.toThrow('plugin 1.0.0  peer @types/zod ^3');
+});
+
+function linkedBlockerFixture(order: string[], dualPeers: boolean) {
+  const f = fixture('npm', true);
+  const json = JSON.parse(readFileSync(join(f.root, 'package.json'), 'utf8'));
+  const registry: Record<string, Awaited<ReturnType<NonNullable<PackageFetcher['manifests']>>>> = {
+    runtime: {
+      '3.25.76': { peerDependencies: { zod: '^3' } },
+      '4.6.5': { peerDependencies: { zod: '^4' } },
+    },
+    observer: { '1.0.0': { peerDependencies: { '@widgets/tabs': '<1.2' } } },
+  };
+  for (const name of ['@widgets/tabs', '@widgets/tooltip']) {
+    registry[name] = {
+      '1.0.0': {
+        dependencies: { '@widgets/shared': '1.0.0' },
+        peerDependencies: { zod: '^3', ...(dualPeers ? { runtime: '^3' } : {}) },
+      },
+      '1.2.0': {
+        dependencies: { '@widgets/shared': '2.0.0' },
+        peerDependencies: { zod: '^4', ...(dualPeers ? { runtime: '^4' } : {}) },
+      },
+    };
+  }
+  for (const name of ['runtime', ...order]) {
+    const version = name === 'runtime' ? '3.25.76' : '1.0.0';
+    json.dependencies[name] = version;
+    mkdirSync(join(f.root, 'node_modules', name), { recursive: true });
+    writeFileSync(
+      join(f.root, 'node_modules', name, 'package.json'),
+      JSON.stringify({ name, version, ...registry[name]?.[version] }),
+    );
+  }
+  writeFileSync(join(f.root, 'package.json'), JSON.stringify(json));
+  const original = f.services.manifests;
+  f.services.manifests = vi.fn(async (name) => registry[name] ?? original(name));
+  return f;
+}
+
+const blockerOrders = [
+  ['@widgets/tabs', '@widgets/tooltip', 'observer'],
+  ['@widgets/tabs', 'observer', '@widgets/tooltip'],
+  ['@widgets/tooltip', '@widgets/tabs', 'observer'],
+  ['@widgets/tooltip', 'observer', '@widgets/tabs'],
+  ['observer', '@widgets/tabs', '@widgets/tooltip'],
+  ['observer', '@widgets/tooltip', '@widgets/tabs'],
+];
+it.each(
+  blockerOrders.flatMap((order) =>
+    [false, true].flatMap((dualPeers) =>
+      [false, true].map((explicit) => ({ order, dualPeers, explicit })),
+    ),
+  ),
+)(
+  'every advertised upgrade is in Next, and Next passes preflight: $order, dualPeers=$dualPeers, explicit=$explicit',
+  async ({ order, dualPeers, explicit }) => {
+    const { root, services } = linkedBlockerFixture(order, dualPeers);
+    let message = '';
+    try {
+      await peerPreflight(
+        {
+          cwd: root,
+          only: 'zod',
+          target: '4.6.5',
+          fixer: null,
+          also: explicit ? ['@widgets/tabs'] : [],
+        },
+        services,
+      );
+    } catch (error) {
+      expect(error).toBeInstanceOf(PeerPreflightError);
+      if (!(error instanceof PeerPreflightError)) throw error;
+      message = error.message;
+      expect(new Set(error.peerConflicts.map((p) => p.name)).size).toBe(error.peerConflicts.length);
+      for (const name of ['@widgets/tabs', '@widgets/tooltip']) {
+        const group = error.peerConflicts.find((p) => p.name === name);
+        expect(group?.peers.map((p) => p.peer).sort()).toEqual(
+          dualPeers ? ['runtime', 'zod'] : ['zod'],
+        );
+        const rows = message.split('\n').filter((line) => line.startsWith(`${name} `));
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toContain(dualPeers ? 'peers zod, runtime ^3' : 'peer zod ^3');
+      }
+    }
+    const next = message.split('\nNext: ')[1];
+    expect(next).toBeDefined();
+    const args = (next ?? '').split(' ');
+    const also = args.slice(4, args.indexOf('--target'));
+    for (const match of message.matchAll(/add (\S+) to the command/g))
+      expect(also).toContain(match[1]);
+    const allowPeer = args.flatMap((arg, i) =>
+      arg === '--allow-peer' ? [args[i + 1] as string] : [],
+    );
+    const plan = await peerPreflight(
+      {
+        cwd: root,
+        only: args[3] as string,
+        target: args[args.indexOf('--target') + 1],
+        also,
+        allowPeer,
+        fixer: null,
+      },
+      services,
+    );
+    expect(plan?.conflicts.filter((p) => !p.allowed)).toEqual([]);
+  },
+);
+
+it('grouped JSON retains distinct ranges, targets and inspected versions without duplicate peers', () => {
+  const other = { ...blocker, peer: 'runtime', range: '^2', target: '3.0.0' };
+  const later = { ...blocker, version: '1.2.0', range: '^3.5' };
+  const grouped = groupPeerBlockers([blocker, other, later, blocker]);
+  expect(grouped).toEqual([
+    {
+      name: 'plugin',
+      version: '1.0.0',
+      allowed: true,
+      peers: [
+        { peer: 'zod', range: '^3', target: '4.6.5', version: '1.0.0' },
+        { peer: 'runtime', range: '^2', target: '3.0.0', version: '1.0.0' },
+        { peer: 'zod', range: '^3.5', target: '4.6.5', version: '1.2.0' },
+      ],
+    },
+  ]);
+  expect(groupPeerBlockers(grouped)).toEqual(grouped);
 });

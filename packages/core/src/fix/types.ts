@@ -3,7 +3,7 @@ import type { Provider } from '../llm/types.js';
 import type { ApiChangeFacts, PackContext } from '../packs/types.js';
 import type { BehaviorResult } from './behavior.js';
 import type { InstallReport } from './managers/upgrade.js';
-import type { PeerBlocker } from './peer-preflight.js';
+import type { PeerBlockerGroup } from './peer-preflight.js';
 export interface FixDiagnostic {
   file: string;
   line: number;
@@ -122,7 +122,7 @@ export interface Fixer {
   fix(input: FixRequest, remainingUsd?: number): Promise<FixResponse>;
 }
 export interface FixReport {
-  peerConflicts?: PeerBlocker[];
+  peerConflicts?: PeerBlockerGroup[];
   /** `generic`: no pack covers the upgrade; every edit is the agent's, verified by the compiler. */
   tier?: Tier;
   lockfile?: InstallReport;
