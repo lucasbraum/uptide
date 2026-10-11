@@ -1,5 +1,19 @@
 # uptide
 
+## 0.7.1
+
+### Patch Changes
+
+- [#66](https://github.com/uptide-dev/uptide/pull/66) [`c5611f4`](https://github.com/uptide-dev/uptide/commit/c5611f44fb322f9a774de1b99844c93d331af453) Thanks [@lucasbraum](https://github.com/lucasbraum)! - Include every advertised peer upgrade in the preflight's Next command, including blockers pulled along as companions, and replay the complete proposed upgrade set. Group blocker output by package with all rejected peers and preserve them in structured JSON on preflight failures and fix reports.
+
+- [#65](https://github.com/uptide-dev/uptide/pull/65) [`35fe251`](https://github.com/uptide-dev/uptide/commit/35fe251a70983fb41e610d1ba34c0d412fc5a912) Thanks [@lucasbraum](https://github.com/lucasbraum)! - Match compiler-confirmed React `useRef` symbol findings so zero-argument calls receive the existing initial-value fix. Route missing global `JSX` namespace diagnostics (TS2503) to the React 19 agent guidance without rewriting them automatically.
+
+- [#68](https://github.com/uptide-dev/uptide/pull/68) [`4ed45ee`](https://github.com/uptide-dev/uptide/commit/4ed45ee54d3d2062b8d2fcd4647442c3545b9068) Thanks [@lucasbraum](https://github.com/lucasbraum)! - Keep already-compatible peer companions at their installed versions, share the lowest compatible peer resolver with preflight, and reject planned downgrades before writing manifests or installing. Keep preflight versions authoritative throughout fix. Bound spinner text to terminal width, summarize install companions by count, and disable animation when stdout is piped.
+  
+  Handle npm's unavoidable reverse-peer re-resolution only when the upgrade stays within every previously declared range, keeps the major version, and never downgrades. List admitted packages and their ranges in the fix report and PR body, while preserving resolutions for other consumers and accounting for identical nested copies.
+  
+  Preserve grouped peer blockers and the complete Next command in JSON when the packaged CLI runs planning in its worker thread.
+
 ## 0.7.0
 
 ### Minor Changes
